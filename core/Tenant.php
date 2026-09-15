@@ -94,8 +94,21 @@ class Tenant
     private static function fail(string $message): never
     {
         http_response_code(403);
-        header('Content-Type: application/json');
-        echo json_encode(['error' => $message]);
+
+        $isApi = str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/api/');
+
+        if ($isApi) {
+            header('Content-Type: application/json');
+            echo json_encode(['error' => $message]);
+            exit;
+        }
+
+        echo '<!DOCTYPE html><html><head><title>Unavailable</title><meta charset="UTF-8">'
+           . '<style>body{font-family:-apple-system,sans-serif;background:#F7F8FA;color:#1F2430;'
+           . 'display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}'
+           . '.box{background:#fff;border:1px solid #E2E4E9;border-radius:8px;padding:28px 32px;max-width:380px;text-align:center}'
+           . 'p{font-size:14px;color:#5B6270;margin:0}</style></head><body>'
+           . '<div class="box"><p>' . htmlspecialchars($message) . '</p></div></body></html>';
         exit;
     }
 }

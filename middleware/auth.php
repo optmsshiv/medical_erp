@@ -1,12 +1,14 @@
 <?php
 /**
- * Stopgap protection for the super-admin portal.
- * Once middleware/auth.php + a real roles system exists, replace this
- * with a proper "is logged in AND role = super_admin" check.
+ * middleware/auth.php
+ *
+ * Include this on any page that requires a logged-in user, AFTER
+ * middleware/tenant.php (auth checks happen within the current client's
+ * own database, so tenant must be resolved first).
  */
-session_start();
+require_once dirname(__DIR__) . '/core/Auth.php';
 
-if (empty($_SESSION['super_admin'])) {
-    header('Location: /super-admin/login.php');
+if (!Auth::check()) {
+    header('Location: /login.php');
     exit;
 }
