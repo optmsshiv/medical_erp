@@ -53,7 +53,7 @@ class CpanelApi
     public function createClientDatabase(string $subdomain): array
     {
         $suffix     = $this->safeSuffix($subdomain);
-        $dbName     = $this->prefixed('optmsrx_' . $suffix, 64);
+        $dbName     = $this->prefixed('edrppymy_' . $suffix, 64);
         $dbUser     = $this->prefixed('u_' . $suffix, $this->userMaxLen);
         $dbPassword = substr(bin2hex(random_bytes(16)), 0, 20);
 

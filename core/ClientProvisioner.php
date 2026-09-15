@@ -84,7 +84,7 @@ class ClientProvisioner
 
         return [
             'subdomain'      => $subdomain,
-            'login_url'      => "https://{$subdomain}.optmsrx.com/login.php",
+            'login_url'      => "https://{$subdomain}.optms.co.in/login.php",
             'admin_email'    => $adminEmail,
             'admin_password' => $adminPassword, // show once — not retrievable after this
             'db_name'        => $dbName,
