@@ -57,14 +57,10 @@ class CpanelApi
         $dbUser     = $this->prefixed('u_' . $suffix, $this->userMaxLen);
         $dbPassword = substr(bin2hex(random_bytes(16)), 0, 20);
 
-        // create_database accepts the UNPREFIXED name and adds the account
-        // prefix itself on this host.
-        $this->call('Mysql', 'create_database', ['name' => $this->unprefixedPart($dbName)]);
+        // This host's UAPI requires the FULL, already-prefixed name for
+        // every call below — it does not auto-add the account prefix itself.
+        $this->call('Mysql', 'create_database', ['name' => $dbName]);
 
-        // create_user, on this host, requires the FULL, already-prefixed
-        // name — it does NOT add the prefix itself. (Different cPanel/WHM
-        // versions disagree on this, which is why the two calls below use
-        // the full name while create_database above uses the suffix.)
         $this->call('Mysql', 'create_user', [
             'name'     => $dbUser,
             'password' => $dbPassword,
