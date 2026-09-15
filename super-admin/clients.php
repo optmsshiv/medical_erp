@@ -6,6 +6,8 @@ $clients = Database::master()
     ->query('SELECT * FROM clients ORDER BY created_at DESC')
     ->fetchAll();
 
+$appDomain = env('APP_DOMAIN', 'optms.co.in');
+
 $flashSuccess = $_SESSION['flash_success'] ?? null;
 $flashError   = $_SESSION['flash_error'] ?? null;
 unset($_SESSION['flash_success'], $_SESSION['flash_error']);
@@ -87,7 +89,7 @@ unset($_SESSION['flash_success'], $_SESSION['flash_error']);
             <div class="cred-row"><span class="cred-label">Login URL</span><span class="cred-value"><?= htmlspecialchars($flashSuccess['login_url']) ?></span></div>
             <div class="cred-row"><span class="cred-label">Admin email</span><span class="cred-value"><?= htmlspecialchars($flashSuccess['admin_email']) ?></span></div>
             <div class="cred-row"><span class="cred-label">Password</span><span class="cred-value"><?= htmlspecialchars($flashSuccess['admin_password']) ?></span></div>
-            <div class="cred-warn">The database (<?= htmlspecialchars($flashSuccess['db_name']) ?>) was created and the schema applied. Point <?= htmlspecialchars($flashSuccess['subdomain']) ?>.optmsrx.com at this app before sharing the login URL.</div>
+            <div class="cred-warn">The database (<?= htmlspecialchars($flashSuccess['db_name']) ?>) was created and the schema applied. Point <?= htmlspecialchars($flashSuccess['subdomain']) ?>.<?= htmlspecialchars($flashSuccess['domain']) ?> at this app before sharing the login URL.</div>
         </div>
     <?php endif; ?>
 
@@ -102,7 +104,7 @@ unset($_SESSION['flash_success'], $_SESSION['flash_error']);
                 <div class="field">
                     <label for="subdomain">Subdomain</label>
                     <input type="text" id="subdomain" name="subdomain" placeholder="greenpharma" required>
-                    <div class="hint">Becomes greenpharma.optmsrx.com</div>
+                    <div class="hint">Becomes greenpharma.<?= htmlspecialchars($appDomain) ?></div>
                 </div>
                 <div class="field">
                     <label for="admin_name">Admin contact name</label>
@@ -133,7 +135,7 @@ unset($_SESSION['flash_success'], $_SESSION['flash_error']);
             <?php else: foreach ($clients as $c): ?>
                 <tr>
                     <td><?= htmlspecialchars($c['name']) ?></td>
-                    <td><?= htmlspecialchars($c['subdomain']) ?>.optmsrx.com</td>
+                    <td><?= htmlspecialchars($c['subdomain']) ?>.<?= htmlspecialchars($appDomain) ?></td>
                     <td><?= htmlspecialchars($c['db_name']) ?></td>
                     <td><span class="status status-<?= htmlspecialchars($c['status']) ?>"><?= htmlspecialchars($c['status']) ?></span></td>
                     <td><?= htmlspecialchars(date('d M Y', strtotime($c['created_at']))) ?></td>

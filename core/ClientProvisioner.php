@@ -82,9 +82,12 @@ class ClientProvisioner
             'db_password' => $dbPassword, // see database/master/schema.sql note re: encrypting this at rest
         ]);
 
+        $domain = getenv('APP_DOMAIN') ?: 'optms.co.in';
+
         return [
             'subdomain'      => $subdomain,
-            'login_url'      => "https://{$subdomain}.optms.co.in/login.php",
+            'domain'         => $domain,
+            'login_url'      => "https://{$subdomain}.{$domain}/login.php",
             'admin_email'    => $adminEmail,
             'admin_password' => $adminPassword, // show once — not retrievable after this
             'db_name'        => $dbName,
