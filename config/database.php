@@ -35,7 +35,7 @@ function env(string $key, $default = null)
 
 return [
     'host'     => env('MASTER_DB_HOST', 'localhost'),
-    'database' => env('MASTER_DB_NAME', 'optms_pharma'),
+    'database' => env('MASTER_DB_NAME', 'edrppymy_optms_pharma'),
     'username' => env('MASTER_DB_USER', 'root'),
     'password' => env('MASTER_DB_PASS', ''),
     'charset'  => 'utf8mb4',
