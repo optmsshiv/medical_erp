@@ -1,0 +1,14 @@
+# Never serve .env or any dotfile
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Never serve raw .sql files
+<FilesMatch "\.sql$">
+    Require all denied
+</FilesMatch>
+
+# core/, models/, middleware/ etc. are only ever require()'d by PHP,
+# never requested directly by a browser — block direct access.
+RewriteEngine On
+RewriteRule ^(core|models|middleware|config|database|scripts|services|controllers|helpers)/ - [F,L]
