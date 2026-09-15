@@ -53,18 +53,25 @@ class CpanelApi
     public function createClientDatabase(string $subdomain): array
     {
         $suffix     = $this->safeSuffix($subdomain);
-        $dbName     = $this->prefixed('edrppymy_' . $suffix, 64);
+        $dbName     = $this->prefixed($suffix, 64);
         $dbUser     = $this->prefixed('u_' . $suffix, $this->userMaxLen);
         $dbPassword = substr(bin2hex(random_bytes(16)), 0, 20);
 
+        // create_database accepts the UNPREFIXED name and adds the account
+        // prefix itself on this host.
         $this->call('Mysql', 'create_database', ['name' => $this->unprefixedPart($dbName)]);
+
+        // create_user, on this host, requires the FULL, already-prefixed
+        // name — it does NOT add the prefix itself. (Different cPanel/WHM
+        // versions disagree on this, which is why the two calls below use
+        // the full name while create_database above uses the suffix.)
         $this->call('Mysql', 'create_user', [
-            'name'     => $this->unprefixedPart($dbUser),
+            'name'     => $dbUser,
             'password' => $dbPassword,
         ]);
         $this->call('Mysql', 'set_privileges_on_database', [
-            'user'       => $this->unprefixedPart($dbUser),
-            'database'   => $this->unprefixedPart($dbName),
+            'user'       => $dbUser,
+            'database'   => $dbName,
             'privileges' => 'ALL PRIVILEGES',
         ]);
 
