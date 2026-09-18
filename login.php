@@ -95,7 +95,7 @@ if (Auth::check()) {
       const label = document.getElementById('loginBtnLabel');
 
       // offline backend → straight in (demo-data mode)
-      if (!cfg.backend) { location.replace('pages/dashboard.php'); return; }
+      if (!cfg.backend) { location.replace('dashboard.php'); return; }
 
       document.getElementById('loginPeek').addEventListener('click', () => {
         const p = document.getElementById('loginPass');
@@ -119,7 +119,7 @@ if (Auth::check()) {
           });
           const json = await res.json();
           if (!res.ok || !json.ok) throw new Error(json.error || 'Login failed');
-          location.replace('dashboard.php');
+          location.replace('pages/dashboard.php');
         } catch (err) {
           errBox.innerHTML = '<i class="bi bi-exclamation-triangle me-1 text-danger"></i>' + err.message;
           errBox.classList.remove('d-none');
