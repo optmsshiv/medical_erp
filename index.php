@@ -9,5 +9,5 @@ session_start();
 require __DIR__ . '/middleware/tenant.php';
 require __DIR__ . '/core/Auth.php';
 
-header('Location: ' . (Auth::check() ? '/pages/dashboard.php' : '/login.php'));
+header('Location: ' . (Auth::check() ? '/dashboard.php' : '/login.php'));
 exit;

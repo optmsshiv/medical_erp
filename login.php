@@ -95,7 +95,7 @@ if (Auth::check()) {
       const label = document.getElementById('loginBtnLabel');
 
       // offline backend → straight in (demo-data mode)
-      if (!cfg.backend) { location.replace('dashboard.php'); return; }
+      if (!cfg.backend) { location.replace('pages/dashboard.php'); return; }
 
       document.getElementById('loginPeek').addEventListener('click', () => {
         const p = document.getElementById('loginPass');
