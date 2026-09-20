@@ -4,6 +4,7 @@ require dirname(__DIR__, 2) . '/middleware/tenant.php';
 require dirname(__DIR__, 2) . '/core/Auth.php';
 require dirname(__DIR__, 2) . '/core/Json.php';
 require dirname(__DIR__, 2) . '/models/Supplier.php';
+require dirname(__DIR__, 2) . '/models/Customer.php';
 
 if (!Auth::check()) {
     Json::error('Not authenticated.', 401);
@@ -79,6 +80,11 @@ $suppliers = array_map(function ($row) {
     ];
 }, $supplierRows);
 
+// --- Customers (real data) --------------------------------------------------
+$customers = $pdo->query('SELECT id, name, phone, address FROM customers ORDER BY (name = "Walk-in Customer") DESC, name')
+    ->fetchAll();
+$customers = array_map(fn($r) => ['id' => (int) $r['id'], 'name' => $r['name'], 'phone' => $r['phone'] ?? '', 'address' => $r['address'] ?? ''], $customers);
+
 // --- Categories / manufacturers (plain name lists, for dropdowns etc.) ----
 $categories    = $pdo->query('SELECT name FROM categories ORDER BY name')->fetchAll(PDO::FETCH_COLUMN);
 $manufacturers = $pdo->query('SELECT name FROM manufacturers ORDER BY name')->fetchAll(PDO::FETCH_COLUMN);
@@ -116,7 +122,7 @@ Json::ok([
         'medicines'        => $medicines,
         'batches'          => $batches,
         'doctors'          => [],
-        'customers'        => [],
+        'customers'        => $customers,
         'suppliers'        => $suppliers,
         'salesInvoices'    => [],
         'purchaseInvoices' => [],

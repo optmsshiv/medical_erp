@@ -90,11 +90,11 @@ function inr($n) { return '₹' . number_format((float) $n, 0); }
         </a>
       </div>
       <div class="col-md-6 col-lg-4">
-        <a class="card-mf module-card p-3" href="#" onclick="return false;" style="opacity:.55;cursor:default">
+        <a class="card-mf module-card p-3" href="retail-pos.php">
           <div class="module-icon mb-3"><i class="bi bi-cart3"></i></div>
           <div class="fw-bold mb-1">Retail POS</div>
           <div class="text-2 small mb-2">Fast counter billing with FEFO batch picking, GST &amp; split payments.</div>
-          <span class="small fw-semibold text-2">Coming soon</span>
+          <span class="small fw-semibold" style="color:var(--mf-primary)">Open <i class="bi bi-arrow-right"></i></span>
         </a>
       </div>
       <div class="col-md-6 col-lg-4">
