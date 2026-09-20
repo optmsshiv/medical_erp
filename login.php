@@ -10,6 +10,20 @@ if (Auth::check()) {
     header('Location: /index.php');
     exit;
 }
+
+$error = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $email    = trim($_POST['email'] ?? '');
+    $password = $_POST['password'] ?? '';
+
+    if (Auth::attempt($email, $password)) {
+        header('Location: /index.php');
+        exit;
+    }
+
+    $error = 'Incorrect email or password.';
+}
 ?>
 <!doctype html>
 <html lang="en">
