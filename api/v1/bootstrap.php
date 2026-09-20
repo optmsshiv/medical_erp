@@ -3,6 +3,7 @@ session_start();
 require dirname(__DIR__, 2) . '/middleware/tenant.php';
 require dirname(__DIR__, 2) . '/core/Auth.php';
 require dirname(__DIR__, 2) . '/core/Json.php';
+require dirname(__DIR__, 2) . '/models/Supplier.php';
 
 if (!Auth::check()) {
     Json::error('Not authenticated.', 401);
@@ -63,6 +64,21 @@ $batches = array_map(function ($row) {
     ];
 }, $batchRows);
 
+// --- Suppliers (real data) --------------------------------------------------
+$stmt = $pdo->query('SELECT * FROM suppliers ORDER BY name');
+$supplierRows = $stmt->fetchAll();
+
+$suppliers = array_map(function ($row) {
+    return [
+        'id'      => (int) $row['id'],
+        'name'    => $row['name'],
+        'gstin'   => $row['gstin'] ?? '',
+        'dlNo'    => $row['dl_no'] ?? '',
+        'phone'   => $row['phone'] ?? '',
+        'address' => $row['address'] ?? '',
+    ];
+}, $supplierRows);
+
 // --- Categories / manufacturers (plain name lists, for dropdowns etc.) ----
 $categories    = $pdo->query('SELECT name FROM categories ORDER BY name')->fetchAll(PDO::FETCH_COLUMN);
 $manufacturers = $pdo->query('SELECT name FROM manufacturers ORDER BY name')->fetchAll(PDO::FETCH_COLUMN);
@@ -101,7 +117,7 @@ Json::ok([
         'batches'          => $batches,
         'doctors'          => [],
         'customers'        => [],
-        'suppliers'        => [],
+        'suppliers'        => $suppliers,
         'salesInvoices'    => [],
         'purchaseInvoices' => [],
         'notifications'    => [],

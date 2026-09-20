@@ -106,11 +106,11 @@ function inr($n) { return '₹' . number_format((float) $n, 0); }
         </a>
       </div>
       <div class="col-md-6 col-lg-4">
-        <a class="card-mf module-card p-3" href="#" onclick="return false;" style="opacity:.55;cursor:default">
+        <a class="card-mf module-card p-3" href="purchase.php">
           <div class="module-icon mb-3"><i class="bi bi-bag-plus-fill"></i></div>
           <div class="fw-bold mb-1">Purchase &amp; GRN</div>
           <div class="text-2 small mb-2">Supplier invoices, batch entry with expiry, payment tracking.</div>
-          <span class="small fw-semibold text-2">Coming soon</span>
+          <span class="small fw-semibold" style="color:var(--mf-primary)">Open <i class="bi bi-arrow-right"></i></span>
         </a>
       </div>
       <div class="col-md-6 col-lg-4">
