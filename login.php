@@ -3,6 +3,8 @@ session_start();
 require __DIR__ . '/middleware/tenant.php';
 require __DIR__ . '/core/Auth.php';
 
+$client = Tenant::current();
+
 // Already logged in? Skip the login form entirely.
 if (Auth::check()) {
     header('Location: /index.php');
@@ -14,79 +16,80 @@ if (Auth::check()) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sign in · Optms Rx</title>
+  <title>Sign in · OPTMS-RX</title>
   <link rel="icon" href="assets/images/logo.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link href="assets/css/style.css" rel="stylesheet">
-  <style>
-    body { min-height: 100vh; display: flex; align-items: center; }
-    .login-hero {
-      background: linear-gradient(160deg, var(--mf-primary-dark) 0%, var(--mf-primary) 55%, var(--mf-accent) 100%);
-      border-radius: 1rem 0 0 1rem; color: #fff; padding: 3rem 2.5rem; display: flex; flex-direction: column;
-    }
-    @media (max-width: 991.98px) { .login-hero { border-radius: 1rem 1rem 0 0; } }
-  </style>
 </head>
-<body class="bg-light">
-  <div class="container py-4" style="max-width:960px">
-    <div class="card-mf overflow-hidden shadow-lg">
-      <div class="row g-0">
-        <div class="col-lg-6">
-          <div class="login-hero h-100">
-            <div class="d-flex align-items-center gap-2 mb-5">
-              <img src="assets/images/logo.svg" width="44" alt="">
-              <div>
-                <div class="fw-bold fs-5">Optms Rx</div>
-                <div class="small" style="color:#BFE3DA">by Optms Tech</div>
-              </div>
-            </div>
-            <h1 class="fw-bold" style="font-size:1.6rem;letter-spacing:-0.02em">
-              Complete Retail &amp; Wholesale Pharmacy Management.
-            </h1>
-            <p class="mt-2 mb-4" style="color:#D7EBE6">
-              POS billing, batch &amp; expiry control, GST invoicing, dues and pharmacy reports — one login for your whole store.
-            </p>
-            <div class="mt-auto">
-              <div class="small" style="color:#BFE3DA"><i class="bi bi-shield-lock me-2"></i>Session secured · Roles &amp; permissions enforced</div>
-            </div>
-          </div>
+<body data-page="login">
+  <div class="login-wrap">
+    <!-- Brand panel -->
+    <div class="login-hero">
+      <div class="lh-brand">
+        <div class="brand-mark"><i class="bi bi-capsule"></i></div>
+        <div>
+          <div class="brand-name">OPTMS-RX</div>
+          <div class="brand-sub">Pharmacy Management System</div>
         </div>
-        <div class="col-lg-6">
-          <div class="p-4 p-lg-5">
-            <h2 class="fs-5 fw-bold mb-1">Sign in</h2>
-            <p class="text-2 small mb-4">Use your staff credentials to continue.</p>
-            <div class="alert alert-light border py-2 small d-none" id="loginError"></div>
-            <form id="loginForm" novalidate>
-              <div class="mb-3">
-                <label class="form-label" for="loginUser">Email</label>
-                <div class="input-group">
-                  <span class="input-group-text"><i class="bi bi-person"></i></span>
-                  <input type="email" class="form-control" id="loginUser" autocomplete="username" required>
-                </div>
-              </div>
-              <div class="mb-3">
-                <label class="form-label" for="loginPass">Password</label>
-                <div class="input-group">
-                  <span class="input-group-text"><i class="bi bi-lock"></i></span>
-                  <input type="password" class="form-control" id="loginPass" autocomplete="current-password" required>
-                  <button class="btn btn-light-mf" type="button" id="loginPeek" tabindex="-1"><i class="bi bi-eye"></i></button>
-                </div>
-              </div>
-              <button class="btn btn-mf w-100 py-2" id="loginBtn" type="submit">
-                <span id="loginBtnLabel"><i class="bi bi-box-arrow-in-right me-1"></i>Sign in</span>
-              </button>
-            </form>
+      </div>
+      <div class="lh-body">
+        <h1>Run your entire pharmacy from one screen.</h1>
+        <p class="lh-tag">Complete retail &amp; wholesale pharmacy management — batch-wise stock, expiry control, GST billing, dues and every report you need to run a modern medical store.</p>
+        <div class="lh-points">
+          <div class="pt"><i class="bi bi-lightning-charge-fill"></i><div><b>Fast retail POS &amp; wholesale billing</b><span>Barcode search, batch selection, split payments, hold &amp; resume bills</span></div></div>
+          <div class="pt"><i class="bi bi-hourglass-split"></i><div><b>Expiry &amp; batch intelligence</b><span>Never lose money to expired stock again — automated alerts &amp; returns</span></div></div>
+          <div class="pt"><i class="bi bi-file-earmark-text"></i><div><b>GST-ready billing &amp; reports</b><span>CGST/SGST/IGST, GSTR-1 summary, e-invoice ready</span></div></div>
+        </div>
+      </div>
+      <div class="sb-footer">© <?= date('Y') ?> OPTMS Tech</div>
+    </div>
+
+    <!-- Login panel -->
+    <div class="login-panel">
+      <div class="login-card">
+        <div class="d-lg-none d-flex align-items-center gap-2 mb-4">
+          <div class="brand-mark" style="background:var(--mf-primary-soft);color:var(--mf-primary)"><i class="bi bi-capsule"></i></div>
+          <div class="brand-name" style="color:var(--mf-text)">OPTMS-RX</div>
+        </div>
+        <h5 style="font-size:22px;font-weight:800;letter-spacing:-.02em;">Welcome back</h5>
+        <p class="text-2 fs-13 mb-4">Sign in to <?= htmlspecialchars($client['name']) ?>.</p>
+
+        <div id="loginError" class="alert alert-danger py-2 px-3 fs-13 d-none" role="alert"></div>
+
+        <form id="loginForm">
+          <label class="form-label-erp" for="loginUser">Email</label>
+          <div class="input-icon mb-3">
+            <i class="bi bi-person"></i>
+            <input class="form-control-erp" id="loginUser" type="email" style="padding-left:36px" autocomplete="username" required>
           </div>
+          <label class="form-label-erp" for="loginPass">Password</label>
+          <div class="input-icon mb-2">
+            <i class="bi bi-lock"></i>
+            <input class="form-control-erp" id="loginPass" type="password" style="padding-left:36px" autocomplete="current-password" required>
+            <button type="button" id="loginPeek" class="btn btn-sm p-0" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);border:none;color:var(--mf-text-2)"><i class="bi bi-eye"></i></button>
+          </div>
+          <div class="d-flex justify-content-end align-items-center mb-4">
+            <a href="#" class="fs-13 fw-600" id="forgotLink">Forgot password?</a>
+          </div>
+          <button class="btn btn-primary btn-primary-erp btn-lg-erp w-100" type="submit" id="loginBtn">
+            <span id="loginBtnLabel"><i class="bi bi-box-arrow-in-right me-1"></i>Sign in</span>
+          </button>
+        </form>
+
+        <div class="text-center mt-4">
+          <img src="assets/images/logo.svg" alt="OPTMS-RX" height="34">
+          <div class="fs-12 text-3 mt-2">Complete Retail &amp; Wholesale Pharmacy Management System</div>
         </div>
       </div>
     </div>
-    <p class="text-center text-2 small mt-3 mb-0">Optms Rx · Stage 2 build · PHP 8 + PDO backend connected</p>
   </div>
 
+  <script src="assets/js/data.js"></script>
   <script src="assets/js/config.js"></script>
+  <script src="assets/js/app.js"></script>
   <script>
     (function () {
       const cfg = window.MF_CONFIG || { apiBase: 'api/v1' };
@@ -94,12 +97,14 @@ if (Auth::check()) {
       const btn = document.getElementById('loginBtn');
       const label = document.getElementById('loginBtnLabel');
 
-      // offline backend → straight in (demo-data mode)
-      if (!cfg.backend) { location.replace('index.php'); return; }
-
       document.getElementById('loginPeek').addEventListener('click', () => {
         const p = document.getElementById('loginPass');
         p.type = p.type === 'password' ? 'text' : 'password';
+      });
+
+      document.getElementById('forgotLink').addEventListener('click', (e) => {
+        e.preventDefault();
+        MF.toast('Contact your administrator to reset your password.', 'info', 'Forgot password');
       });
 
       document.getElementById('loginForm').addEventListener('submit', async (e) => {
@@ -121,7 +126,7 @@ if (Auth::check()) {
           if (!res.ok || !json.ok) throw new Error(json.error || 'Login failed');
           location.replace('index.php');
         } catch (err) {
-          errBox.innerHTML = '<i class="bi bi-exclamation-triangle me-1 text-danger"></i>' + err.message;
+          errBox.textContent = err.message;
           errBox.classList.remove('d-none');
           btn.disabled = false;
           label.innerHTML = '<i class="bi bi-box-arrow-in-right me-1"></i>Sign in';
