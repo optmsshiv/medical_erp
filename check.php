@@ -1,40 +1,68 @@
 <?php
 /**
- * check.php — one-time file-audit script.
+ * check.php — file-audit script v2: existence AND content signature.
  * Upload to the project root, visit in your browser, then DELETE this
- * file afterward (it lists your server's folder structure, which
- * shouldn't stay publicly reachable once you're done checking).
+ * file afterward (it lists your server's folder structure).
  */
 
+// path => a short string that MUST appear in the correct version of that file.
+// If the file exists but doesn't contain this, it's a stale/wrong version.
 $expected = [
-    '.env', '.env.example', '.htaccess',
-    'api/v1/auth/login.php', 'api/v1/auth/logout.php', 'api/v1/bootstrap.php', 'api/v1/medicines.php',
-    'assets/css/style.css', 'assets/images/logo.svg', 'assets/js/app.js', 'assets/js/charts.js',
-    'assets/js/config.js', 'assets/js/data.js',
-    'batch-management.php', 'config/database.php',
-    'core/Auth.php', 'core/ClientProvisioner.php', 'core/CpanelApi.php', 'core/Database.php',
-    'core/Json.php', 'core/Model.php', 'core/Tenant.php',
-    'dashboard.php',
-    'database/client-schema/schema.sql', 'database/master/schema.sql',
-    'database/migrations/001_expand_medicine_batch_schema.sql',
-    'database/migrations/002_seed_categories_manufacturers.sql',
-    'index.php', 'login.php', 'logout.php', 'medicine-master.php',
-    'middleware/auth.php', 'middleware/tenant.php',
-    'models/Batch.php', 'models/Category.php', 'models/Manufacturer.php', 'models/Medicine.php',
-    'scripts/provision-client.php',
-    'super-admin/_guard.php', 'super-admin/actions/create-client.php',
-    'super-admin/clients.php', 'super-admin/login.php',
+    '.htaccess'                                    => 'core|models|middleware',
+    'api/v1/auth/login.php'                        => "dirname(__DIR__, 3)",
+    'api/v1/auth/logout.php'                       => 'Auth::logout',
+    'api/v1/bootstrap.php'                         => 'gst_rate',
+    'api/v1/medicines.php'                         => 'findOrCreateId',
+    'assets/js/app.js'                             => 'MF_CONFIG',
+    'assets/js/config.js'                          => 'MF_CONFIG',
+    'batch-management.php'                         => 'middleware/auth.php',
+    'config/database.php'                          => 'putenv',
+    'core/Auth.php'                                => 'class Auth',
+    'core/ClientProvisioner.php'                   => 'class ClientProvisioner',
+    'core/CpanelApi.php'                            => 'class CpanelApi',
+    'core/Database.php'                            => 'class Database',
+    'core/Json.php'                                => 'class Json',
+    'core/Model.php'                               => 'abstract class Model',
+    'core/Tenant.php'                              => 'class Tenant',
+    'dashboard.php'                                => 'middleware/auth.php',
+    'index.php'                                    => 'middleware/auth.php',
+    'login.php'                                    => 'login-wrap',
+    'logout.php'                                   => 'Auth::logout',
+    'medicine-master.php'                          => 'middleware/auth.php',
+    'middleware/auth.php'                          => 'Auth::check',
+    'middleware/tenant.php'                        => 'Tenant::resolve',
+    'models/Batch.php'                             => 'class Batch',
+    'models/Category.php'                          => 'class Category',
+    'models/Manufacturer.php'                      => 'class Manufacturer',
+    'models/Medicine.php'                          => 'class Medicine',
+    'super-admin/_guard.php'                       => 'super_admin',
+    'super-admin/actions/create-client.php'        => 'ClientProvisioner::provision',
+    'super-admin/clients.php'                      => 'Add a client',
+    'super-admin/login.php'                        => 'SUPER_ADMIN_KEY',
 ];
 
 header('Content-Type: text/plain');
 
-$missingCount = 0;
-foreach ($expected as $path) {
-    $exists = file_exists(__DIR__ . '/' . $path);
-    if (!$exists) {
-        $missingCount++;
+$missing = 0;
+$stale = 0;
+
+foreach ($expected as $path => $signature) {
+    $full = __DIR__ . '/' . $path;
+
+    if (!file_exists($full)) {
+        echo "MISSING  {$path}\n";
+        $missing++;
+        continue;
     }
-    echo ($exists ? 'OK      ' : 'MISSING ') . $path . "\n";
+
+    $content = file_get_contents($full);
+
+    if (str_contains($content, $signature)) {
+        echo "OK       {$path}\n";
+    } else {
+        echo "STALE?   {$path}  (expected to contain: \"{$signature}\")\n";
+        $stale++;
+    }
 }
 
-echo "\n{$missingCount} missing out of " . count($expected) . " total.\n";
+echo "\n{$missing} missing, {$stale} possibly stale, out of " . count($expected) . " checked.\n";
