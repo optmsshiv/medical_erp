@@ -119,6 +119,33 @@ CREATE TABLE IF NOT EXISTS sale_items (
 -- Every client needs at least one customer to bill against from day one.
 INSERT INTO customers (name) VALUES ('Walk-in Customer');
 
+CREATE TABLE IF NOT EXISTS payments (
+    id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    party_type   ENUM('customer','supplier') NOT NULL,
+    party_id     INT UNSIGNED NOT NULL,
+    amount       DECIMAL(12,2) NOT NULL,
+    mode         ENUM('Cash','Bank','UPI','Cheque') NOT NULL DEFAULT 'Cash',
+    payment_date DATE NOT NULL,
+    note         VARCHAR(255) NULL,
+    created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_party (party_type, party_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS stock_adjustments (
+    id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    medicine_id      INT UNSIGNED NOT NULL,
+    batch_id         INT UNSIGNED NOT NULL,
+    old_qty          INT NOT NULL,
+    new_qty          INT NOT NULL,
+    reason           VARCHAR(100) NOT NULL,
+    note             VARCHAR(255) NULL,
+    adjusted_by_user_id INT UNSIGNED NULL,
+    created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (medicine_id) REFERENCES medicines(id) ON DELETE CASCADE,
+    FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE CASCADE,
+    FOREIGN KEY (adjusted_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS suppliers (
     id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     name       VARCHAR(200) NOT NULL,

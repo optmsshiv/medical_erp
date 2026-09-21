@@ -114,7 +114,7 @@ function inr($n) { return '₹' . number_format((float) $n, 0); }
         </a>
       </div>
       <div class="col-md-6 col-lg-4">
-        <a class="card-mf module-card p-3" href="batch-management.php">
+        <a class="card-mf module-card p-3" href="expiry-management.php">
           <div class="module-icon mb-3"><i class="bi bi-calendar2-x"></i></div>
           <div class="fw-bold mb-1">Batch &amp; Expiry Control</div>
           <div class="text-2 small mb-2">Expiry dashboard with 30/60/90-day buckets and return-to-supplier flow.</div>
@@ -130,11 +130,11 @@ function inr($n) { return '₹' . number_format((float) $n, 0); }
         </a>
       </div>
       <div class="col-md-6 col-lg-4">
-        <a class="card-mf module-card p-3" href="#" onclick="return false;" style="opacity:.55;cursor:default">
+        <a class="card-mf module-card p-3" href="customers.php">
           <div class="module-icon mb-3"><i class="bi bi-people"></i></div>
           <div class="fw-bold mb-1">Customers &amp; Suppliers</div>
           <div class="text-2 small mb-2">Party ledgers with dues, payment history and purchase profiles.</div>
-          <span class="small fw-semibold text-2">Coming soon</span>
+          <span class="small fw-semibold" style="color:var(--mf-primary)">Open <i class="bi bi-arrow-right"></i></span>
         </a>
       </div>
       <div class="col-md-6 col-lg-4">

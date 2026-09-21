@@ -65,9 +65,17 @@ $batches = array_map(function ($row) {
     ];
 }, $batchRows);
 
-// --- Suppliers (real data) --------------------------------------------------
-$stmt = $pdo->query('SELECT * FROM suppliers ORDER BY name');
-$supplierRows = $stmt->fetchAll();
+// --- Suppliers (real data, with real aggregated purchase stats) -----------
+$supplierRows = $pdo->query(
+    'SELECT s.*, COALESCE(SUM(p.grand_total), 0) AS total_purchases,
+            COALESCE(SUM(p.amount_paid), 0) AS paid,
+            COALESCE(SUM(p.balance_due), 0) AS due,
+            MAX(p.invoice_date) AS last_purchase
+     FROM suppliers s
+     LEFT JOIN purchases p ON p.supplier_id = s.id
+     GROUP BY s.id
+     ORDER BY s.name'
+)->fetchAll();
 
 $suppliers = array_map(function ($row) {
     return [
@@ -77,13 +85,30 @@ $suppliers = array_map(function ($row) {
         'dlNo'    => $row['dl_no'] ?? '',
         'phone'   => $row['phone'] ?? '',
         'address' => $row['address'] ?? '',
+        'totalPurchases' => (float) $row['total_purchases'],
+        'paid'    => (float) $row['paid'],
+        'due'     => (float) $row['due'],
+        'lastPurchase' => $row['last_purchase'],
     ];
 }, $supplierRows);
 
-// --- Customers (real data) --------------------------------------------------
-$customers = $pdo->query('SELECT id, name, phone, address FROM customers ORDER BY (name = "Walk-in Customer") DESC, name')
-    ->fetchAll();
-$customers = array_map(fn($r) => ['id' => (int) $r['id'], 'name' => $r['name'], 'phone' => $r['phone'] ?? '', 'address' => $r['address'] ?? ''], $customers);
+// --- Customers (real data, with real aggregated sales stats) --------------
+$customers = $pdo->query(
+    'SELECT c.id, c.name, c.phone, c.address,
+            COALESCE(SUM(s.grand_total), 0) AS total_sales,
+            COALESCE(SUM(s.amount_paid), 0) AS paid,
+            COALESCE(SUM(s.balance_due), 0) AS due,
+            MAX(s.sale_date) AS last_purchase
+     FROM customers c
+     LEFT JOIN sales s ON s.customer_id = c.id
+     GROUP BY c.id
+     ORDER BY (c.name = "Walk-in Customer") DESC, c.name'
+)->fetchAll();
+$customers = array_map(fn($r) => [
+    'id' => (int) $r['id'], 'name' => $r['name'], 'phone' => $r['phone'] ?? '', 'address' => $r['address'] ?? '',
+    'totalSales' => (float) $r['total_sales'], 'paid' => (float) $r['paid'], 'due' => (float) $r['due'],
+    'lastPurchase' => $r['last_purchase'],
+], $customers);
 
 // --- Categories / manufacturers (plain name lists, for dropdowns etc.) ----
 $categories    = $pdo->query('SELECT name FROM categories ORDER BY name')->fetchAll(PDO::FETCH_COLUMN);
