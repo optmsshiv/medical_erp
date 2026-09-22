@@ -57,4 +57,7 @@ try {
     Json::error('Could not save the adjustment.', 500);
 }
 
+require dirname(__DIR__, 2) . '/core/Audit.php';
+Audit::log('STOCK_ADJUST', "Batch {$batch['batch_no']}: {$oldQty} → {$newQty} ({$reason})");
+
 Json::ok(['oldQty' => $oldQty, 'newQty' => $newQty]);

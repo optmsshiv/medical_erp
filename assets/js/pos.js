@@ -261,7 +261,8 @@
     return `
       <div class="text-center mb-3">
         <img src="assets/images/logo.svg" width="42" alt="">
-        <h6 class="fw-bold mt-2 mb-0">${MF.esc((window.MF_STORE && window.MF_STORE.name) || 'Your Pharmacy')}</h6>
+        <h6 class="fw-bold mt-2 mb-0">${MF.esc(D.store.name)}</h6>
+        ${D.store.address ? `<div class="text-2 small-xs">${MF.esc(D.store.address)}${D.store.gstin ? ' · GSTIN ' + D.store.gstin : ''}</div>` : ''}
       </div>
       <div class="d-flex justify-content-between small mb-2">
         <span>Invoice: <strong>${invNo}</strong></span><span>${MF.fmtDate(MF.today())}</span>

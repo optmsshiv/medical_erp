@@ -77,7 +77,15 @@ require __DIR__ . '/middleware/auth.php';
         <div class="modal-header"><h5 class="modal-title">Add Customer</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
           <div class="mb-2"><label class="form-label">Customer Name <span class="req">*</span></label><input class="form-control" id="cuName"></div>
-          <div class="mb-2"><label class="form-label">Phone</label><input class="form-control" id="cuPhone" placeholder="98xxx xxxxx"></div>
+          <div class="row g-2 mb-2">
+            <div class="col-6"><label class="form-label">Phone</label><input class="form-control" id="cuPhone" placeholder="98xxx xxxxx"></div>
+            <div class="col-6"><label class="form-label">Type</label>
+              <select class="form-select" id="cuType"><option value="retail">Retail Customer</option><option value="wholesale">Wholesale Dealer</option></select></div>
+          </div>
+          <div class="row g-2 mb-2">
+            <div class="col-6"><label class="form-label">GSTIN</label><input class="form-control" id="cuGstin" placeholder="Optional for retail"></div>
+            <div class="col-6"><label class="form-label">Drug License No.</label><input class="form-control" id="cuDl" placeholder="Optional"></div>
+          </div>
           <div><label class="form-label">Address</label><textarea class="form-control" id="cuAddr" rows="2"></textarea></div>
         </div>
         <div class="modal-footer">
@@ -253,14 +261,18 @@ require __DIR__ . '/middleware/auth.php';
       });
 
       $('#cuAddBtn').addEventListener('click', () => {
-        ['cuName', 'cuPhone', 'cuAddr'].forEach((id) => $('#' + id).value = '');
+        ['cuName', 'cuPhone', 'cuGstin', 'cuDl', 'cuAddr'].forEach((id) => $('#' + id).value = '');
+        $('#cuType').value = 'retail';
         new bootstrap.Modal($('#cuAddModal')).show();
       });
       $('#cuAddSave').addEventListener('click', async () => {
         const name = $('#cuName').value.trim();
         if (!name) { MF.toast('Customer name is required.', 'err', 'Validation'); return; }
         try {
-          await MF.Api.post('customers.php', { name, phone: $('#cuPhone').value.trim(), address: $('#cuAddr').value.trim() });
+          await MF.Api.post('customers.php', {
+            name, type: $('#cuType').value, phone: $('#cuPhone').value.trim(),
+            gstin: $('#cuGstin').value.trim(), dlNo: $('#cuDl').value.trim(), address: $('#cuAddr').value.trim(),
+          });
           bootstrap.Modal.getInstance($('#cuAddModal')).hide();
           MF.toast(name + ' added to customer master.', 'success', 'Customer created');
           await MF.rehydrate();

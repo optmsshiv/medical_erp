@@ -177,7 +177,6 @@ $user   = Auth::user();
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="assets/js/data.js"></script>
   <script src="assets/js/config.js"></script>
-  <script>window.MF_STORE = { name: <?= json_encode($client['name']) ?> };</script>
   <script src="assets/js/app.js"></script>
   <script src="assets/js/pos.js"></script>
   <script>

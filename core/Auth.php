@@ -29,6 +29,8 @@ class Auth
             return false;
         }
 
+        Tenant::db()->prepare('UPDATE users SET last_login = NOW() WHERE id = :id')->execute(['id' => $user['id']]);
+
         self::login($user);
         return true;
     }

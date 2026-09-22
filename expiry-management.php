@@ -195,7 +195,7 @@ require __DIR__ . '/middleware/auth.php';
       }
 
       function openReturn() {
-        MF.toast('Purchase Returns aren\'t available yet — this will let you return expired stock to the supplier for credit.', 'info', 'Coming soon');
+        window.location.href = 'purchase-return.php';
       }
 
       function openAdjust() {

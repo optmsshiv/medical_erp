@@ -92,6 +92,9 @@ try {
     Json::error($e->getMessage() ?: 'Could not record the payment.', 422);
 }
 
+require dirname(__DIR__, 2) . '/core/Audit.php';
+Audit::log('PAYMENT_RECORDED', ucfirst($partyType) . " #{$partyId} · ₹{$amount} ({$mode})");
+
 Json::ok([
     'id'          => $paymentId,
     'newTotalDue' => max(0, $totalDue - $amount),

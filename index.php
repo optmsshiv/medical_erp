@@ -98,11 +98,11 @@ function inr($n) { return '₹' . number_format((float) $n, 0); }
         </a>
       </div>
       <div class="col-md-6 col-lg-4">
-        <a class="card-mf module-card p-3" href="#" onclick="return false;" style="opacity:.55;cursor:default">
+        <a class="card-mf module-card p-3" href="wholesale-billing.php">
           <div class="module-icon mb-3"><i class="bi bi-receipt"></i></div>
           <div class="fw-bold mb-1">Wholesale Billing</div>
           <div class="text-2 small mb-2">Dealer invoices with GSTIN, DL no., free qty, schemes &amp; CGST/SGST/IGST.</div>
-          <span class="small fw-semibold text-2">Coming soon</span>
+          <span class="small fw-semibold" style="color:var(--mf-primary)">Open <i class="bi bi-arrow-right"></i></span>
         </a>
       </div>
       <div class="col-md-6 col-lg-4">
@@ -138,26 +138,25 @@ function inr($n) { return '₹' . number_format((float) $n, 0); }
         </a>
       </div>
       <div class="col-md-6 col-lg-4">
-        <a class="card-mf module-card p-3" href="#" onclick="return false;" style="opacity:.55;cursor:default">
+        <a class="card-mf module-card p-3" href="reports.php">
           <div class="module-icon mb-3"><i class="bi bi-graph-up"></i></div>
           <div class="fw-bold mb-1">Reports</div>
           <div class="text-2 small mb-2">Sales, purchase, stock, expiry, profit, GST and due reports with CSV export.</div>
-          <span class="small fw-semibold text-2">Coming soon</span>
+          <span class="small fw-semibold" style="color:var(--mf-primary)">Open <i class="bi bi-arrow-right"></i></span>
         </a>
       </div>
       <div class="col-md-6 col-lg-4">
-        <a class="card-mf module-card p-3" href="#" onclick="return false;" style="opacity:.55;cursor:default">
+        <a class="card-mf module-card p-3" href="settings.php">
           <div class="module-icon mb-3"><i class="bi bi-gear"></i></div>
           <div class="fw-bold mb-1">Administration</div>
           <div class="text-2 small mb-2">Store, invoice &amp; tax settings, users, roles and audit logs.</div>
-          <span class="small fw-semibold text-2">Coming soon</span>
+          <span class="small fw-semibold" style="color:var(--mf-primary)">Open <i class="bi bi-arrow-right"></i></span>
         </a>
       </div>
     </div>
 
     <div class="card-mf p-3 d-flex flex-wrap align-items-center gap-3 mb-4">
       <span class="badge badge-soft-primary"><i class="bi bi-shield-check me-1"></i>GST &amp; Drug-License compliant workflows</span>
-      <span class="text-2 small ms-auto"><i class="bi bi-info-circle me-1"></i>Modules marked "Coming soon" are still in development.</span>
     </div>
 
     <p class="text-center text-2 small mb-0">OPTMS-RX · <?= htmlspecialchars($client['name']) ?></p>

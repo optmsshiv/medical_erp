@@ -137,7 +137,11 @@ try {
         'sale_date'    => date('Y-m-d'),
         'subtotal'     => $subtotal,
         'discount'     => $discount,
+        'channel'      => 'retail',
         'gst_amount'   => $gstAmount,
+        'cgst'         => $gstAmount / 2,
+        'sgst'         => $gstAmount / 2,
+        'igst'         => 0,
         'round_off'    => $roundOff,
         'grand_total'  => $grand,
         'payment_mode' => $paymentMode,
@@ -178,6 +182,9 @@ try {
     $pdo->rollBack();
     Json::error($e->getMessage() ?: 'Could not complete the sale.', 422);
 }
+
+require dirname(__DIR__, 2) . '/core/Audit.php';
+Audit::log('SALE_CREATE', "{$invoiceNo} · ₹{$grand}");
 
 Json::ok([
     'id'         => $saleId,

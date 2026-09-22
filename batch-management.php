@@ -202,7 +202,7 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
       }
       $('#bmDetailReturn').addEventListener('click', () => {
         bootstrap.Modal.getInstance($('#bmDetailModal')).hide();
-        MF.toast('Purchase return draft created for batch ' + detailBatch.batchNo + ' (opens Purchase Returns in Stage 2)', 'info', 'Return initiated');
+        window.location.href = 'purchase-return.php';
       });
 
       ['bmSearch', 'bmMfg', 'bmStatus', 'bmExpMonth', 'bmSort'].forEach((id) =>

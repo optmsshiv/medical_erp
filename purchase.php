@@ -28,7 +28,7 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
             <h1 class="page-title"><i class="bi bi-bag-plus-fill me-2 text-success"></i>New Purchase Entry</h1>
             <p class="page-sub">Supplier invoice → GRN · batch &amp; expiry capture · stock posting</p>
           </div>
-          <div class="ms-auto"><a class="btn btn-light-mf" href="#" onclick="MF.toast('Reports module is coming soon.', 'info'); return false;"><i class="bi bi-file-earmark-ruled me-1"></i>Purchase Invoices</a></div>
+          <div class="ms-auto"><a class="btn btn-light-mf" href="reports.php?tab=purchase"><i class="bi bi-file-earmark-ruled me-1"></i>Purchase Invoices</a></div>
         </div>
 
         <div class="row g-3">
@@ -229,7 +229,7 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
         $('#puItemsBody').querySelectorAll('tr[data-row]').forEach((tr) => {
           const r = rows.find((x) => x.id === +tr.dataset.row);
           tr.querySelector('.pu-med').addEventListener('change', (e) => {
-            r.medId = e.target.value;
+            r.medId = Number(e.target.value);
             const m = MF.med(r.medId);
             if (m) { r.rate = m.purchaseRate; r.gst = m.gst; }
             render();

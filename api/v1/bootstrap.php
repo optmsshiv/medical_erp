@@ -94,7 +94,7 @@ $suppliers = array_map(function ($row) {
 
 // --- Customers (real data, with real aggregated sales stats) --------------
 $customers = $pdo->query(
-    'SELECT c.id, c.name, c.phone, c.address,
+    'SELECT c.id, c.name, c.type, c.phone, c.gstin, c.dl_no, c.address,
             COALESCE(SUM(s.grand_total), 0) AS total_sales,
             COALESCE(SUM(s.amount_paid), 0) AS paid,
             COALESCE(SUM(s.balance_due), 0) AS due,
@@ -105,10 +105,28 @@ $customers = $pdo->query(
      ORDER BY (c.name = "Walk-in Customer") DESC, c.name'
 )->fetchAll();
 $customers = array_map(fn($r) => [
-    'id' => (int) $r['id'], 'name' => $r['name'], 'phone' => $r['phone'] ?? '', 'address' => $r['address'] ?? '',
+    'id' => (int) $r['id'], 'name' => $r['name'], 'type' => $r['type'], 'phone' => $r['phone'] ?? '',
+    'gstin' => $r['gstin'] ?? '', 'dlNo' => $r['dl_no'] ?? '', 'address' => $r['address'] ?? '',
     'totalSales' => (float) $r['total_sales'], 'paid' => (float) $r['paid'], 'due' => (float) $r['due'],
     'lastPurchase' => $r['last_purchase'],
 ], $customers);
+
+// --- Store settings (real, with sensible fallback to the client's name) ---
+$settingsRows = $pdo->query('SELECT setting_key, setting_value FROM settings')->fetchAll();
+$settingsFlat = [];
+foreach ($settingsRows as $r) {
+    $settingsFlat[$r['setting_key']] = $r['setting_value'];
+}
+$store = [
+    'name'    => $settingsFlat['store_name'] ?? Tenant::current()['name'],
+    'address' => $settingsFlat['store_address'] ?? '',
+    'phone'   => $settingsFlat['store_phone'] ?? '',
+    'gstin'   => $settingsFlat['store_gstin'] ?? '',
+    'pan'     => $settingsFlat['store_pan'] ?? '',
+    'dl20b'   => $settingsFlat['store_dl20b'] ?? '',
+    'dl21b'   => $settingsFlat['store_dl21b'] ?? '',
+    'email'   => $settingsFlat['store_email'] ?? '',
+];
 
 // --- Categories / manufacturers (plain name lists, for dropdowns etc.) ----
 $categories    = $pdo->query('SELECT name FROM categories ORDER BY name')->fetchAll(PDO::FETCH_COLUMN);
@@ -152,6 +170,7 @@ Json::ok([
         'salesInvoices'    => [],
         'purchaseInvoices' => [],
         'notifications'    => [],
+        'store'            => $store,
         'users'            => [],
         'auditLogs'        => [],
         'dashboard'        => $dashboard,

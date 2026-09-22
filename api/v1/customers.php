@@ -24,9 +24,14 @@ switch ($method) {
             Json::error('Customer name is required.', 422);
         }
 
+        $type = ($input['type'] ?? 'retail') === 'wholesale' ? 'wholesale' : 'retail';
+
         $id = Customer::create([
             'name'    => $name,
+            'type'    => $type,
             'phone'   => trim($input['phone'] ?? ''),
+            'gstin'   => trim($input['gstin'] ?? ''),
+            'dl_no'   => trim($input['dlNo'] ?? ''),
             'address' => trim($input['address'] ?? ''),
         ]);
 

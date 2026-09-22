@@ -165,6 +165,9 @@ try {
     Json::error('Could not save the purchase. Nothing was changed.', 500);
 }
 
+require dirname(__DIR__, 2) . '/core/Audit.php';
+Audit::log('PURCHASE_CREATE', "{$invoiceNo} · ₹{$grand}");
+
 Json::ok([
     'id'         => $purchaseId,
     'grandTotal' => $grand,
