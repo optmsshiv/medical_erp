@@ -6,7 +6,6 @@
  */
 
 // Minimal .env loader (no composer dependency needed)
-if (!function_exists('env')) {
 function env(string $key, $default = null)
 {
     static $loaded = false;
@@ -33,12 +32,10 @@ function env(string $key, $default = null)
 
     return $vars[$key] ?? $default;
 }
-}
 
 return [
-   // 'host'     => env('MASTER_DB_HOST', 'localhost'),
+    'host'     => env('MASTER_DB_HOST', 'localhost'),
     'database' => env('MASTER_DB_NAME', 'edrppymy_optms_pharma'),
-    'database' => env('MASTER_DB_NAME', 'medical_client'),
     'username' => env('MASTER_DB_USER', 'root'),
     'password' => env('MASTER_DB_PASS', ''),
     'charset'  => 'utf8mb4',
