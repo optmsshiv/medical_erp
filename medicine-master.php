@@ -15,6 +15,19 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link href="assets/css/style.css" rel="stylesheet">
+  <style>
+    .mm-section-title{
+      font-size:.75rem;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+      color:#6c757d;
+      padding-bottom:.35rem;
+      margin-bottom:.9rem;
+      border-bottom:1px solid #e9ecef;
+    }
+    .mm-section-title:not(:first-child){ margin-top:1.5rem; }
+  </style>
 </head>
 <body data-page="medicine-master">
   <div class="mf-layout">
@@ -94,40 +107,63 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
       <div class="modal-content">
         <div class="modal-header"><h5 class="modal-title" id="mmFormTitle">Add Medicine</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
+
+          <div class="mm-section-title">Basic Details</div>
           <div class="row g-3">
             <div class="col-md-6"><label class="form-label">Medicine Name <span class="req">*</span></label><input class="form-control" id="fName" placeholder="e.g. Paracetamol 500mg"></div>
             <div class="col-md-6"><label class="form-label">Generic Name</label><input class="form-control" id="fGeneric" placeholder="e.g. Paracetamol"></div>
-            <div class="col-md-8"><label class="form-label">Composition</label><input class="form-control" id="fComp"></div>
-            <div class="col-md-4"><label class="form-label">Schedule</label>
+            <div class="col-md-6"><label class="form-label">Composition</label><input class="form-control" id="fComp"></div>
+            <div class="col-md-3"><label class="form-label">Category</label><select class="form-select" id="fCategory"></select></div>
+            <div class="col-md-3"><label class="form-label">Manufacturer</label><select class="form-select" id="fMfg"></select></div>
+          </div>
+
+          <div class="mm-section-title">Packaging &amp; Identification</div>
+          <div class="row g-3">
+            <div class="col-md-3 col-6"><label class="form-label">Schedule</label>
               <select class="form-select" id="fSchedule"><option>OTC</option><option>H</option><option>H1</option></select></div>
-            <div class="col-md-6"><label class="form-label">Category</label><select class="form-select" id="fCategory"></select></div>
-            <div class="col-md-6"><label class="form-label">Manufacturer</label><select class="form-select" id="fMfg"></select></div>
-            <div class="col-md-3"><label class="form-label">HSN Code</label><input class="form-control" id="fHsn" value="3004"></div>
-            <div class="col-md-3"><label class="form-label">Barcode</label><input class="form-control" id="fBarcode" placeholder="8901234…"></div>
-            <div class="col-md-3"><label class="form-label">Unit</label>
+            <div class="col-md-3 col-6"><label class="form-label">HSN Code</label><input class="form-control" id="fHsn" value="3004"></div>
+            <div class="col-md-3 col-6"><label class="form-label">Barcode</label><input class="form-control" id="fBarcode" placeholder="8901234…"></div>
+            <div class="col-md-3 col-6"><label class="form-label">Unit</label>
               <select class="form-select" id="fUnit"><option>Strip</option><option>Bottle</option><option>Tube</option><option>Sachet</option><option>Vial</option><option>Inhaler</option><option>Pen</option></select></div>
-            <div class="col-md-3"><label class="form-label">Pack Size</label><input class="form-control" id="fPack" placeholder="e.g. 15 Tablets"></div>
-            <div class="col-md-2"><label class="form-label">GST %</label>
-              <select class="form-select" id="fGst"><option>5</option><option selected>12</option><option>18</option></select></div>
-            <div class="col-md-3 col-6"><label class="form-label">MRP (₹)</label><input type="number" step="0.01" class="form-control" id="fMrp"></div>
-            <div class="col-md-3 col-6"><label class="form-label">Purchase Rate (₹)</label><input type="number" step="0.01" class="form-control" id="fPtr"></div>
-            <div class="col-md-2 col-6"><label class="form-label">Retail Rate (₹)</label><input type="number" step="0.01" class="form-control" id="fRetail"></div>
-            <div class="col-md-2 col-6"><label class="form-label">Wholesale Rate (₹)</label><input type="number" step="0.01" class="form-control" id="fWholesale"></div>
-            <div class="col-md-3 col-6"><label class="form-label">Minimum Stock</label><input type="number" class="form-control" id="fMin" value="50"></div>
-            <div class="col-md-3 col-6"><label class="form-label">Reorder Level</label><input type="number" class="form-control" id="fReorder" value="100"></div>
-            <div class="col-md-3 d-flex align-items-end">
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" id="fRx">
-                <label class="form-check-label small" for="fRx">Prescription required</label>
-              </div>
-            </div>
-            <div class="col-md-3 d-flex align-items-end">
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" id="fActive" checked>
-                <label class="form-check-label small" for="fActive">Active</label>
+            <div class="col-md-3 col-6"><label class="form-label">Pack Size</label><input class="form-control" id="fPack" placeholder="e.g. 15 Tablets"></div>
+            <div class="col-md-3 col-6"><label class="form-label">Pack Qty</label><input type="number" min="1" class="form-control" id="fPackQty" value="1" placeholder="e.g. 10"></div>
+            <div class="col-md-3 col-6"><label class="form-label">Sub-unit</label><input class="form-control" id="fSubUnit" placeholder="e.g. Tablet"></div>
+            <div class="col-md-3 col-6 d-flex align-items-center">
+              <div class="form-check form-switch mt-4 pt-1">
+                <input class="form-check-input" type="checkbox" id="fAllowLoose">
+                <label class="form-check-label" for="fAllowLoose">Allow loose sale</label>
               </div>
             </div>
           </div>
+
+          <div class="mm-section-title">Pricing &amp; Tax</div>
+          <div class="row g-3">
+            <div class="col-md-3 col-6"><label class="form-label">GST %</label>
+              <select class="form-select" id="fGst"><option>5</option><option selected>12</option><option>18</option></select></div>
+            <div class="col-md-3 col-6"><label class="form-label">MRP (₹)</label><input type="number" step="0.01" class="form-control" id="fMrp"></div>
+            <div class="col-md-3 col-6"><label class="form-label">Purchase Rate (₹)</label><input type="number" step="0.01" class="form-control" id="fPtr"></div>
+            <div class="col-md-3 col-6"><label class="form-label">Retail Rate (₹)</label><input type="number" step="0.01" class="form-control" id="fRetail"></div>
+            <div class="col-md-3 col-6"><label class="form-label">Wholesale Rate (₹)</label><input type="number" step="0.01" class="form-control" id="fWholesale"></div>
+          </div>
+
+          <div class="mm-section-title">Stock &amp; Status</div>
+          <div class="row g-3">
+            <div class="col-md-3 col-6"><label class="form-label">Minimum Stock</label><input type="number" class="form-control" id="fMin" value="50"></div>
+            <div class="col-md-3 col-6"><label class="form-label">Reorder Level</label><input type="number" class="form-control" id="fReorder" value="100"></div>
+            <div class="col-md-3 col-6 d-flex align-items-center">
+              <div class="form-check form-switch mt-4 pt-1">
+                <input class="form-check-input" type="checkbox" id="fRx">
+                <label class="form-check-label" for="fRx">Prescription required</label>
+              </div>
+            </div>
+            <div class="col-md-3 col-6 d-flex align-items-center">
+              <div class="form-check form-switch mt-4 pt-1">
+                <input class="form-check-input" type="checkbox" id="fActive" checked>
+                <label class="form-check-label" for="fActive">Active</label>
+              </div>
+            </div>
+          </div>
+
         </div>
         <div class="modal-footer">
           <button class="btn btn-light-mf" data-bs-dismiss="modal">Cancel</button>
@@ -263,6 +299,7 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
         $('#fName').value = m?.name || ''; $('#fGeneric').value = m?.generic || ''; $('#fComp').value = m?.composition || '';
         $('#fCategory').value = m?.category || D.categories[0]; $('#fMfg').value = m?.manufacturer || D.manufacturers[0];
         $('#fHsn').value = m?.hsn || '3004'; $('#fUnit').value = m?.unit || 'Strip'; $('#fPack').value = m?.packSize || '';
+        $('#fPackQty').value = m?.packQty || 1; $('#fSubUnit').value = m?.subUnit || ''; $('#fAllowLoose').checked = !!m?.allowLoose;
         $('#fGst').value = m ? String(m.gst) : '12'; $('#fSchedule').value = m?.schedule || 'OTC';
         $('#fMrp').value = m?.mrp ?? ''; $('#fPtr').value = m?.purchaseRate ?? ''; $('#fRetail').value = m?.mrp ?? '';
         $('#fWholesale').value = m?.wholesaleRate ?? ''; $('#fMin').value = m?.minStock ?? 50; $('#fReorder').value = m?.reorderLevel ?? 100;
@@ -277,6 +314,7 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
           name: $('#fName').value.trim(), generic: $('#fGeneric').value, composition: $('#fComp').value,
           category: $('#fCategory').value, manufacturer: $('#fMfg').value, hsn: $('#fHsn').value,
           unit: $('#fUnit').value, packSize: $('#fPack').value, gst: +$('#fGst').value, schedule: $('#fSchedule').value,
+          packQty: +$('#fPackQty').value || 1, subUnit: $('#fSubUnit').value.trim(), allowLoose: $('#fAllowLoose').checked,
           mrp: +$('#fMrp').value, purchaseRate: +$('#fPtr').value || 0,
           wholesaleRate: +$('#fWholesale').value || (+$('#fMrp').value * 0.9), minStock: +$('#fMin').value,
           reorderLevel: +$('#fReorder').value, rxRequired: $('#fRx').checked,

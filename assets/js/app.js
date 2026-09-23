@@ -74,7 +74,12 @@ window.MF = window.MF || {};
   MF.fmt = (n, dec = 0) =>
     '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: dec, maximumFractionDigits: dec });
   MF.num = (n) => Number(n || 0).toLocaleString('en-IN');
-  MF.today = () => new Date().toISOString().slice(0, 10);
+  // Local calendar date (YYYY-MM-DD). toISOString() would give the UTC date, which is
+  // yesterday in India between 00:00 and 05:30.
+  MF.today = () => {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  };
   MF.fmtDate = (iso) => {
     if (!iso) return '—';
     return new Date(iso + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -99,6 +104,14 @@ window.MF = window.MF || {};
   MF.sup = (id) => D.suppliers.find((s) => s.id == id);
   MF.batchesOf = (medId) => D.batches.filter((b) => b.medId == medId);
   MF.stockOf = (medId) => MF.batchesOf(medId).reduce((s, b) => s + b.qty, 0);
+
+  /* Loose Sale: total sub-units sellable right now — loose stock already broken
+     out of a pack, plus what every sealed pack could still yield if opened. */
+  MF.looseAvailable = (medId) => {
+    const med = MF.med(medId);
+    const packQty = med && med.packQty ? med.packQty : 1;
+    return MF.batchesOf(medId).reduce((s, b) => s + (b.looseQty || 0) + (b.qty - (b.reserved || 0)) * packQty, 0);
+  };
 
   MF.batchStatus = (b) => {
     const days = MF.daysTo(b.expiry);

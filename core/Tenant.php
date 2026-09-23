@@ -81,11 +81,15 @@ class Tenant
         $host = explode(':', $host)[0];
         $parts = explode('.', $host);
 
-        // Expect subdomain.optmsrx.com -> at least 3 parts
-        if (count($parts) < 3) {
-            // Allow a LOCAL_DEV_SUBDOMAIN override for local testing without real subdomains
+        // Localhost and loopback IPs do not have a tenant subdomain.
+        if ($host === 'localhost' || filter_var($host, FILTER_VALIDATE_IP)) {
             $override = getenv('LOCAL_DEV_SUBDOMAIN');
             return $override ?: null;
+        }
+
+        // Expect subdomain.optmsrx.com -> at least 3 parts.
+        if (count($parts) < 3) {
+            return null;
         }
 
         return $parts[0];

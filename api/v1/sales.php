@@ -68,12 +68,35 @@ try {
             throw new RuntimeException("Batch not found for {$medicine['name']}.");
         }
 
-        $available = (int) $batch['quantity'] - (int) $batch['reserved'];
-        if ($qty > $available) {
-            throw new RuntimeException("Only {$available} unit(s) of {$medicine['name']} (batch {$batch['batch_no']}) available.");
+        $unit = ($item['unit'] ?? 'pack') === 'loose' ? 'loose' : 'pack';
+        $packQty = max(1, (int) $medicine['pack_qty']);
+        $allowLoose = !empty($medicine['allow_loose_sale']);
+
+        if ($unit === 'loose' && !$allowLoose) {
+            throw new RuntimeException("Loose sale is not enabled for {$medicine['name']}.");
         }
 
-        $rate    = max(0, (float) ($item['rate'] ?? $medicine['mrp']));
+        $sealedAvailable = (int) $batch['quantity'] - (int) $batch['reserved'];
+        $looseAvailable  = (int) $batch['loose_qty'];
+        $strippedBreak   = 0; // sealed packs that need opening to cover this line
+
+        if ($unit === 'loose') {
+            $totalLooseAvailable = $looseAvailable + $sealedAvailable * $packQty;
+            if ($qty > $totalLooseAvailable) {
+                $label = $medicine['sub_unit'] ?: 'unit';
+                throw new RuntimeException("Only {$totalLooseAvailable} {$label}(s) of {$medicine['name']} (batch {$batch['batch_no']}) available.");
+            }
+            if ($qty > $looseAvailable) {
+                $strippedBreak = (int) ceil(($qty - $looseAvailable) / $packQty);
+            }
+        } else {
+            if ($qty > $sealedAvailable) {
+                throw new RuntimeException("Only {$sealedAvailable} unit(s) of {$medicine['name']} (batch {$batch['batch_no']}) available.");
+            }
+        }
+
+        $defaultRate = $unit === 'loose' ? $medicine['mrp'] / $packQty : $medicine['mrp'];
+        $rate    = max(0, (float) ($item['rate'] ?? $defaultRate));
         $discPct = min(100, max(0, (float) ($item['discPct'] ?? 0)));
         $gstPct  = (float) $medicine['gst_rate'];
 
@@ -90,6 +113,7 @@ try {
         $lines[] = [
             'medId' => $medId, 'batchId' => $batchId, 'batchNo' => $batch['batch_no'],
             'qty' => $qty, 'rate' => $rate, 'discPct' => $discPct, 'gstPct' => $gstPct, 'amount' => $net,
+            'unit' => $unit, 'packQty' => $packQty, 'strippedBreak' => $strippedBreak,
         ];
     }
 
@@ -164,14 +188,37 @@ try {
             'disc_pct'    => $line['discPct'],
             'gst_pct'     => $line['gstPct'],
             'amount'      => $line['amount'],
+            'unit_sold'         => $line['unit'],
+            'pack_qty_at_sale'  => $line['packQty'],
         ]);
 
-        // Conditional UPDATE — extra safety net beyond the row lock above.
-        $stmt = $pdo->prepare(
-            'UPDATE batches SET quantity = quantity - :qty
-             WHERE id = :id AND (quantity - reserved) >= :qty2'
-        );
-        $stmt->execute(['qty' => $line['qty'], 'id' => $line['batchId'], 'qty2' => $line['qty']]);
+        if ($line['unit'] === 'loose') {
+            // Break `strippedBreak` sealed packs into loose stock, then sell `qty`
+            // sub-units out of the resulting loose pool. The WHERE re-checks both
+            // sealed availability (for the break) and total loose availability
+            // (for the sale) — same safety-net role as the plain-pack UPDATE below.
+            $stmt = $pdo->prepare(
+                'UPDATE batches
+                 SET quantity = quantity - :breakQty,
+                     loose_qty = loose_qty + (:breakQty2 * :packQty) - :qty
+                 WHERE id = :id
+                   AND (quantity - reserved) >= :breakQty3
+                   AND (loose_qty + ((quantity - reserved) * :packQty2)) >= :qty2'
+            );
+            $stmt->execute([
+                'breakQty' => $line['strippedBreak'], 'breakQty2' => $line['strippedBreak'], 'breakQty3' => $line['strippedBreak'],
+                'packQty' => $line['packQty'], 'packQty2' => $line['packQty'],
+                'qty' => $line['qty'], 'qty2' => $line['qty'],
+                'id' => $line['batchId'],
+            ]);
+        } else {
+            // Conditional UPDATE — extra safety net beyond the row lock above.
+            $stmt = $pdo->prepare(
+                'UPDATE batches SET quantity = quantity - :qty
+                 WHERE id = :id AND (quantity - reserved) >= :qty2'
+            );
+            $stmt->execute(['qty' => $line['qty'], 'id' => $line['batchId'], 'qty2' => $line['qty']]);
+        }
         if ($stmt->rowCount() === 0) {
             throw new RuntimeException("Stock changed for batch {$line['batchNo']} — please retry.");
         }

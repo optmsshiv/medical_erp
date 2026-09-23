@@ -8,5 +8,6 @@
  */
 require_once dirname(__DIR__) . '/core/Database.php';
 require_once dirname(__DIR__) . '/core/Tenant.php';
+require_once dirname(__DIR__) . '/config/database.php';
 
 Tenant::resolve();

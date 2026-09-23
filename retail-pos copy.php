@@ -43,13 +43,10 @@ $user   = Auth::user();
         <div class="pos-grid">
           <!-- LEFT: search -->
           <div class="card-mf p-3">
-            <label class="form-label d-flex justify-content-between" for="posSearch">
-               <span>Search medicine</span>
-               <span class="badge bg-light text-dark border">F2</span>
-            </label>
+            <label class="form-label" for="posSearch">Search medicine</label>
             <div class="input-group mb-2">
               <span class="input-group-text"><i class="bi bi-search"></i></span>
-              <input id="posSearch" class="form-control" placeholder="Medicine name, barcode or batch…" autocomplete="off" autofocus>
+              <input id="posSearch" class="form-control" placeholder="Medicine name, generic, composition, barcode or batch…" autocomplete="off">
             </div>
             <div id="posResults"></div>
           </div>
@@ -91,8 +88,8 @@ $user   = Auth::user();
 
               <div class="sr-group-label mt-3">Payment</div>
               <div class="row g-2 row-cols-5 mb-3">
-                <div class="col pay-opt"><input type="radio" name="posPay" id="posPayCash" value="cash" checked><label for="posPayCash"><i class="bi bi-cash"></i>Cash <small class="d-block text-muted">F3</small></label></div>
-                <div class="col pay-opt"><input type="radio" name="posPay" id="posPayUpi" value="upi"><label for="posPayUpi"><i class="bi bi-qr-code-scan"></i>UPI <small class="d-block text-muted">F4</small></label></div>
+                <div class="col pay-opt"><input type="radio" name="posPay" id="posPayCash" value="cash" checked><label for="posPayCash"><i class="bi bi-cash"></i>Cash</label></div>
+                <div class="col pay-opt"><input type="radio" name="posPay" id="posPayUpi" value="upi"><label for="posPayUpi"><i class="bi bi-qr-code-scan"></i>UPI</label></div>
                 <div class="col pay-opt"><input type="radio" name="posPay" id="posPayCard" value="card"><label for="posPayCard"><i class="bi bi-credit-card"></i>Card</label></div>
                 <div class="col pay-opt"><input type="radio" name="posPay" id="posPayCredit" value="credit"><label for="posPayCredit"><i class="bi bi-journal-text"></i>Credit</label></div>
                 <div class="col pay-opt"><input type="radio" name="posPay" id="posPaySplit" value="split"><label for="posPaySplit"><i class="bi bi-diagram-3"></i>Split</label></div>
@@ -103,7 +100,7 @@ $user   = Auth::user();
                 <button class="btn btn-light-mf" id="posDraft"><i class="bi bi-save me-1"></i>Save Draft</button>
                 <button class="btn btn-light-mf" id="posPrint"><i class="bi bi-printer me-1"></i>Print Invoice</button>
                 <button class="btn btn-light-mf text-danger ms-auto" id="posClearCart"><i class="bi bi-trash3 me-1"></i>Clear</button>
-                <button class="btn btn-mf px-4" id="posComplete"><i class="bi bi-check2-circle me-1"></i>Complete Sale <span class="badge bg-white text-success ms-2">F10</span></button>
+                <button class="btn btn-mf px-4" id="posComplete"><i class="bi bi-check2-circle me-1"></i>Complete Sale</button>
               </div>
             </div>
           </div>

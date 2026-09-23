@@ -35,6 +35,9 @@ $medicines = array_map(function ($row) {
         'gst'           => (float) $row['gst_rate'],
         'unit'          => $row['unit'],
         'packSize'      => $row['pack_size'] ?? '',
+        'packQty'       => (int) $row['pack_qty'],
+        'subUnit'       => $row['sub_unit'] ?? '',
+        'allowLoose'    => (bool) $row['allow_loose_sale'],
         'mrp'           => (float) $row['mrp'],
         'purchaseRate'  => (float) $row['purchase_rate'],
         'wholesaleRate' => (float) $row['wholesale_rate'],
@@ -61,6 +64,7 @@ $batches = array_map(function ($row) {
         'purchaseRate' => (float) $row['purchase_rate'],
         'mrp'          => (float) $row['mrp'],
         'qty'          => (int) $row['quantity'],
+        'looseQty'     => (int) $row['loose_qty'],
         'reserved'     => (int) $row['reserved'],
     ];
 }, $batchRows);

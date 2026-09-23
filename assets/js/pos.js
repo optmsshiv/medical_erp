@@ -18,10 +18,48 @@
   const $ = (s) => document.querySelector(s);
   const walkInId = () => D.customers.find((c) => c.name === 'Walk-in Customer')?.id ?? (D.customers[0]?.id ?? '');
 
+  /* dd Mon yyyy, e.g. "08 Oct 2026" */
+  function fmtExpiryDate(dateVal) {
+    const d = new Date(dateVal);
+    if (isNaN(d)) return '—';
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = d.toLocaleString('en-US', { month: 'short' });
+    return `${day} ${month} ${d.getFullYear()}`;
+  }
+
+  /* 'danger' once expired, 'warning' inside 90 days, else 'success' */
+  function expiryTone(dateVal) {
+    const exp = new Date(dateVal);
+    const today = new Date(MF.today ? MF.today() : Date.now());
+    if (isNaN(exp)) return 'success';
+    const days = Math.ceil((exp - today) / 86400000);
+    if (days < 0) return 'danger';
+    if (days <= 90) return 'warning';
+    return 'success';
+  }
+
+  /* ASSUMPTION: medicine record exposes a unit label as m.unit (e.g. "Tabs", "Strip").
+     Adjust this one line if your data.js uses a different field name. */
+  function unitLabel(m) {
+    return m && m.unit ? m.unit : 'units';
+  }
+
+  function batchExpiryPills(b) {
+    if (!b) return '';
+    const tone = expiryTone(b.expiry);
+    return `
+      <div class="d-flex align-items-center gap-1 mt-1">
+        <span class="badge rounded-pill bg-light text-dark border" title="Batch ${MF.esc(b.batchNo)}"><i class="bi bi-upc-scan"></i> ${MF.esc(b.batchNo)}</span>
+        <span class="badge rounded-pill text-bg-${tone}">Exp : ${fmtExpiryDate(b.expiry)}</span>
+      </div>`;
+  }
+
   /* Attach click → addToCart for BOTH search results and the "Fast moving" shortcuts */
   function bindResultClicks(box) {
     box.querySelectorAll('.pos-result:not([disabled])').forEach((btn) =>
       btn.addEventListener('click', () => addToCart(btn.dataset.med)));
+    box.querySelectorAll('.pos-loose-add').forEach((btn) =>
+      btn.addEventListener('click', (e) => { e.stopPropagation(); addToCart(btn.dataset.med, 'loose'); }));
   }
 
   /* ---------------- Medicine search ---------------- */
@@ -37,22 +75,21 @@
     box.innerHTML = hits.map((m) => {
       const b = MF.pickBatch(m.id);
       const stock = MF.stockOf(m.id);
-      const stockBadge = stock === 0 ? MF.badge('Out of stock', 'danger') : stock <= m.minStock ? MF.badge('Low stock', 'warning') : MF.badge('In stock', 'success');
       return `
-      <button class="pos-result" data-med="${m.id}" ${!b ? 'disabled' : ''}>
+      <div class="pos-result" role="button" tabindex="0" data-med="${m.id}" ${!b ? 'disabled' : ''}>
         <div class="kpi-icon tone-primary" style="width:38px;height:38px;flex-basis:38px;font-size:1rem"><i class="bi bi-capsule"></i></div>
         <div class="flex-grow-1 text-start">
           <div class="pr-name">${MF.esc(m.name)} <span class="text-2 fw-normal">· ${MF.esc(m.brandRef)}</span></div>
           <div class="pr-meta">${MF.esc(m.composition)}</div>
-          ${b ? `<div class="pr-meta num">Batch ${b.batchNo} · Exp ${MF.fmtMonthYear(b.expiry)} · Avail ${b.qty - b.reserved} / ${stock}</div>`
-              : `<div class="pr-meta text-danger">No sellable batch (expired stock only)</div>`}
+          ${b ? batchExpiryPills(b) : `<div class="pr-meta text-danger mt-1">No sellable batch (expired stock only)</div>`}
         </div>
         <div class="text-end">
           <div class="fw-bold num">${MF.fmt(m.mrp, 2)}</div>
-          <div class="small-xs text-2">MRP · GST ${m.gst}%</div>
-          <div class="mt-1">${stockBadge}</div>
+          <div class="small-xs text-2 mt-1">Stock ${MF.num(stock)} ${MF.esc(unitLabel(m))}</div>
+          <div class="small-xs text-2 mt-1">MRP ${MF.fmt(m.mrp, 2)}</div>
+          ${m.allowLoose ? `<button type="button" class="btn btn-light-mf btn-sm mt-1 pos-loose-add" data-med="${m.id}">+ ${MF.esc(m.subUnit || 'Loose')}</button>` : ''}
         </div>
-      </button>`;
+      </div>`;
     }).join('');
     bindResultClicks(box);
   }
@@ -64,30 +101,42 @@
       <div class="sr-group-label">Quick picks</div>
       ${picks.map((m) => {
         const id = m.id;
-        return `<button class="pos-result" data-med="${id}">
+        const b = MF.pickBatch(id);
+        const stock = MF.stockOf(id);
+        return `<div class="pos-result" role="button" tabindex="0" data-med="${id}">
           <div class="kpi-icon tone-primary" style="width:38px;height:38px;flex-basis:38px;font-size:1rem"><i class="bi bi-capsule"></i></div>
           <div class="flex-grow-1 text-start">
             <div class="pr-name">${MF.esc(m.name)}</div>
-            <div class="pr-meta">${MF.esc(m.composition)} · Stock ${MF.num(MF.stockOf(id))}</div>
+            <div class="pr-meta">${MF.esc(m.composition)}</div>
+            ${batchExpiryPills(b)}
           </div>
-          <div class="fw-bold num">${MF.fmt(m.mrp, 2)}</div>
-        </button>`;
+          <div class="text-end">
+            <div class="fw-bold num">${MF.fmt(m.mrp, 2)}</div>
+            <div class="small-xs text-2 mt-1">Stock ${MF.num(stock)} ${MF.esc(unitLabel(m))}</div>
+            <div class="small-xs text-2 mt-1">MRP ${MF.fmt(m.mrp, 2)}</div>
+            ${m.allowLoose ? `<button type="button" class="btn btn-light-mf btn-sm mt-1 pos-loose-add" data-med="${id}">+ ${MF.esc(m.subUnit || 'Loose')}</button>` : ''}
+          </div>
+        </div>`;
       }).join('')}
       <p class="text-2 small mt-3 mb-0"><i class="bi bi-lightbulb me-1"></i>Search by medicine name, generic name, composition, batch no or barcode.</p>`;
   }
 
   /* ---------------- Cart ---------------- */
-  function addToCart(medId) {
+  function addToCart(medId, unit = 'pack') {
     const med = MF.med(medId);
     const batch = MF.pickBatch(medId);
     if (!batch) { MF.toast('No sellable batch available for ' + med.name, 'warn', 'Stock'); return; }
-    const line = state.cart.find((l) => l.batchId === batch.id);
-    const avail = batch.qty - batch.reserved;
+    if (unit === 'loose' && !med.allowLoose) { MF.toast('Loose sale is not enabled for ' + med.name, 'warn', 'Stock'); return; }
+    const rate = unit === 'loose' ? med.mrp / (med.packQty || 1) : med.mrp;
+    const avail = unit === 'loose' ? MF.looseAvailable(medId) : batch.qty - batch.reserved;
+    const unitName = unit === 'loose' ? (med.subUnit || 'units') : 'units';
+    const line = state.cart.find((l) => l.batchId === batch.id && l.unit === unit);
     if (line) {
-      if (line.qty >= avail) { MF.toast(`Only ${avail} units available in batch ${batch.batchNo}`, 'warn', 'Stock limit'); return; }
+      if (line.qty >= avail) { MF.toast(`Only ${avail} ${unitName} available`, 'warn', 'Stock limit'); return; }
       line.qty++;
     } else {
-      state.cart.push({ medId, batchId: batch.id, qty: 1, rate: med.mrp, mrp: med.mrp, discPct: 0 });
+      if (avail <= 0) { MF.toast(`No ${unitName} available for ` + med.name, 'warn', 'Stock'); return; }
+      state.cart.push({ medId, batchId: batch.id, qty: 1, rate, mrp: med.mrp, discPct: 0, unit });
     }
     if (med.rxRequired) MF.toast(med.name + ' is Schedule ' + med.schedule + ' — verify prescription', 'info', 'Rx item');
     renderCart();
@@ -134,7 +183,7 @@
             return `<tr>
               <td style="min-width:170px">
                 <div class="td-title">${MF.esc(med.name)}</div>
-                <div class="td-sub num">B: ${b.batchNo} · Exp ${MF.fmtMonthYear(b.expiry)} · GST ${med.gst}%</div>
+                <div class="td-sub num">B: ${b.batchNo} · Exp ${MF.fmtMonthYear(b.expiry)} · GST ${med.gst}%${l.unit === 'loose' ? ` · Loose (${MF.esc(med.subUnit || 'unit')})` : ''}</div>
               </td>
               <td class="text-center">
                 <div class="qty-stepper">
@@ -158,9 +207,10 @@
         el.addEventListener(el.tagName === 'INPUT' ? 'change' : 'click', () => {
           const i = +el.dataset.i, l = state.cart[i], a = el.dataset.a;
           const b = D.batches.find((x) => x.id === l.batchId);
-          if (a === 'inc') { if (l.qty >= b.qty - b.reserved) { MF.toast(`Batch limit reached (${b.qty - b.reserved} avail)`, 'warn', 'Stock'); } else l.qty++; }
+          const cap = l.unit === 'loose' ? MF.looseAvailable(l.medId) : b.qty - b.reserved;
+          if (a === 'inc') { if (l.qty >= cap) { MF.toast(`Batch limit reached (${cap} avail)`, 'warn', 'Stock'); } else l.qty++; }
           if (a === 'dec') l.qty = Math.max(1, l.qty - 1);
-          if (a === 'qty') l.qty = Math.max(1, Math.min(b.qty - b.reserved, parseInt(el.value) || 1));
+          if (a === 'qty') l.qty = Math.max(1, Math.min(cap, parseInt(el.value) || 1));
           if (a === 'disc') l.discPct = Math.max(0, Math.min(100, parseFloat(el.value) || 0));
           if (a === 'rm') state.cart.splice(i, 1);
           renderCart(); renderSummary();
@@ -235,7 +285,7 @@
             <div class="text-2 small-xs">${h.items.length} item(s)</div>
           </div>
           <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-mf-soft" data-load="${h.id}">Load</button>
+            <button class="btn btn-sm btn-light-mf" data-load="${h.id}">Load</button>
             <button class="btn btn-sm btn-light-mf text-danger" data-del="${h.id}"><i class="bi bi-trash3"></i></button>
           </div>
         </div>`).join('')}</div>`;
@@ -298,7 +348,7 @@
         globalDiscPct: parseFloat($('#posGlobalDisc').value) || 0,
         splitCash: state.split.cash,
         splitUpi: state.split.upi,
-        items: state.cart.map((l) => ({ medId: l.medId, batchId: l.batchId, qty: l.qty, rate: l.rate, discPct: l.discPct })),
+        items: state.cart.map((l) => ({ medId: l.medId, batchId: l.batchId, qty: l.qty, rate: l.rate, discPct: l.discPct, unit: l.unit || 'pack' })),
       });
       MF.printHtml(receiptHtml(res.invoiceNo, t));
       MF.toast(`${res.invoiceNo} · ${MF.fmt(res.grandTotal)} · ${state.payment.toUpperCase()}`, 'success', 'Sale completed');
@@ -338,5 +388,12 @@
     $('#posGlobalDisc').addEventListener('input', renderSummary);
     bindPayments();
     renderCart();
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'F2') { e.preventDefault(); $('#posSearch').focus(); }
+      else if (e.key === 'F3') { e.preventDefault(); $('#posPayCash').checked = true; $('#posPayCash').dispatchEvent(new Event('change')); }
+      else if (e.key === 'F4') { e.preventDefault(); $('#posPayUpi').checked = true; $('#posPayUpi').dispatchEvent(new Event('change')); }
+      else if (e.key === 'F10') { e.preventDefault(); completeSale(); }
+    });
   });
 })();
