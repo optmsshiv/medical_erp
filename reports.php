@@ -26,16 +26,26 @@ require __DIR__ . '/middleware/auth.php';
         <div class="page-head">
           <div>
             <h1 class="page-title"><i class="bi bi-graph-up me-2 text-success"></i>Reports</h1>
-            <p class="page-sub">Pharmacy operational &amp; statutory reporting · CSV export included</p>
+            <p class="page-sub">Sales · purchase · stock · expiry · profit · GST · dues — exportable &amp; print-ready</p>
           </div>
           <div class="ms-auto d-flex align-items-center gap-2">
+            <select class="form-select form-select-sm" id="rpPeriod" style="width:auto;min-width:150px">
+              <option value="7">Last 7 days</option>
+              <option value="30" selected>Last 30 days</option>
+              <option value="90">Last 90 days</option>
+              <option value="fy" id="rpFyOpt">This financial year</option>
+              <option value="custom">Custom range</option>
+            </select>
             <input type="date" class="form-control form-control-sm" id="rpFrom" style="width:150px">
             <span class="text-2 small">to</span>
             <input type="date" class="form-control form-control-sm" id="rpTo" style="width:150px">
             <button class="btn btn-sm btn-light-mf" id="rpApply"><i class="bi bi-funnel me-1"></i>Apply</button>
             <button class="btn btn-sm btn-mf" id="rpExport"><i class="bi bi-download me-1"></i>Export CSV</button>
+            <button class="btn btn-sm btn-light-mf" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button>
           </div>
         </div>
+
+        <div class="alert alert-warning py-2 small d-none" id="rpErrors"></div>
 
         <ul class="nav nav-pills-mf mb-3" id="rpTabs">
           <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#rp-sales" data-tab="sales"><i class="bi bi-receipt"></i>Sales</button></li>
@@ -193,19 +203,46 @@ require __DIR__ . '/middleware/auth.php';
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
       await MF.boot();
-    (function () {
+    await (async function () {
       const MF = window.MF, D = window.MF_DATA;
       const $ = (s) => document.querySelector(s);
       let activeTab = 'sales';
       let data = null; // last response from reports.php
 
-      $('#rpFrom').value = MF.today().slice(0, 8) + '01';
-      $('#rpTo').value = MF.today();
+      const ymd = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      const now = new Date();
+      const fyYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+      $('#rpFyOpt').textContent = `FY ${fyYear}-${String(fyYear + 1).slice(2)}`;
+
+      function applyPeriod() {
+        const v = $('#rpPeriod').value;
+        if (v === 'custom') return;
+        const from = v === 'fy' ? new Date(fyYear, 3, 1) : new Date(now.getFullYear(), now.getMonth(), now.getDate() - (Number(v) - 1));
+        $('#rpFrom').value = ymd(from);
+        $('#rpTo').value = ymd(now);
+      }
+      applyPeriod();
+      $('#rpPeriod').addEventListener('change', () => { applyPeriod(); if ($('#rpPeriod').value !== 'custom') load(); });
+      ['#rpFrom', '#rpTo'].forEach((id) => $(id).addEventListener('change', () => { $('#rpPeriod').value = 'custom'; }));
 
       async function load() {
         const from = $('#rpFrom').value, to = $('#rpTo').value;
-        data = await MF.Api.get(`reports.php?from=${from}&to=${to}`);
-        renderSales(); renderPurchase(); renderStock(); renderExpiry(); renderProfit(); renderGst(); renderDues();
+        if (from > to) { MF.toast('"From" date must be before "To" date.', 'warn'); return; }
+        try {
+          data = await MF.Api.get(`reports.php?from=${from}&to=${to}`);
+        } catch (err) {
+          MF.toast(err.message || 'Could not load reports.', 'danger');
+          return;
+        }
+        if (!data || !data.sales) { MF.toast('Reports need the live backend (api/v1/reports.php).', 'warn'); return; }
+        // Sections that failed on the server are listed here; the other tabs still work.
+        const errs = data.errors || {};
+        const bad = Object.keys(errs);
+        $('#rpErrors').classList.toggle('d-none', !bad.length);
+        $('#rpErrors').innerHTML = bad.length ? '<i class="bi bi-exclamation-triangle me-1"></i>Some reports could not load: ' + bad.map((k) => `<strong>${MF.esc(k)}</strong>${errs[k] && errs[k] !== 'failed' ? ' (' + MF.esc(errs[k]) + ')' : ''}`).join(', ') : '';
+        [renderSales, renderPurchase, renderStock, renderExpiry, renderProfit, renderGst, renderDues].forEach((fn) => {
+          try { fn(); } catch (e) { console.error(fn.name, e); } // one broken tab must not blank the rest
+        });
       }
 
       function renderSales() {
@@ -284,7 +321,11 @@ require __DIR__ . '/middleware/auth.php';
             <td class="text-end num text-success fw-semibold">${MF.fmt(c.gp)}</td><td class="text-end num">${c.margin}%</td></tr>`).join('')
           || `<tr><td colspan="5"><div class="empty-state"><i class="bi bi-graph-up"></i>No sales in this period.</div></td></tr>`;
         if (window._profitChart) window._profitChart.destroy();
-        window._profitChart = MFCharts.profitTrend('profitChart', data.profitTrend);
+        window._profitChart = new Chart($('#profitChart'), {
+          type: 'line',
+          data: { labels: data.profitTrend.map((x) => x.label), datasets: [{ label: 'Gross profit', data: data.profitTrend.map((x) => x.value), borderColor: '#2f8f77', backgroundColor: 'rgba(47,143,119,.15)', fill: true, tension: 0.4, borderWidth: 2.5, pointRadius: 3 }] },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => 'Profit: ' + MF.fmt(c.parsed.y) } } }, scales: { x: { grid: { display: false } }, y: { ticks: { callback: (v) => '₹' + (Math.abs(v) >= 1000 ? v / 1000 + 'k' : v) } } } }
+        });
       }
 
       function renderGst() {
@@ -310,11 +351,17 @@ require __DIR__ . '/middleware/auth.php';
             <td class="text-end num fw-semibold">${MF.fmt(i.total)}</td>
           </tr>`).join('') || `<tr><td colspan="7"><div class="empty-state"><i class="bi bi-receipt"></i>No wholesale invoices in this period.</div></td></tr>`;
         if (window._gstChart) window._gstChart.destroy();
-        window._gstChart = MFCharts.gstSummary('gstChart', [k.cgst, k.sgst, k.igst, data.gstIn.cgst, data.gstIn.sgst]);
+        window._gstChart = new Chart($('#gstChart'), {
+          type: 'bar',
+          data: { labels: ['CGST', 'SGST', 'IGST'], datasets: [
+            { label: 'Output (sales)', data: [k.cgst, k.sgst, k.igst], backgroundColor: '#2f8f77', borderRadius: 6 },
+            { label: 'Input (purchases)', data: [data.gstIn.cgst, data.gstIn.sgst, data.gstIn.igst], backgroundColor: '#f59e0b', borderRadius: 6 } ] },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { tooltip: { callbacks: { label: (c) => c.dataset.label + ': ' + MF.fmt(c.parsed.y) } } }, scales: { y: { ticks: { callback: (v) => MF.fmt(v) } } } }
+        });
       }
 
       function renderDues() {
-        const custRows = D.customers.filter((c) => c.due > 0);
+        const custRows = ((data.dues || {}).customers || []).filter((c) => c.due > 0);
         $('#rpDueCustBody').innerHTML = custRows.map((c) => `
           <tr>
             <td class="td-title">${MF.esc(c.name)}</td>
@@ -325,7 +372,7 @@ require __DIR__ . '/middleware/auth.php';
           </tr>`).join('') || `<tr><td colspan="5"><div class="empty-state"><i class="bi bi-check-circle"></i>No customer dues.</div></td></tr>`;
         $('#rpDueCustFoot').innerHTML = custRows.length ? `<tr><td>Total</td><td colspan="2"></td><td class="text-end num text-danger">${MF.fmt(custRows.reduce((s, c) => s + c.due, 0))}</td><td></td></tr>` : '';
 
-        const supRows = D.suppliers.filter((s) => s.due > 0);
+        const supRows = ((data.dues || {}).suppliers || []).filter((s) => s.due > 0);
         $('#rpDueSupBody').innerHTML = supRows.map((s) => `
           <tr>
             <td>${MF.esc(s.name)}</td>
@@ -351,10 +398,11 @@ require __DIR__ . '/middleware/auth.php';
             () => data.gstInvoices.map((i) => [i.no, i.party, i.gstin, i.taxable, i.cgst, i.sgst, i.igst, i.total])],
           dues: ['Dues', ['Party', 'Type', 'Total Sales', 'Paid', 'Due', 'Last Purchase'],
             () => [
-              ...D.customers.filter((c) => c.due > 0).map((c) => ['Customer: ' + c.name, 'Customer', c.totalSales, c.paid, c.due, c.lastPurchase || '']),
-              ...D.suppliers.filter((s) => s.due > 0).map((s) => ['Supplier: ' + s.name, 'Supplier', s.totalPurchases, s.paid, s.due, s.lastPurchase || '']),
+              ...((data.dues || {}).customers || []).map((c) => ['Customer: ' + c.name, 'Customer', c.totalSales, c.paid, c.due, c.lastPurchase || '']),
+              ...((data.dues || {}).suppliers || []).map((s) => ['Supplier: ' + s.name, 'Supplier', s.totalPurchases, s.paid, s.due, s.lastPurchase || '']),
             ]]
         };
+        if (!data) { MF.toast('Nothing to export yet.', 'warn'); return; }
         const [name, headers, rowsFn] = map[activeTab];
         MF.exportCSV(name.toLowerCase() + '-report.csv', headers, rowsFn());
       });
