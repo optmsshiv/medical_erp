@@ -134,44 +134,23 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
           </div>
         </div>
 
-        <!-- Recent sales + profit trend -->
+        <!-- Recent sales + purchases -->
         <div class="row g-3 mb-3">
-          <div class="col-xl-8">
+          <div class="col-xl-6">
             <div class="card-mf h-100">
               <div class="card-head">
-                <div>
-                  <h2 class="card-title"><i class="bi bi-receipt"></i>Recent Sales</h2>
-                  <div class="text-2 small mt-1">Latest invoices across counters</div>
-                </div>
-                <div class="card-tools"><a class="btn btn-sm btn-mf-soft" href="reports.php?tab=sales">All invoices <i class="bi bi-arrow-right ms-1"></i></a></div>
+                <h2 class="card-title"><i class="bi bi-receipt"></i>Recent Sales</h2>
+                <div class="card-tools"><a class="btn btn-sm btn-mf-soft" href="reports.php?tab=sales">All invoices</a></div>
               </div>
-              <div class="table-scroll">
+              <div class="table-scroll" style="max-height:330px">
                 <table class="table table-mf">
-                  <thead><tr><th>Invoice</th><th>Customer</th><th>Type</th><th class="text-end">Amount</th><th>Payment</th><th>Status</th><th></th></tr></thead>
+                  <thead><tr><th>Invoice</th><th>Customer</th><th>Type</th><th class="text-end">Amount</th><th>Payment</th><th>Status</th></tr></thead>
                   <tbody id="recentSalesBody"></tbody>
                 </table>
               </div>
             </div>
           </div>
-          <div class="col-xl-4">
-            <div class="card-mf h-100">
-              <div class="card-head">
-                <div>
-                  <h2 class="card-title"><i class="bi bi-cash-stack"></i>Profit Trend</h2>
-                  <div class="text-2 small mt-1">Gross profit · last 14 days</div>
-                </div>
-              </div>
-              <div class="p-3">
-                <div class="chart-box" style="height:300px"><canvas id="profitChart"></canvas></div>
-                <div class="text-center text-2 small mt-2 d-none" id="profitEmptyNote">No profit data yet.</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Recent purchases + top sellers (60 : 40) -->
-        <div class="row g-3 mb-3">
-          <div class="col-12 w-xl-60">
+          <div class="col-xl-6">
             <div class="card-mf h-100">
               <div class="card-head">
                 <h2 class="card-title"><i class="bi bi-truck"></i>Recent Purchases</h2>
@@ -185,7 +164,11 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
               </div>
             </div>
           </div>
-          <div class="col-12 w-xl-40">
+        </div>
+
+        <!-- Top sellers + receivables snapshot -->
+        <div class="row g-3">
+          <div class="col-xl-7">
             <div class="card-mf h-100">
               <div class="card-head">
                 <h2 class="card-title"><i class="bi bi-trophy"></i>Top Selling Medicines</h2>
@@ -197,72 +180,39 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
               </table>
             </div>
           </div>
-        </div>
-
-        <!-- Dues snapshot -->
-        <div class="row g-3">
-          <div class="col-12">
+          <div class="col-xl-5">
             <div class="card-mf h-100">
               <div class="card-head">
                 <h2 class="card-title"><i class="bi bi-wallet2"></i>Dues Snapshot</h2>
                 <div class="card-tools"><a class="btn btn-sm btn-mf-soft" href="reports.php?tab=dues">Due report</a></div>
               </div>
               <div class="p-3">
-                <div class="row g-4">
-                  <div class="col-md-6">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                      <div><div class="kpi-label mb-1">Total Customer Dues</div><div class="kpi-value text-danger" id="dueCust">₹0</div></div>
-                      <div class="kpi-icon tone-danger"><i class="bi bi-people"></i></div>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center">
-                      <div><div class="kpi-label mb-1">Total Supplier Dues</div><div class="kpi-value text-warning" id="dueSup">₹0</div></div>
-                      <div class="kpi-icon tone-warning"><i class="bi bi-truck"></i></div>
-                    </div>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <div>
+                    <div class="kpi-label mb-1">Total Customer Dues</div>
+                    <div class="kpi-value text-danger" id="dueCust">₹0</div>
                   </div>
-                  <div class="col-md-6">
-                    <div class="sr-group-label">Aging (customers)</div>
-                    <div class="sum-row"><span class="text-2">0–7 days</span><span class="num fw-semibold" id="ageA">₹0</span></div>
-                    <div class="sum-row"><span class="text-2">8–30 days</span><span class="num fw-semibold" id="ageB">₹0</span></div>
-                    <div class="sum-row"><span class="text-2">31–60 days</span><span class="num fw-semibold" id="ageC">₹0</span></div>
-                    <div class="sum-row"><span class="text-2">&gt; 60 days</span><span class="num fw-semibold text-danger" id="ageD">₹0</span></div>
-                  </div>
+                  <div class="kpi-icon tone-danger"><i class="bi bi-people"></i></div>
                 </div>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <div>
+                    <div class="kpi-label mb-1">Total Supplier Dues</div>
+                    <div class="kpi-value text-warning" id="dueSup">₹0</div>
+                  </div>
+                  <div class="kpi-icon tone-warning"><i class="bi bi-truck"></i></div>
+                </div>
+                <div class="divider-dashed my-3"></div>
+                <div class="sr-group-label">Aging (customers)</div>
+                <div class="sum-row"><span class="text-2">0–7 days</span><span class="num fw-semibold" id="ageA">₹0</span></div>
+                <div class="sum-row"><span class="text-2">8–30 days</span><span class="num fw-semibold" id="ageB">₹0</span></div>
+                <div class="sum-row"><span class="text-2">31–60 days</span><span class="num fw-semibold" id="ageC">₹0</span></div>
+                <div class="sum-row"><span class="text-2">&gt; 60 days</span><span class="num fw-semibold text-danger" id="ageD">₹0</span></div>
               </div>
             </div>
           </div>
         </div>
 
       </main>
-    </div>
-  </div>
-
-  <style>
-    @media (min-width:1200px){ .w-xl-60{flex:0 0 auto;width:60%} .w-xl-40{flex:0 0 auto;width:40%} }
-    .split-row{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-radius:12px;margin-bottom:10px;font-weight:600}
-    .split-row:last-child{margin-bottom:0}
-    .split-row .split-name{display:flex;align-items:center;gap:10px}
-    .split-row .split-dot{width:12px;height:12px;border-radius:50%}
-    .split-row .split-amt{color:#111827;font-weight:700;font-size:1.05rem}
-    .split-retail{background:#e6f0ec;color:#146c55} .split-retail .split-dot{background:#146c55}
-    .split-wholesale{background:#fdf3e0;color:#b45309} .split-wholesale .split-dot{background:#f59e0b}
-    .sv-label{font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af;margin-bottom:4px}
-    .sv-value{font-weight:600}
-  </style>
-
-  <!-- Sale view modal -->
-  <div class="modal fade" id="saleViewModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title d-flex align-items-center gap-2"><span class="kpi-icon tone-green" style="width:36px;height:36px"><i class="bi bi-receipt"></i></span><span id="svInvoice"></span></h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body" id="svBody"></div>
-        <div class="modal-footer">
-          <button class="btn btn-light-mf" data-bs-dismiss="modal">Close</button>
-          <button class="btn btn-mf-soft" id="svPrint"><i class="bi bi-printer me-1"></i>Print</button>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -391,10 +341,10 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
       const legendContainer = document.getElementById('splitLegend');
       if (legendContainer) {
         legendContainer.innerHTML = (split.retail + split.wholesale) === 0 ? '<div class="text-center text-2 small">No sales recorded today yet</div>' : `
-          <div class="split-row split-retail"><span class="split-name"><span class="split-dot"></span>Retail</span><span class="split-amt num">${MF.fmt(split.retail)}</span></div>
-          <div class="split-row split-wholesale"><span class="split-name"><span class="split-dot"></span>Wholesale</span><span class="split-amt num">${MF.fmt(split.wholesale)}</span></div>`;
+          <div class="sum-row"><span><span class="badge badge-soft-primary me-2">Retail</span></span><span class="num fw-semibold">${MF.fmt(split.retail)} · ${(split.retail / tot * 100).toFixed(0)}%</span></div>
+          <div class="sum-row"><span><span class="badge badge-soft-warning me-2">Wholesale</span></span><span class="num fw-semibold">${MF.fmt(split.wholesale)} · ${(split.wholesale / tot * 100).toFixed(0)}%</span></div>`;
       }
-
+        
       document.querySelectorAll('#salesPeriod button').forEach((b) => b.addEventListener('click', () => {
         document.querySelectorAll('#salesPeriod button').forEach((x) => x.classList.remove('active'));
         b.classList.add('active');
@@ -454,65 +404,19 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
         }).join('') : emptyRow(6, 'No batches expiring in the next 90 days');
       }
 
-      /* Recent sales (eye button opens the invoice modal) */
-      const payLabel = (p) => { const k = String(p || '').toLowerCase(); return ({ cash: 'Cash', upi: 'UPI', card: 'Card', credit: 'Credit', split: 'Split', bank: 'Bank' })[k] || (p || '—'); };
-      const payTone = (p) => ({ cash: 'success', upi: 'info', card: 'primary', credit: 'danger', split: 'warning', bank: 'secondary' })[String(p || '').toLowerCase()] || 'secondary';
+      /* Recent sales */
       const recentSalesBody = document.getElementById('recentSalesBody');
-      const recentList = (liveList('recentSales') || (D.salesInvoices || []).slice(0, 6));
       if (recentSalesBody) {
-        const list = recentList;
-        recentSalesBody.innerHTML = list.length ? list.map((i, idx) => `
+        const list = (liveList('recentSales') || (D.salesInvoices || []).slice(0, 6));
+        recentSalesBody.innerHTML = list.length ? list.map((i) => `
           <tr>
             <td><div class="td-title num">${MF.esc(i.no)}</div><div class="td-sub">${MF.fmtDate(i.date)}${i.time ? ' · ' + i.time : ''}</div></td>
             <td>${MF.esc(i.customer)}</td>
             <td>${i.type === 'Retail' ? MF.badge('Retail', 'primary') : MF.badge('Wholesale', 'warning')}</td>
             <td class="text-end num fw-semibold">${MF.fmt(i.amount)}</td>
-            <td><span class="badge badge-soft-${payTone(i.payment)}">${MF.esc(payLabel(i.payment))}</span></td>
+            <td>${MF.esc(i.payment)}</td>
             <td>${MF.statusBadge(i.status)}</td>
-            <td class="text-end"><button class="btn btn-sm btn-light-mf" data-view-sale="${idx}" title="View invoice"><i class="bi bi-eye"></i></button></td>
-          </tr>`).join('') : emptyRow(7, 'No sales yet');
-
-        recentSalesBody.addEventListener('click', (e) => {
-          const btn = e.target.closest('[data-view-sale]');
-          if (!btn) return;
-          const i = recentList[Number(btn.dataset.viewSale)];
-          if (!i) return;
-          document.getElementById('svInvoice').textContent = i.no;
-          const items = Array.isArray(i.items) ? i.items : [];
-          const rows = items.length ? items.map((it) => `
-            <tr>
-              <td>${MF.esc(it.name)}</td>
-              <td class="num">${MF.esc(it.batch || '—')}</td>
-              <td class="text-end num">${MF.num(it.qty)}</td>
-              <td class="text-end num">${MF.fmt(it.mrp, 2)}</td>
-              <td class="text-end num">${MF.fmt(it.rate, 2)}</td>
-              <td class="text-end num">${Number(it.gst || 0)}%</td>
-              <td class="text-end num fw-semibold">${MF.fmt(it.amount, 2)}</td>
-            </tr>`).join('') : emptyRow(7, 'No line items available for this invoice');
-          document.getElementById('svBody').innerHTML = `
-            <div class="row g-3 mb-3">
-              <div class="col-6"><div class="sv-label">Customer</div><div class="sv-value">${MF.esc(i.customer)}</div></div>
-              <div class="col-6"><div class="sv-label">Date &amp; Time</div><div class="sv-value">${MF.fmtDate(i.date)}${i.time ? ' · ' + i.time : ''}</div></div>
-              <div class="col-6"><div class="sv-label">Type</div><div class="sv-value">${MF.esc(i.type)}</div></div>
-              <div class="col-6"><div class="sv-label">Payment</div><div class="d-flex gap-1"><span class="badge badge-soft-${payTone(i.payment)}">${MF.esc(payLabel(i.payment))}</span>${MF.statusBadge(i.status)}</div></div>
-            </div>
-            <div class="table-scroll">
-              <table class="table table-mf">
-                <thead><tr><th>Medicine</th><th>Batch</th><th class="text-end">Qty</th><th class="text-end">MRP</th><th class="text-end">Rate</th><th class="text-end">GST</th><th class="text-end">Amount</th></tr></thead>
-                <tbody>${rows}</tbody>
-              </table>
-            </div>
-            <div class="d-flex justify-content-end align-items-center gap-4 mt-3">
-              <span class="text-2">Grand Total</span>
-              <span class="fw-bold fs-4 num" style="color:#146c55">${MF.fmt(i.amount, 2)}</span>
-            </div>`;
-          bootstrap.Modal.getOrCreateInstance(document.getElementById('saleViewModal')).show();
-        });
-
-        document.getElementById('svPrint').addEventListener('click', () => {
-          const html = `<h5>${document.getElementById('svInvoice').textContent}</h5>` + document.getElementById('svBody').innerHTML;
-          if (MF.printHtml) MF.printHtml(html); else window.print();
-        });
+          </tr>`).join('') : emptyRow(6, 'No sales yet');
       }
 
       /* Recent purchases */
@@ -542,26 +446,6 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
             <td class="text-end num">${MF.num(t.qty)}</td>
             <td class="text-end num fw-semibold">${MF.fmt(t.revenue)}</td>
           </tr>`).join('') : emptyRow(4, 'No sales in the last 7 days');
-      }
-
-      /* Profit trend (last 14 days) */
-      const pt = db.profitTrend || { dates: [], values: [] };
-      const profitCanvas = document.getElementById('profitChart');
-      if (profitCanvas && window.Chart) {
-        const hasProfit = (pt.values || []).some((v) => Number(v) !== 0);
-        document.getElementById('profitEmptyNote').classList.toggle('d-none', hasProfit);
-        const labels = (pt.dates || []).map((x) => new Date(x + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }));
-        const kfmt = (v) => '₹' + (Math.abs(v) >= 1000 ? (v / 1000) + 'k' : v);
-        new Chart(profitCanvas, {
-          type: 'line',
-          data: { labels, datasets: [{ label: 'Profit', data: pt.values || [], borderColor: '#2f8f77', backgroundColor: 'rgba(47,143,119,.15)', fill: true, tension: 0.4, borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 5 }] },
-          options: {
-            responsive: true, maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
-            plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => 'Profit: ' + MF.fmt(c.parsed.y) } } },
-            scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 7 } }, y: { ticks: { callback: kfmt } } }
-          }
-        });
       }
 
       /* Dues snapshot */

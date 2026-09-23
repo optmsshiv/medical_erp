@@ -327,15 +327,13 @@ try {
         $when  = (string) $r['sale_date'];
         // Only datetimes carry a time; a plain DATE is shown as stored.
         $local = strlen($when) > 10 ? (new DateTimeImmutable($when, $dbTz))->setTimezone($appTz) : null;
-        // sale_date is a plain DATE, so take the time of day from created_at when present.
-        $created = !empty($r['created_at']) ? (new DateTimeImmutable((string) $r['created_at'], $dbTz))->setTimezone($appTz) : null;
         return [
             'id'       => (int) $r['id'],
             'no'       => (string) ds_first($r, ['invoice_no', 'invoice_number', 'bill_no', 'sale_no'], 'INV-' . $r['id']),
             'customer' => $r['customer_name'] ?? 'Walk-in Customer',
             'type'     => strcasecmp((string) ($r['channel'] ?? $r['customer_type'] ?? ''), 'Wholesale') === 0 ? 'Wholesale' : 'Retail',
             'date'     => $local ? $local->format('Y-m-d') : substr($when, 0, 10),
-            'time'     => $local ? $local->format('h:i A') : ($created ? $created->format('h:i A') : ''),
+            'time'     => $local ? $local->format('h:i A') : '',
             'amount'   => (float) $r['grand_total'],
             'payment'  => (string) ds_first($r, ['payment_mode', 'payment_method', 'payment_type'], (float) $r['balance_due'] > 0 ? 'Credit' : '—'),
             'status'   => ds_status($r),
@@ -345,83 +343,6 @@ try {
          FROM sales s LEFT JOIN customers c ON c.id = s.customer_id
          ORDER BY s.sale_date DESC, s.id DESC LIMIT 6'
     )->fetchAll());
-
-    // --- Line items for the invoice pop-up on Recent Sales -------------------------
-    try {
-        $sit = ds_find_table($pdo, ['sale_items', 'sales_items', 'sale_details', 'sale_lines']);
-        $sids = array_column($recentSales, 'id');
-        if ($sit && $sids) {
-            $in = implode(',', array_fill(0, count($sids), '?'));
-            $st = $pdo->prepare(
-                "SELECT si.*, m.name AS med_name, m.mrp AS med_mrp, b.batch_no AS batch_no
-                 FROM `{$sit}` si
-                 LEFT JOIN medicines m ON m.id = si.medicine_id
-                 LEFT JOIN batches b ON b.id = si.batch_id
-                 WHERE si.sale_id IN ({$in}) ORDER BY si.id"
-            );
-            $st->execute($sids);
-            $byId = [];
-            foreach ($st->fetchAll() as $r) {
-                $q     = (float) $r['qty'];
-                $loose = (($r['unit_sold'] ?? 'pack') === 'loose') ? max(1, (int) ($r['pack_qty_at_sale'] ?? 1)) : 1;
-                $byId[(int) $r['sale_id']][] = [
-                    'name'   => (string) $r['med_name'],
-                    'batch'  => (string) $r['batch_no'],
-                    'qty'    => $q,
-                    'mrp'    => round((float) $r['med_mrp'] / $loose, 2),
-                    'rate'   => $q > 0 ? round((float) $r['amount'] / $q, 2) : (float) $r['rate'],
-                    'gst'    => (float) $r['gst_pct'],
-                    'amount' => round((float) $r['amount'], 2),
-                ];
-            }
-            foreach ($recentSales as &$rs) {
-                $rs['items'] = $byId[$rs['id']] ?? [];
-            }
-            unset($rs);
-        }
-    } catch (Throwable $e) {
-        error_log('dashboard-stats sale items: ' . $e->getMessage());
-    }
-
-    // --- Gross profit per day, last 14 days (revenue ex-GST minus purchase cost) ---
-    $profitTrend = ['dates' => [], 'values' => []];
-    $profitByDay = [];
-    try {
-        $sit = $sit ?? ds_find_table($pdo, ['sale_items', 'sales_items', 'sale_details', 'sale_lines']);
-        if ($sit) {
-            $ic       = ds_columns($pdo, $sit);
-            $freeExpr = in_array('free_qty', $ic, true) ? '+ COALESCE(si.free_qty, 0)' : '';
-            $perUnit  = in_array('unit_sold', $ic, true) && in_array('pack_qty_at_sale', $ic, true)
-                ? "CASE WHEN si.unit_sold = 'loose' THEN GREATEST(si.pack_qty_at_sale, 1) ELSE 1 END" : '1';
-            // Retail amounts include GST (MRP-inclusive); wholesale amounts are before GST.
-            $rev  = in_array('channel', $saleCols, true)
-                ? "CASE WHEN LOWER(s.channel) = 'wholesale' THEN si.amount ELSE si.amount / (1 + si.gst_pct / 100) END"
-                : 'si.amount / (1 + si.gst_pct / 100)';
-            $cost = "(si.qty {$freeExpr}) * b.purchase_rate / ({$perUnit})";
-            $st = $pdo->prepare(
-                "SELECT DATE({$localSaleDt}) AS d, SUM({$rev}) AS revenue, SUM({$rev} - {$cost}) AS profit
-                 FROM `{$sit}` si
-                 JOIN sales s ON s.id = si.sale_id
-                 JOIN batches b ON b.id = si.batch_id
-                 WHERE s.sale_date >= :f AND s.sale_date < :t
-                 GROUP BY DATE({$localSaleDt})"
-            );
-            $st->execute(['f' => $dbStart($d($today->modify('-13 days'))), 't' => $dbStart($d($tomorrow))]);
-            foreach ($st->fetchAll() as $r) {
-                $profitByDay[$r['d']] = ['profit' => (float) $r['profit'], 'revenue' => (float) $r['revenue']];
-            }
-        }
-    } catch (Throwable $e) {
-        error_log('dashboard-stats profit: ' . $e->getMessage());
-    }
-    for ($i = 13; $i >= 0; $i--) {
-        $day = $d($today->modify("-{$i} days"));
-        $profitTrend['dates'][]  = $day;
-        $profitTrend['values'][] = round($profitByDay[$day]['profit'] ?? 0, 2);
-    }
-    $profitToday = $profitByDay[$d($today)]['profit'] ?? 0.0;
-    $profitYest  = $profitByDay[$d($yesterday)]['profit'] ?? 0.0;
-    $revToday    = $profitByDay[$d($today)]['revenue'] ?? 0.0;
 
     // --- Recent purchases (last 6) ---------------------------------------------
     $purchaseRows = $pdo->query(
@@ -550,10 +471,9 @@ try {
             'todaySalesDelta'    => ds_delta($todaySales, $yesterdaySales),
             'todayPurchase'      => round($todayPurchase, 2),
             'todayPurchaseDelta' => ds_delta($todayPurchase, $yesterdayPurchase),
-            'grossProfit'        => round($profitToday, 2),
-            'grossProfitDelta'   => ds_delta($profitToday, $profitYest),
-            'grossProfitMargin'  => $revToday > 0 ? round($profitToday / $revToday * 100, 1) : 0,
-            'profitTrend'        => $profitTrend,
+            'grossProfit'        => 0,
+            'grossProfitDelta'   => 0,
+            'grossProfitMargin'  => 0,
             'stockValue'         => round((float) $stockRow['value'], 2),
             'stockUnits'         => (int) $stockRow['units'],
             'customerDue'        => round((float) $custDue['due'], 2),
