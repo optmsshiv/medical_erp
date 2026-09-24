@@ -301,7 +301,7 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
         $('#fHsn').value = m?.hsn || '3004'; $('#fUnit').value = m?.unit || 'Strip'; $('#fPack').value = m?.packSize || '';
         $('#fPackQty').value = m?.packQty || 1; $('#fSubUnit').value = m?.subUnit || ''; $('#fAllowLoose').checked = !!m?.allowLoose;
         $('#fGst').value = m ? String(m.gst) : '12'; $('#fSchedule').value = m?.schedule || 'OTC';
-        $('#fMrp').value = m?.mrp ?? ''; $('#fPtr').value = m?.purchaseRate ?? ''; $('#fRetail').value = m?.retailRate ?? m?.mrp ?? '';
+        $('#fMrp').value = m?.mrp ?? ''; $('#fPtr').value = m?.purchaseRate ?? ''; $('#fRetail').value = m?.mrp ?? '';
         $('#fWholesale').value = m?.wholesaleRate ?? ''; $('#fMin').value = m?.minStock ?? 50; $('#fReorder').value = m?.reorderLevel ?? 100;
         $('#fRx').checked = !!m?.rxRequired; $('#fActive').checked = m ? m.status === 'Active' : true;
         new bootstrap.Modal($('#mmFormModal')).show();
@@ -315,7 +315,7 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
           category: $('#fCategory').value, manufacturer: $('#fMfg').value, hsn: $('#fHsn').value,
           unit: $('#fUnit').value, packSize: $('#fPack').value, gst: +$('#fGst').value, schedule: $('#fSchedule').value,
           packQty: +$('#fPackQty').value || 1, subUnit: $('#fSubUnit').value.trim(), allowLoose: $('#fAllowLoose').checked,
-          mrp: +$('#fMrp').value, retailRate: +$('#fRetail').value || +$('#fMrp').value, purchaseRate: +$('#fPtr').value || 0,
+          mrp: +$('#fMrp').value, purchaseRate: +$('#fPtr').value || 0,
           wholesaleRate: +$('#fWholesale').value || (+$('#fMrp').value * 0.9), minStock: +$('#fMin').value,
           reorderLevel: +$('#fReorder').value, rxRequired: $('#fRx').checked,
           status: $('#fActive').checked ? 'Active' : 'Inactive'

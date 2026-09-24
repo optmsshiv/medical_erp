@@ -52,7 +52,6 @@ function mapPayloadToRow(array $input): array
         'sub_unit'        => trim($input['subUnit'] ?? ''),
         'allow_loose_sale' => !empty($input['allowLoose']) ? 1 : 0,
         'mrp'             => (float) ($input['mrp'] ?? 0),
-        'retail_rate'     => (float) ($input['retailRate'] ?? $input['mrp'] ?? 0),
         'purchase_rate'   => (float) ($input['purchaseRate'] ?? 0),
         'wholesale_rate'  => (float) ($input['wholesaleRate'] ?? 0),
         'min_stock'       => (int) ($input['minStock'] ?? 0),

@@ -88,7 +88,7 @@ $purchases = $section('purchases', function () use ($pdo, $from, $to) {
 // "Loose Stock" column) and the manufacturer name (shown under the medicine name).
 $stock = $section('stock', function () use ($pdo) {
     $stmt = $pdo->query(
-        "SELECT b.*, m.name AS med_name, m.min_stock, m.mrp AS med_mrp, m.unit, m.sub_unit, mf.name AS manufacturer
+        "SELECT b.*, m.name AS med_name, m.min_stock, m.mrp AS med_mrp, m.sub_unit, mf.name AS manufacturer
          FROM batches b
          JOIN medicines m ON m.id = b.medicine_id
          LEFT JOIN manufacturers mf ON mf.id = m.manufacturer_id
@@ -99,7 +99,7 @@ $stock = $section('stock', function () use ($pdo) {
         $status = $qty === 0 ? 'Out of Stock' : ($qty <= (int) ($r['min_stock'] ?? 0) ? 'Low Stock' : 'In Stock');
         return [
             'name' => $r['med_name'], 'manufacturer' => $r['manufacturer'] ?? '', 'batch' => $r['batch_no'], 'qty' => $qty,
-            'unit' => $r['unit'] ?? '', 'looseQty' => (int) ($r['loose_qty'] ?? 0), 'subUnit' => $r['sub_unit'] ?? '',
+            'looseQty' => (int) ($r['loose_qty'] ?? 0), 'subUnit' => $r['sub_unit'] ?? '',
             'purchaseValue' => round($qty * (float) $r['purchase_rate']),
             'mrpValue' => round($qty * (float) ($r['mrp'] ?? $r['med_mrp'] ?? 0)),
             'status' => $status,

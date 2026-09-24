@@ -39,7 +39,6 @@ $medicines = array_map(function ($row) {
         'subUnit'       => $row['sub_unit'] ?? '',
         'allowLoose'    => (bool) $row['allow_loose_sale'],
         'mrp'           => (float) $row['mrp'],
-        'retailRate'    => (float) $row['retail_rate'],
         'purchaseRate'  => (float) $row['purchase_rate'],
         'wholesaleRate' => (float) $row['wholesale_rate'],
         'minStock'      => (int) $row['min_stock'],

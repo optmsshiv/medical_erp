@@ -284,8 +284,8 @@ require __DIR__ . '/middleware/auth.php';
           <tr>
             <td class="td-title">${MF.esc(b.name)}${b.manufacturer ? `<div class="text-2 small">${MF.esc(b.manufacturer)}</div>` : ''}</td>
             <td class="num">${b.batch}</td>
-            <td class="text-end num">${b.qty} ${MF.esc(b.unit || 'unit')}</td>
-            <td class="text-end num">${b.looseQty ? MF.num(b.looseQty) + ' ' + MF.esc(b.subUnit || 'unit') + ' (loose)' : '—'}</td>
+            <td class="text-end num">${b.qty}</td>
+            <td class="text-end num">${b.looseQty ? MF.num(b.looseQty) + ' ' + MF.esc(b.subUnit || 'unit') : '—'}</td>
             <td class="text-end num">${MF.fmt(b.purchaseValue)}</td>
             <td class="text-end num">${MF.fmt(b.mrpValue)}</td>
             <td>${MF.statusBadge(b.status)}</td>
@@ -390,7 +390,7 @@ require __DIR__ . '/middleware/auth.php';
           purchase: ['Purchase', ['Date', 'Supplier', 'Invoice', 'Amount', 'Tax', 'Payment', 'Status'],
             () => data.purchases.map((p) => [p.date, p.supplier, p.no, p.amount, p.tax, p.payment, p.status])],
           stock: ['Stock', ['Medicine', 'Batch', 'Qty', 'Loose Stock', 'Purchase Value', 'MRP Value', 'Status'],
-            () => data.stock.filter((b) => b.qty > 0 || b.looseQty > 0).map((b) => [b.name, b.batch, `${b.qty} ${b.unit || 'unit'}`, b.looseQty ? `${b.looseQty} ${b.subUnit || 'unit'} (loose)` : '', b.purchaseValue, b.mrpValue, b.status])],
+            () => data.stock.filter((b) => b.qty > 0 || b.looseQty > 0).map((b) => [b.name, b.batch, b.qty, b.looseQty ? `${b.looseQty} ${b.subUnit || 'unit'}` : '', b.purchaseValue, b.mrpValue, b.status])],
           expiry: ['Expiry', ['Medicine', 'Batch', 'Expiry', 'Days', 'Qty', 'Value'],
             () => data.expiry.map((b) => [b.name, b.batch, b.expiry, b.days, b.qty, b.value])],
           profit: ['Profit', ['Category', 'Sales', 'Cost', 'GP', 'Margin%'],
