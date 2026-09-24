@@ -55,7 +55,7 @@ function mapPayloadToRow(array $input): array
     return [
         'name'            => trim($input['name'] ?? ''),
         'generic_name'    => $input['generic'] ?? '',
-        'brand_name'      => trim($input['brandRef'] ?? ''),
+        'brand_ref'       => trim($input['brandRef'] ?? ''),
         'composition'     => $input['composition'] ?? '',
         'category_id'     => findOrCreateId('Category', $input['category'] ?? ''),
         'manufacturer_id' => findOrCreateId('Manufacturer', $input['manufacturer'] ?? ''),
