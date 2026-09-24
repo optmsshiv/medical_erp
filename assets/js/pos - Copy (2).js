@@ -67,26 +67,6 @@
       btn.addEventListener('click', () => addToCart(btn.dataset.med)));
     box.querySelectorAll('.pos-loose-add').forEach((btn) =>
       btn.addEventListener('click', (e) => { e.stopPropagation(); addToCart(btn.dataset.med, 'loose'); }));
-    box.querySelectorAll('.pos-order-sub').forEach((btn) =>
-      btn.addEventListener('click', (e) => { e.stopPropagation(); MF.toast('Order / substitute isn\'t available yet.', 'info', 'Stock'); }));
-  }
-
-  /* Right-side price block: MRP + available stock, and either the add button
-     or the out-of-stock / order-substitute action when nothing is left to sell. */
-  function priceBlock(m, stock) {
-    const outOfStock = stock <= 0;
-    const action = outOfStock
-      ? `<div class="d-flex align-items-center justify-content-end gap-1 mt-1 text-danger">
-           <span style="width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block"></span>
-           <span class="small-xs">Out of stock</span>
-         </div>
-         <button type="button" class="btn btn-mf btn-sm mt-1 pos-order-sub" data-med="${m.id}">Order / substitute</button>`
-      : (m.allowLoose ? `<button type="button" class="btn btn-light-mf btn-sm mt-1 pos-loose-add" data-med="${m.id}">+ Add ${MF.esc(m.subUnit || 'Loose')}</button>` : '');
-    return `
-        <div class="fw-bold num">${MF.fmt(m.mrp, 2)}</div>
-        <div class="small-xs text-2 mt-1">MRP : ${MF.fmt(m.mrp, 2)}</div>
-        <div class="small-xs text-2 mt-1">Stock : ${MF.num(stock)} ${MF.esc(unitLabel(m))}</div>
-        ${action}`;
   }
 
   /* ---------------- Medicine search ---------------- */
@@ -103,7 +83,7 @@
       const b = MF.pickBatch(m.id);
       const stock = MF.stockOf(m.id);
       return `
-      <div class="pos-result" role="button" tabindex="0" data-med="${m.id}" ${(!b || stock <= 0) ? 'disabled' : ''}>
+      <div class="pos-result" role="button" tabindex="0" data-med="${m.id}" ${!b ? 'disabled' : ''}>
         <div class="kpi-icon tone-primary" style="width:38px;height:38px;flex-basis:38px;font-size:1rem"><i class="bi bi-capsule"></i></div>
         <div class="flex-grow-1 text-start">
           <div class="pr-name">${MF.esc(m.name)} <span class="text-2 fw-normal">· ${MF.esc(m.brandRef)}</span></div>
@@ -111,7 +91,10 @@
           ${b ? batchExpiryPills(b, m) : `<div class="pr-meta text-danger mt-1">No sellable batch (expired stock only)</div>${subsLine(m)}`}
         </div>
         <div class="text-end">
-          ${priceBlock(m, stock)}
+          <div class="fw-bold num">${MF.fmt(m.mrp, 2)}</div>
+          <div class="small-xs text-2 mt-1">Stock ${MF.num(stock)} ${MF.esc(unitLabel(m))}</div>
+          <div class="small-xs text-2 mt-1">MRP ${MF.fmt(m.mrp, 2)}</div>
+          ${m.allowLoose ? `<button type="button" class="btn btn-light-mf btn-sm mt-1 pos-loose-add" data-med="${m.id}">+ ${MF.esc(m.subUnit || 'Loose')}</button>` : ''}
         </div>
       </div>`;
     }).join('');
@@ -127,7 +110,7 @@
         const id = m.id;
         const b = MF.pickBatch(id);
         const stock = MF.stockOf(id);
-        return `<div class="pos-result" role="button" tabindex="0" data-med="${id}" ${stock <= 0 ? 'disabled' : ''}>
+        return `<div class="pos-result" role="button" tabindex="0" data-med="${id}">
           <div class="kpi-icon tone-primary" style="width:38px;height:38px;flex-basis:38px;font-size:1rem"><i class="bi bi-capsule"></i></div>
           <div class="flex-grow-1 text-start">
             <div class="pr-name">${MF.esc(m.name)}</div>
@@ -135,7 +118,10 @@
             ${batchExpiryPills(b, m)}
           </div>
           <div class="text-end">
-            ${priceBlock(m, stock)}
+            <div class="fw-bold num">${MF.fmt(m.mrp, 2)}</div>
+            <div class="small-xs text-2 mt-1">Stock ${MF.num(stock)} ${MF.esc(unitLabel(m))}</div>
+            <div class="small-xs text-2 mt-1">MRP ${MF.fmt(m.mrp, 2)}</div>
+            ${m.allowLoose ? `<button type="button" class="btn btn-light-mf btn-sm mt-1 pos-loose-add" data-med="${id}">+ ${MF.esc(m.subUnit || 'Loose')}</button>` : ''}
           </div>
         </div>`;
       }).join('')}
