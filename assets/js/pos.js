@@ -52,13 +52,12 @@
 
       /* Stock status badge (next to MRP) */
       .pos-stock-badge {
-        display:inline-flex; align-items:center; gap:4px; margin-left:8px; padding:1px 8px;
-        font-size:.68rem; font-weight:600; line-height:1.5; border-radius:999px; vertical-align:middle;
+        display:inline-flex; align-items:center; margin-left:8px; padding:1px 8px;
+        font-size:.68rem; font-weight:600; line-height:1.5; border-radius:3px; vertical-align:middle;
       }
-      .pos-stock-badge::before { content:''; width:6px; height:6px; border-radius:50%; background:currentColor; }
-      .pos-stock-badge.in  { background:#e6f6ec; color:#157347; box-shadow:0 2px 6px rgba(21,115,71,.22); }
-      .pos-stock-badge.low { background:#fff4dc; color:#a86400; box-shadow:0 2px 6px rgba(217,119,6,.25); }
-      .pos-stock-badge.out { background:#fdeaea; color:#c62828; box-shadow:0 2px 6px rgba(220,53,69,.25); }
+      .pos-stock-badge.in  { background:#e6f6ec; color:#157347; }
+      .pos-stock-badge.low { background:#fff4dc; color:#a86400; }
+      .pos-stock-badge.out { background:#fdeaea; color:#c62828; }
 
       /* "Avail : 110/300" next to expiry pill */
       .pos-avail { font-size:.72rem; color:#6c757d; white-space:nowrap; margin-left:4px; }
@@ -186,7 +185,7 @@
       const stock = MF.stockOf(m.id);
       const outOfStock = !b || stock <= 0;
       return `
-      <div class="pos-result" role="button" tabindex="0" data-med="${m.id}" ${outOfStock ? 'disabled' : ''} ${outOfStock ? 'style="border-color:#dc3545"' : ''}>
+      <div class="pos-result" role="button" tabindex="0" data-med="${m.id}" ${outOfStock ? 'disabled' : ''}>
         <div class="kpi-icon tone-primary" style="width:38px;height:38px;flex-basis:38px;font-size:1rem"><i class="bi bi-capsule"></i></div>
         <div class="flex-grow-1 text-start">
           ${nameLine(m)}
@@ -212,7 +211,7 @@
         const b = MF.pickBatch(id);
         const stock = MF.stockOf(id);
         const outOfStock = stock <= 0;
-        return `<div class="pos-result" role="button" tabindex="0" data-med="${id}" ${outOfStock ? 'disabled' : ''} ${outOfStock ? 'style="border-color:#dc3545"' : ''}>
+        return `<div class="pos-result" role="button" tabindex="0" data-med="${id}" ${outOfStock ? 'disabled' : ''}>
           <div class="kpi-icon tone-primary" style="width:38px;height:38px;flex-basis:38px;font-size:1rem"><i class="bi bi-capsule"></i></div>
           <div class="flex-grow-1 text-start">
             ${nameLine(m)}
