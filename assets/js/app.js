@@ -298,18 +298,20 @@ window.MF = window.MF || {};
       { label: 'Stock Adjustment', icon: 'sliders', stub: true },
       { label: 'Stock Transfer', icon: 'arrow-left-right', stub: true }
     ]},
-    { label: 'Pharmacy', icon: 'heart-pulse', items: [
-      { label: 'Prescriptions', icon: 'file-medical', stub: true },
-      { label: 'Doctors', icon: 'heart-pulse', stub: true },
-      { label: 'Manufacturers', icon: 'buildings', stub: true },
-      { label: 'Medicine Categories', icon: 'tags', stub: true }
-    ]},
-    { label: 'Accounts', icon: 'wallet2', items: [
-      { label: 'Payments', icon: 'credit-card-2-front', stub: true },
-      { label: 'Expenses', icon: 'cash-coin', stub: true },
-      { label: 'Cash Book', icon: 'journal-text', stub: true },
-      { label: 'GST', icon: 'percent', href: 'reports.php?tab=gst&view=summary' }
-    ]},
+    {
+      label: 'Pharmacy', icon: 'heart-pulse', items: [
+        { label: 'Prescriptions', icon: 'file-medical', page: 'prescriptions', href: 'prescriptions.php' },
+        { label: 'Doctors', icon: 'heart-pulse', page: 'doctors', href: 'doctors.php' },
+        { label: 'Manufacturers', icon: 'buildings', stub: true },
+        { label: 'Medicine Categories', icon: 'tags', stub: true }
+      ]},
+    {
+      label: 'Accounts', icon: 'wallet2', items: [
+        { label: 'Payments', icon: 'credit-card-2-front', stub: true },
+        { label: 'Expenses', icon: 'cash-coin', page: 'expenses', href: 'expenses.php' },
+        { label: 'Cash Book', icon: 'journal-text', stub: true },
+        { label: 'GST', icon: 'percent', href: 'reports.php?tab=gst&view=summary' }
+      ]},
     { label: 'Reports', icon: 'graph-up', items: [
       { label: 'Sales Reports', icon: 'graph-up', href: 'reports.php?tab=sales' },
       { label: 'Purchase Reports', icon: 'receipt-cutoff', href: 'reports.php?tab=purchase' },
