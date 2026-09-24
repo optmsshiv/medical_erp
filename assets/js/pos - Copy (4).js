@@ -16,26 +16,6 @@
   };
 
   const $ = (s) => document.querySelector(s);
-
-  /* Button styles that need :hover / :active (can't be done with inline styles) */
-  if (!document.getElementById('pos-btn-styles')) {
-    const st = document.createElement('style');
-    st.id = 'pos-btn-styles';
-    st.textContent = `
-      .pos-loose-add {
-        background:#e7edf6; color:#16325c; border:1px solid transparent; border-radius:8px;
-        padding:6px 14px; font-weight:500; display:inline-flex; align-items:center; gap:4px;
-        transition:background-color .15s ease, color .15s ease, transform .15s ease, box-shadow .15s ease;
-      }
-      .pos-loose-add:hover {
-        background:#16325c; color:#fff;
-        transform:translateY(-1px); box-shadow:0 4px 10px rgba(22,50,92,.25);
-      }
-      .pos-loose-add:active { transform:translateY(0); box-shadow:none; background:#0f2444; color:#fff; }
-      .pos-loose-add:focus-visible { outline:2px solid #16325c; outline-offset:2px; }
-    `;
-    document.head.appendChild(st);
-  }
   const walkInId = () => D.customers.find((c) => c.name === 'Walk-in Customer')?.id ?? (D.customers[0]?.id ?? '');
 
   /* dd Mon yyyy, e.g. "08 Oct 2026" */
@@ -103,11 +83,12 @@
     const action = outOfStock
       ? `<button type="button" class="btn pos-order-sub mt-1" data-med="${m.id}"
            style="border:1.5px solid #8b5cf6;border-radius:10px;background:#f5f3ff;color:#6d28d9;
-                  padding:8px 12px;display:inline-flex;flex-direction:row;align-items:center;justify-content:center;gap:6px;white-space:nowrap;">
+                  padding:8px 10px;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:120px;">
            <i class="bi bi-arrow-repeat" style="font-size:1rem;"></i>
            <span class="fw-semibold" style="font-size:.75rem;">Order / substitute</span>
          </button>`
-      : (m.allowLoose ? `<button type="button" class="btn btn-sm mt-1 pos-loose-add" data-med="${m.id}">
+      : (m.allowLoose ? `<button type="button" class="btn btn-sm mt-1 pos-loose-add" data-med="${m.id}"
+           style="background:#e7edf6;color:#16325c;border:none;border-radius:8px;padding:6px 14px;font-weight:500;display:inline-flex;align-items:center;gap:4px;">
            <i class="bi bi-plus-circle"></i> Add ${MF.esc(m.subUnit || 'Loose')}
          </button>` : '');
     return `
