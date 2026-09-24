@@ -219,8 +219,7 @@ require __DIR__ . '/middleware/auth.php';
   <script src="assets/js/app.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
-      await MF.boot();
-    (function () {
+      await window.MF.boot();
       const MF = window.MF, D = window.MF_DATA;
       const $ = (s) => document.querySelector(s);
       let settings = {}, users = [], rolePerms = [];
@@ -385,7 +384,6 @@ require __DIR__ . '/middleware/auth.php';
         const btn = document.querySelector(`#setTabs [data-tab="${tab}"]`);
         if (btn) bootstrap.Tab.getOrCreateInstance(btn).show();
       }
-    })();
     });
   </script>
 </body>
