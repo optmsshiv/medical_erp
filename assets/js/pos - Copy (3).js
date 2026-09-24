@@ -49,8 +49,8 @@
     const tone = expiryTone(b.expiry, m && m.expiryAlertDays);
     return `
       <div class="d-flex align-items-center gap-1 mt-1">
-        <span class="badge rounded-pill bg-light text-dark" title="Batch ${MF.esc(b.batchNo)}"><i class="bi bi-upc-scan"></i> ${MF.esc(b.batchNo)}</span>
-        <span class="badge rounded-pill bg-${tone}-subtle text-${tone}-emphasis">Exp : ${fmtExpiryDate(b.expiry)}</span>
+        <span class="badge rounded-pill bg-light text-dark border" title="Batch ${MF.esc(b.batchNo)}"><i class="bi bi-upc-scan"></i> ${MF.esc(b.batchNo)}</span>
+        <span class="badge rounded-pill text-bg-${tone}">Exp : ${fmtExpiryDate(b.expiry)}</span>
       </div>`;
   }
 
@@ -71,28 +71,20 @@
       btn.addEventListener('click', (e) => { e.stopPropagation(); MF.toast('Order / substitute isn\'t available yet.', 'info', 'Stock'); }));
   }
 
-  /* Left-column MRP line: shown as its own row right under the batch/expiry pills. */
-  function mrpLine(m) {
-    return `<div class="small-xs text-2 mt-1">MRP : ${MF.fmt(m.mrp, 2)}/${MF.esc(unitLabel(m))}</div>`;
-  }
-
-  /* Right-side block: available stock, and either the add button or a purple
-     order/substitute tile (styled like the payment-method tiles) when out of stock. */
+  /* Right-side price block: MRP + available stock, and either the add button
+     or the out-of-stock / order-substitute action when nothing is left to sell. */
   function priceBlock(m, stock) {
     const outOfStock = stock <= 0;
     const action = outOfStock
-      ? `<button type="button" class="btn pos-order-sub mt-1" data-med="${m.id}"
-           style="border:1.5px solid #8b5cf6;border-radius:10px;background:#f5f3ff;color:#6d28d9;
-                  padding:8px 10px;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:120px;">
-           <i class="bi bi-arrow-repeat" style="font-size:1rem;"></i>
-           <span class="fw-semibold" style="font-size:.75rem;">Order / substitute</span>
-         </button>`
-      : (m.allowLoose ? `<button type="button" class="btn btn-sm mt-1 pos-loose-add" data-med="${m.id}"
-           style="background:#e7edf6;color:#16325c;border:none;border-radius:8px;padding:6px 14px;font-weight:500;display:inline-flex;align-items:center;gap:4px;">
-           <i class="bi bi-plus-circle"></i> Add ${MF.esc(m.subUnit || 'Loose')}
-         </button>` : '');
+      ? `<div class="d-flex align-items-center justify-content-end gap-1 mt-1 text-danger">
+           <span style="width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block"></span>
+           <span class="small-xs">Out of stock</span>
+         </div>
+         <button type="button" class="btn btn-mf btn-sm mt-1 pos-order-sub" data-med="${m.id}">Order / substitute</button>`
+      : (m.allowLoose ? `<button type="button" class="btn btn-light-mf btn-sm mt-1 pos-loose-add" data-med="${m.id}">+ Add ${MF.esc(m.subUnit || 'Loose')}</button>` : '');
     return `
         <div class="fw-bold num">${MF.fmt(m.mrp, 2)}</div>
+        <div class="small-xs text-2 mt-1">MRP : ${MF.fmt(m.mrp, 2)}</div>
         <div class="small-xs text-2 mt-1">Stock : ${MF.num(stock)} ${MF.esc(unitLabel(m))}</div>
         ${action}`;
   }
@@ -110,15 +102,13 @@
     box.innerHTML = hits.map((m) => {
       const b = MF.pickBatch(m.id);
       const stock = MF.stockOf(m.id);
-      const outOfStock = !b || stock <= 0;
       return `
-      <div class="pos-result" role="button" tabindex="0" data-med="${m.id}" ${outOfStock ? 'disabled' : ''} ${outOfStock ? 'style="border-color:#dc3545"' : ''}>
+      <div class="pos-result" role="button" tabindex="0" data-med="${m.id}" ${(!b || stock <= 0) ? 'disabled' : ''}>
         <div class="kpi-icon tone-primary" style="width:38px;height:38px;flex-basis:38px;font-size:1rem"><i class="bi bi-capsule"></i></div>
         <div class="flex-grow-1 text-start">
           <div class="pr-name">${MF.esc(m.name)} <span class="text-2 fw-normal">· ${MF.esc(m.brandRef)}</span></div>
           <div class="pr-meta">${MF.esc(m.composition)}</div>
           ${b ? batchExpiryPills(b, m) : `<div class="pr-meta text-danger mt-1">No sellable batch (expired stock only)</div>${subsLine(m)}`}
-          ${mrpLine(m)}
         </div>
         <div class="text-end">
           ${priceBlock(m, stock)}
@@ -137,14 +127,12 @@
         const id = m.id;
         const b = MF.pickBatch(id);
         const stock = MF.stockOf(id);
-        const outOfStock = stock <= 0;
-        return `<div class="pos-result" role="button" tabindex="0" data-med="${id}" ${outOfStock ? 'disabled' : ''} ${outOfStock ? 'style="border-color:#dc3545"' : ''}>
+        return `<div class="pos-result" role="button" tabindex="0" data-med="${id}" ${stock <= 0 ? 'disabled' : ''}>
           <div class="kpi-icon tone-primary" style="width:38px;height:38px;flex-basis:38px;font-size:1rem"><i class="bi bi-capsule"></i></div>
           <div class="flex-grow-1 text-start">
             <div class="pr-name">${MF.esc(m.name)}</div>
             <div class="pr-meta">${MF.esc(m.composition)}</div>
             ${batchExpiryPills(b, m)}
-            ${mrpLine(m)}
           </div>
           <div class="text-end">
             ${priceBlock(m, stock)}
