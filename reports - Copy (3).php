@@ -282,7 +282,7 @@ require __DIR__ . '/middleware/auth.php';
         const rows = data.stock.filter((b) => b.qty > 0 || b.looseQty > 0);
         $('#rpStockBody').innerHTML = rows.map((b) => `
           <tr>
-            <td class="td-title">${MF.esc(b.name)}${b.manufacturer ? `<div class="text-2 small">${MF.esc(b.manufacturer)}</div>` : ''}</td>
+            <td class="td-title">${MF.esc(b.name)}</td>
             <td class="num">${b.batch}</td>
             <td class="text-end num">${b.qty}</td>
             <td class="text-end num">${b.looseQty ? MF.num(b.looseQty) + ' ' + MF.esc(b.subUnit || 'unit') : '—'}</td>
