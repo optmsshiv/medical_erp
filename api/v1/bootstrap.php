@@ -140,6 +140,14 @@ $store = [
     'email'   => $settingsFlat['store_email'] ?? '',
 ];
 
+// --- Doctors (real data) -----------------------------------------------------
+$doctors = $pdo->query('SELECT id, name, specialty, phone, reg_no FROM doctors ORDER BY name')->fetchAll();
+$doctors = array_map(fn($r) => [
+    'id' => (int) $r['id'], 'name' => $r['name'], 'specialty' => $r['specialty'] ?? '',
+    'phone' => $r['phone'] ?? '', 'regNo' => $r['reg_no'] ?? '',
+], $doctors);
+
+
 // --- Categories / manufacturers (plain name lists, for dropdowns etc.) ----
 $categories    = $pdo->query('SELECT name FROM categories ORDER BY name')->fetchAll(PDO::FETCH_COLUMN);
 $manufacturers = $pdo->query('SELECT name FROM manufacturers ORDER BY name')->fetchAll(PDO::FETCH_COLUMN);
