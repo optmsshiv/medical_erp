@@ -33,35 +33,6 @@
       }
       .pos-loose-add:active { transform:translateY(0); box-shadow:none; background:#0f2444; color:#fff; }
       .pos-loose-add:focus-visible { outline:2px solid #16325c; outline-offset:2px; }
-
-      /* Order / substitute (out of stock) */
-      .pos-order-sub {
-        border:1.5px solid #8b5cf6; border-radius:10px; background:#f5f3ff; color:#6d28d9;
-        padding:8px 12px; display:inline-flex; flex-direction:row; align-items:center; justify-content:center;
-        gap:6px; white-space:nowrap;
-        transition:background-color .15s ease, color .15s ease, border-color .15s ease, transform .15s ease, box-shadow .15s ease;
-      }
-      .pos-order-sub i { font-size:1rem; transition:transform .35s ease; }
-      .pos-order-sub:hover {
-        background:#7c3aed; border-color:#7c3aed; color:#fff;
-        transform:translateY(-1px); box-shadow:0 4px 12px rgba(124,58,237,.30);
-      }
-      .pos-order-sub:hover i { transform:rotate(180deg); }
-      .pos-order-sub:active { transform:translateY(0); box-shadow:none; background:#6d28d9; border-color:#6d28d9; color:#fff; }
-      .pos-order-sub:focus-visible { outline:2px solid #7c3aed; outline-offset:2px; }
-
-      /* Stock status badge (next to MRP) */
-      .pos-stock-badge {
-        display:inline-flex; align-items:center; gap:4px; margin-left:8px; padding:1px 8px;
-        font-size:.68rem; font-weight:600; line-height:1.5; border-radius:999px; vertical-align:middle;
-      }
-      .pos-stock-badge::before { content:''; width:6px; height:6px; border-radius:50%; background:currentColor; }
-      .pos-stock-badge.in  { background:#e6f6ec; color:#157347; box-shadow:0 2px 6px rgba(21,115,71,.22); }
-      .pos-stock-badge.low { background:#fff4dc; color:#a86400; box-shadow:0 2px 6px rgba(217,119,6,.25); }
-      .pos-stock-badge.out { background:#fdeaea; color:#c62828; box-shadow:0 2px 6px rgba(220,53,69,.25); }
-
-      /* "Avail : 110/300" next to expiry pill */
-      .pos-avail { font-size:.72rem; color:#6c757d; white-space:nowrap; margin-left:4px; }
     `;
     document.head.appendChild(st);
   }
@@ -93,41 +64,13 @@
     return m && m.unit ? m.unit : 'units';
   }
 
-  /* ASSUMPTION: a batch records its original quantity in one of these fields
-     (b.totalQty / receivedQty / purchasedQty / initialQty). Falls back to b.qty if none exist.
-     Adjust this one helper if your data.js uses a different name. */
-  function batchTotal(b) {
-    const t = b.totalQty ?? b.receivedQty ?? b.purchasedQty ?? b.initialQty ?? b.qty;
-    return Math.max(Number(t) || 0, Number(b.qty) || 0);
-  }
-
-  /* Remaining sellable qty of a batch */
-  function batchAvail(b) {
-    return Math.max(0, (Number(b.qty) || 0) - (Number(b.reserved) || 0));
-  }
-
-  /* In stock / Low stock / Out of stock.
-     ASSUMPTION: low-stock threshold is m.reorderLevel or m.minStock, else 10 units. */
-  function stockBadge(m, stock) {
-    const low = Number(m.reorderLevel ?? m.minStock ?? 10);
-    const st = stock <= 0 ? ['out', 'Out of stock'] : stock <= low ? ['low', 'Low stock'] : ['in', 'In stock'];
-    return `<span class="pos-stock-badge ${st[0]}">${st[1]}</span>`;
-  }
-
-  /* "Medicine name · Brand" — brand shown muted after a centre dot */
-  function nameLine(m) {
-    const brand = m.brandRef ? ` <span class="text-2 fw-normal">· ${MF.esc(m.brandRef)}</span>` : '';
-    return `<div class="pr-name">${MF.esc(m.name)}${brand}</div>`;
-  }
-
   function batchExpiryPills(b, m) {
     if (!b) return '';
     const tone = expiryTone(b.expiry, m && m.expiryAlertDays);
     return `
-      <div class="d-flex align-items-center flex-wrap gap-1 mt-1">
+      <div class="d-flex align-items-center gap-1 mt-1">
         <span class="badge rounded-pill bg-light text-dark" title="Batch ${MF.esc(b.batchNo)}"><i class="bi bi-upc-scan"></i> ${MF.esc(b.batchNo)}</span>
         <span class="badge rounded-pill bg-${tone}-subtle text-${tone}-emphasis">Exp : ${fmtExpiryDate(b.expiry)}</span>
-        <span class="pos-avail">Avail : ${MF.num(batchAvail(b))}/${MF.num(batchTotal(b))}</span>
       </div>`;
   }
 
@@ -149,8 +92,8 @@
   }
 
   /* Left-column MRP line: shown as its own row right under the batch/expiry pills. */
-  function mrpLine(m, stock) {
-    return `<div class="small-xs text-2 mt-1">MRP : ${MF.fmt(m.mrp, 2)}/${MF.esc(unitLabel(m))}${stockBadge(m, stock)}</div>`;
+  function mrpLine(m) {
+    return `<div class="small-xs text-2 mt-1">MRP : ${MF.fmt(m.mrp, 2)}/${MF.esc(unitLabel(m))}</div>`;
   }
 
   /* Right-side block: available stock, and either the add button or a purple
@@ -158,8 +101,10 @@
   function priceBlock(m, stock) {
     const outOfStock = stock <= 0;
     const action = outOfStock
-      ? `<button type="button" class="btn pos-order-sub mt-1" data-med="${m.id}">
-           <i class="bi bi-arrow-repeat"></i>
+      ? `<button type="button" class="btn pos-order-sub mt-1" data-med="${m.id}"
+           style="border:1.5px solid #8b5cf6;border-radius:10px;background:#f5f3ff;color:#6d28d9;
+                  padding:8px 12px;display:inline-flex;flex-direction:row;align-items:center;justify-content:center;gap:6px;white-space:nowrap;">
+           <i class="bi bi-arrow-repeat" style="font-size:1rem;"></i>
            <span class="fw-semibold" style="font-size:.75rem;">Order / substitute</span>
          </button>`
       : (m.allowLoose ? `<button type="button" class="btn btn-sm mt-1 pos-loose-add" data-med="${m.id}">
@@ -189,10 +134,10 @@
       <div class="pos-result" role="button" tabindex="0" data-med="${m.id}" ${outOfStock ? 'disabled' : ''} ${outOfStock ? 'style="border-color:#dc3545"' : ''}>
         <div class="kpi-icon tone-primary" style="width:38px;height:38px;flex-basis:38px;font-size:1rem"><i class="bi bi-capsule"></i></div>
         <div class="flex-grow-1 text-start">
-          ${nameLine(m)}
+          <div class="pr-name">${MF.esc(m.name)} <span class="text-2 fw-normal">· ${MF.esc(m.brandRef)}</span></div>
           <div class="pr-meta">${MF.esc(m.composition)}</div>
           ${b ? batchExpiryPills(b, m) : `<div class="pr-meta text-danger mt-1">No sellable batch (expired stock only)</div>${subsLine(m)}`}
-          ${mrpLine(m, stock)}
+          ${mrpLine(m)}
         </div>
         <div class="text-end">
           ${priceBlock(m, stock)}
@@ -215,10 +160,10 @@
         return `<div class="pos-result" role="button" tabindex="0" data-med="${id}" ${outOfStock ? 'disabled' : ''} ${outOfStock ? 'style="border-color:#dc3545"' : ''}>
           <div class="kpi-icon tone-primary" style="width:38px;height:38px;flex-basis:38px;font-size:1rem"><i class="bi bi-capsule"></i></div>
           <div class="flex-grow-1 text-start">
-            ${nameLine(m)}
+            <div class="pr-name">${MF.esc(m.name)}</div>
             <div class="pr-meta">${MF.esc(m.composition)}</div>
             ${batchExpiryPills(b, m)}
-            ${mrpLine(m, stock)}
+            ${mrpLine(m)}
           </div>
           <div class="text-end">
             ${priceBlock(m, stock)}
