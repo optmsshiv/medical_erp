@@ -110,8 +110,8 @@ $stock = $section('stock', function () use ($pdo) {
 // --- Expiry (<=90 days including already expired) ----------------------------
 $expiry = $section('expiry', function () use ($pdo, $today) {
     $stmt = $pdo->prepare(
-        "SELECT b.*, m.name AS med_name, m.expiry_alert_days FROM batches b JOIN medicines m ON m.id = b.medicine_id
-         WHERE b.quantity > 0 AND DATEDIFF(b.expiry_date, :today) <= COALESCE(m.expiry_alert_days, 90)
+        "SELECT b.*, m.name AS med_name FROM batches b JOIN medicines m ON m.id = b.medicine_id
+         WHERE b.quantity > 0 AND DATEDIFF(b.expiry_date, :today) <= 90
          ORDER BY b.expiry_date ASC"
     );
     $stmt->execute(['today' => $today]);

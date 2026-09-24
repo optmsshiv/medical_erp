@@ -74,7 +74,12 @@ window.MF = window.MF || {};
   MF.fmt = (n, dec = 0) =>
     '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: dec, maximumFractionDigits: dec });
   MF.num = (n) => Number(n || 0).toLocaleString('en-IN');
-  MF.today = () => new Date().toISOString().slice(0, 10);
+  // Local calendar date (YYYY-MM-DD). toISOString() would give the UTC date, which is
+  // yesterday in India between 00:00 and 05:30.
+  MF.today = () => {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  };
   MF.fmtDate = (iso) => {
     if (!iso) return '—';
     return new Date(iso + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -106,14 +111,6 @@ window.MF = window.MF || {};
     const med = MF.med(medId);
     const packQty = med && med.packQty ? med.packQty : 1;
     return MF.batchesOf(medId).reduce((s, b) => s + (b.looseQty || 0) + (b.qty - (b.reserved || 0)) * packQty, 0);
-  };
-
-  /* Generic/substitute linking: other active medicines sharing the same generic
-     group that currently have sellable stock — useful when the searched item is out. */
-  MF.substitutesOf = (medId) => {
-    const med = MF.med(medId);
-    if (!med || !med.genericGroupId) return [];
-    return D.medicines.filter((m) => m.genericGroupId === med.genericGroupId && m.id !== medId && MF.stockOf(m.id) > 0);
   };
 
   MF.batchStatus = (b) => {

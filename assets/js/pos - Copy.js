@@ -28,13 +28,13 @@
   }
 
   /* 'danger' once expired, 'warning' inside 90 days, else 'success' */
-  function expiryTone(dateVal, alertDays = 90) {
+  function expiryTone(dateVal) {
     const exp = new Date(dateVal);
     const today = new Date(MF.today ? MF.today() : Date.now());
     if (isNaN(exp)) return 'success';
     const days = Math.ceil((exp - today) / 86400000);
     if (days < 0) return 'danger';
-    if (days <= (alertDays || 90)) return 'warning';
+    if (days <= 90) return 'warning';
     return 'success';
   }
 
@@ -44,21 +44,14 @@
     return m && m.unit ? m.unit : 'units';
   }
 
-  function batchExpiryPills(b, m) {
+  function batchExpiryPills(b) {
     if (!b) return '';
-    const tone = expiryTone(b.expiry, m && m.expiryAlertDays);
+    const tone = expiryTone(b.expiry);
     return `
       <div class="d-flex align-items-center gap-1 mt-1">
         <span class="badge rounded-pill bg-light text-dark border" title="Batch ${MF.esc(b.batchNo)}"><i class="bi bi-upc-scan"></i> ${MF.esc(b.batchNo)}</span>
         <span class="badge rounded-pill text-bg-${tone}">Exp : ${fmtExpiryDate(b.expiry)}</span>
       </div>`;
-  }
-
-  /* Generic/substitute linking: shown only when a medicine has no sellable batch. */
-  function subsLine(m) {
-    const subs = MF.substitutesOf(m.id);
-    if (!subs.length) return '';
-    return `<div class="pr-meta text-2 mt-1"><i class="bi bi-arrow-left-right"></i> Try instead: ${subs.map((s) => MF.esc(s.name)).join(', ')}</div>`;
   }
 
   /* Attach click → addToCart for BOTH search results and the "Fast moving" shortcuts */
@@ -88,7 +81,7 @@
         <div class="flex-grow-1 text-start">
           <div class="pr-name">${MF.esc(m.name)} <span class="text-2 fw-normal">· ${MF.esc(m.brandRef)}</span></div>
           <div class="pr-meta">${MF.esc(m.composition)}</div>
-          ${b ? batchExpiryPills(b, m) : `<div class="pr-meta text-danger mt-1">No sellable batch (expired stock only)</div>${subsLine(m)}`}
+          ${b ? batchExpiryPills(b) : `<div class="pr-meta text-danger mt-1">No sellable batch (expired stock only)</div>`}
         </div>
         <div class="text-end">
           <div class="fw-bold num">${MF.fmt(m.mrp, 2)}</div>
@@ -115,7 +108,7 @@
           <div class="flex-grow-1 text-start">
             <div class="pr-name">${MF.esc(m.name)}</div>
             <div class="pr-meta">${MF.esc(m.composition)}</div>
-            ${batchExpiryPills(b, m)}
+            ${batchExpiryPills(b)}
           </div>
           <div class="text-end">
             <div class="fw-bold num">${MF.fmt(m.mrp, 2)}</div>

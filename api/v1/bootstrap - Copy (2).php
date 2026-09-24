@@ -14,11 +14,10 @@ $pdo = Tenant::db();
 
 // --- Medicines (real data, joined to category/manufacturer names) ---------
 $stmt = $pdo->query(
-    'SELECT m.*, c.name AS category_name, mf.name AS manufacturer_name, gg.name AS generic_group_name
+    'SELECT m.*, c.name AS category_name, mf.name AS manufacturer_name
      FROM medicines m
      LEFT JOIN categories c ON m.category_id = c.id
      LEFT JOIN manufacturers mf ON m.manufacturer_id = mf.id
-     LEFT JOIN generic_groups gg ON m.generic_group_id = gg.id
      ORDER BY m.name'
 );
 $medicineRows = $stmt->fetchAll();
@@ -39,12 +38,6 @@ $medicines = array_map(function ($row) {
         'packQty'       => (int) $row['pack_qty'],
         'subUnit'       => $row['sub_unit'] ?? '',
         'allowLoose'    => (bool) $row['allow_loose_sale'],
-        'barcode'       => $row['barcode'] ?? '',
-        'genericGroupId' => $row['generic_group_id'] ? (int) $row['generic_group_id'] : null,
-        'genericGroup'  => $row['generic_group_name'] ?? '',
-        'expiryAlertDays' => $row['expiry_alert_days'] !== null ? (int) $row['expiry_alert_days'] : null,
-        'boxQty'        => $row['box_qty'] !== null ? (int) $row['box_qty'] : null,
-        'boxUnit'       => $row['box_unit'] ?? 'Box',
         'mrp'           => (float) $row['mrp'],
         'retailRate'    => (float) $row['retail_rate'],
         'purchaseRate'  => (float) $row['purchase_rate'],

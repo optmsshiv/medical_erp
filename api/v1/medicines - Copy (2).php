@@ -6,7 +6,6 @@ require dirname(__DIR__, 2) . '/core/Json.php';
 require dirname(__DIR__, 2) . '/models/Medicine.php';
 require dirname(__DIR__, 2) . '/models/Category.php';
 require dirname(__DIR__, 2) . '/models/Manufacturer.php';
-require dirname(__DIR__, 2) . '/models/GenericGroup.php';
 
 if (!Auth::check()) {
     Json::error('Not authenticated.', 401);
@@ -36,19 +35,6 @@ function findOrCreateId(string $modelClass, string $name): ?int
     return $modelClass::create(['name' => $name]);
 }
 
-/** Find another medicine with the same value in $field, if any (excludes $excludeId on edit). */
-function findConflict(string $field, string $value, ?int $excludeId = null): ?array
-{
-    if (trim($value) === '') {
-        return null;
-    }
-    $row = Medicine::first($field, '=', $value);
-    if ($row && ($excludeId === null || (int) $row['id'] !== $excludeId)) {
-        return $row;
-    }
-    return null;
-}
-
 /** Map the frontend's camelCase payload to our snake_case columns. */
 function mapPayloadToRow(array $input): array
 {
@@ -65,11 +51,6 @@ function mapPayloadToRow(array $input): array
         'pack_qty'        => max(1, (int) ($input['packQty'] ?? 1)),
         'sub_unit'        => trim($input['subUnit'] ?? ''),
         'allow_loose_sale' => !empty($input['allowLoose']) ? 1 : 0,
-        'barcode'         => (trim($input['barcode'] ?? '') !== '') ? trim($input['barcode']) : null,
-        'generic_group_id' => findOrCreateId('GenericGroup', $input['genericGroup'] ?? ''),
-        'expiry_alert_days' => ($input['expiryAlertDays'] ?? '') !== '' ? max(1, (int) $input['expiryAlertDays']) : null,
-        'box_qty'         => ($input['boxQty'] ?? '') !== '' ? max(1, (int) $input['boxQty']) : null,
-        'box_unit'        => trim($input['boxUnit'] ?? '') !== '' ? trim($input['boxUnit']) : 'Box',
         'mrp'             => (float) ($input['mrp'] ?? 0),
         'retail_rate'     => (float) ($input['retailRate'] ?? $input['mrp'] ?? 0),
         'purchase_rate'   => (float) ($input['purchaseRate'] ?? 0),
@@ -97,12 +78,6 @@ switch ($method) {
         if ($row['mrp'] <= 0) {
             Json::error('MRP is required.', 422);
         }
-        if ($conflict = findConflict('name', $row['name'])) {
-            Json::error("A medicine named \"{$row['name']}\" already exists.", 422);
-        }
-        if ($row['barcode'] !== null && ($conflict = findConflict('barcode', $row['barcode']))) {
-            Json::error("Barcode {$row['barcode']} is already used by \"{$conflict['name']}\".", 422);
-        }
 
         $id = Medicine::create($row);
         Json::ok(['id' => $id]);
@@ -120,12 +95,6 @@ switch ($method) {
 
         if ($row['name'] === '') {
             Json::error('Medicine name is required.', 422);
-        }
-        if ($conflict = findConflict('name', $row['name'], $id)) {
-            Json::error("A medicine named \"{$row['name']}\" already exists.", 422);
-        }
-        if ($row['barcode'] !== null && ($conflict = findConflict('barcode', $row['barcode'], $id))) {
-            Json::error("Barcode {$row['barcode']} is already used by \"{$conflict['name']}\".", 422);
         }
 
         Medicine::update($id, $row);

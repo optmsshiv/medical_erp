@@ -110,12 +110,11 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
 
           <div class="mm-section-title">Basic Details</div>
           <div class="row g-3">
-            <div class="col-md-6"><label class="form-label">Medicine Name <span class="req">*</span></label><input class="form-control" id="fName" placeholder="e.g. Paracetamol 500mg"><div id="fNameWarn" class="small mt-1" style="display:none"></div></div>
+            <div class="col-md-6"><label class="form-label">Medicine Name <span class="req">*</span></label><input class="form-control" id="fName" placeholder="e.g. Paracetamol 500mg"></div>
             <div class="col-md-6"><label class="form-label">Generic Name</label><input class="form-control" id="fGeneric" placeholder="e.g. Paracetamol"></div>
             <div class="col-md-6"><label class="form-label">Composition</label><input class="form-control" id="fComp"></div>
             <div class="col-md-3"><label class="form-label">Category</label><select class="form-select" id="fCategory"></select></div>
             <div class="col-md-3"><label class="form-label">Manufacturer</label><select class="form-select" id="fMfg"></select></div>
-            <div class="col-md-6"><label class="form-label">Generic Group</label><input class="form-control" id="fGenericGroup" list="fGenericGroupList" placeholder="e.g. Telmisartan 40mg — leave blank if none"><datalist id="fGenericGroupList"></datalist><div class="text-2 small mt-1">Medicines sharing a group are treated as substitutes of each other</div></div>
           </div>
 
           <div class="mm-section-title">Packaging &amp; Identification</div>
@@ -123,11 +122,11 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
             <div class="col-md-3 col-6"><label class="form-label">Schedule</label>
               <select class="form-select" id="fSchedule"><option>OTC</option><option>H</option><option>H1</option></select></div>
             <div class="col-md-3 col-6"><label class="form-label">HSN Code</label><input class="form-control" id="fHsn" value="3004"></div>
-            <div class="col-md-3 col-6"><label class="form-label">Barcode</label><input class="form-control" id="fBarcode" placeholder="8901234…"><div id="fBarcodeWarn" class="small mt-1" style="display:none"></div></div>
+            <div class="col-md-3 col-6"><label class="form-label">Barcode</label><input class="form-control" id="fBarcode" placeholder="8901234…"></div>
             <div class="col-md-3 col-6"><label class="form-label">Unit</label>
               <select class="form-select" id="fUnit"><option>Strip</option><option>Bottle</option><option>Tube</option><option>Sachet</option><option>Vial</option><option>Inhaler</option><option>Pen</option></select></div>
-            <div class="col-md-3 col-6"><label class="form-label">Pack Size</label><input class="form-control" id="fPack" placeholder="e.g. 15 Tablets"><div class="text-2 small mt-1">Total Pieces in 1 Pack</div></div>
-            <div class="col-md-3 col-6"><label class="form-label">Pack Qty</label><input type="number" min="1" class="form-control" id="fPackQty" value="1" placeholder="e.g. 10"></div>
+            <div class="col-md-3 col-6"><label class="form-label">Pack Size (For Loose Sale)</label><input class="form-control" id="fPack" placeholder="e.g. 15 Tablets"></div>
+            <div class="col-md-3 col-6"><label class="form-label">Pack Qty(No. of packets)</label><input type="number" min="1" class="form-control" id="fPackQty" value="1" placeholder="e.g. 10"></div>
             <div class="col-md-3 col-6"><label class="form-label">Sub-unit</label><input class="form-control" id="fSubUnit" placeholder="e.g. Tablet"></div>
             <div class="col-md-3 col-6 d-flex align-items-center">
               <div class="form-check form-switch mt-4 pt-1">
@@ -135,8 +134,6 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
                 <label class="form-check-label" for="fAllowLoose">Allow loose sale</label>
               </div>
             </div>
-            <div class="col-md-3 col-6"><label class="form-label">Box Qty <span class="text-2">(packs/strips per box)</span></label><input type="number" min="1" class="form-control" id="fBoxQty" placeholder="e.g. 10"></div>
-            <div class="col-md-3 col-6"><label class="form-label">Box Unit</label><input class="form-control" id="fBoxUnit" placeholder="Box" value="Box"></div>
           </div>
 
           <div class="mm-section-title">Pricing &amp; Tax</div>
@@ -153,7 +150,6 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
           <div class="row g-3">
             <div class="col-md-3 col-6"><label class="form-label">Minimum Stock</label><input type="number" class="form-control" id="fMin" value="50"></div>
             <div class="col-md-3 col-6"><label class="form-label">Reorder Level</label><input type="number" class="form-control" id="fReorder" value="100"></div>
-            <div class="col-md-3 col-6"><label class="form-label">Expiry Alert (days)</label><input type="number" min="1" class="form-control" id="fExpiryAlert" placeholder="Default: 90"></div>
             <div class="col-md-3 col-6 d-flex align-items-center">
               <div class="form-check form-switch mt-4 pt-1">
                 <input class="form-check-input" type="checkbox" id="fRx">
@@ -213,8 +209,6 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
         $('#mmMfg').innerHTML = '<option value="">All Manufacturers</option>' + D.manufacturers.map((m) => `<option>${m}</option>`).join('');
         $('#fCategory').innerHTML = D.categories.map((c) => `<option>${c}</option>`).join('');
         $('#fMfg').innerHTML = D.manufacturers.map((m) => `<option>${m}</option>`).join('');
-        const groups = [...new Set(D.medicines.map((m) => m.genericGroup).filter(Boolean))].sort();
-        $('#fGenericGroupList').innerHTML = groups.map((g) => `<option value="${MF.esc(g)}">`).join('');
       }
 
       function filtered() {
@@ -304,74 +298,14 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
         $('#mmFormTitle').textContent = m ? 'Edit Medicine — ' + m.name : 'Add Medicine';
         $('#fName').value = m?.name || ''; $('#fGeneric').value = m?.generic || ''; $('#fComp').value = m?.composition || '';
         $('#fCategory').value = m?.category || D.categories[0]; $('#fMfg').value = m?.manufacturer || D.manufacturers[0];
-        $('#fGenericGroup').value = m?.genericGroup || '';
         $('#fHsn').value = m?.hsn || '3004'; $('#fUnit').value = m?.unit || 'Strip'; $('#fPack').value = m?.packSize || '';
-        $('#fBarcode').value = m?.barcode || '';
         $('#fPackQty').value = m?.packQty || 1; $('#fSubUnit').value = m?.subUnit || ''; $('#fAllowLoose').checked = !!m?.allowLoose;
-        $('#fBoxQty').value = m?.boxQty ?? ''; $('#fBoxUnit').value = m?.boxUnit || 'Box';
         $('#fGst').value = m ? String(m.gst) : '12'; $('#fSchedule').value = m?.schedule || 'OTC';
         $('#fMrp').value = m?.mrp ?? ''; $('#fPtr').value = m?.purchaseRate ?? ''; $('#fRetail').value = m?.retailRate ?? m?.mrp ?? '';
         $('#fWholesale').value = m?.wholesaleRate ?? ''; $('#fMin').value = m?.minStock ?? 50; $('#fReorder').value = m?.reorderLevel ?? 100;
-        $('#fExpiryAlert').value = m?.expiryAlertDays ?? '';
         $('#fRx').checked = !!m?.rxRequired; $('#fActive').checked = m ? m.status === 'Active' : true;
-        $('#fNameWarn').style.display = 'none'; $('#fBarcodeWarn').style.display = 'none';
         new bootstrap.Modal($('#mmFormModal')).show();
       }
-
-      /* Small edit-distance helper — used only to flag likely-duplicate medicine names as you type. */
-      function levenshtein(a, b) {
-        const m = a.length, n = b.length;
-        const dp = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
-        for (let j = 0; j <= n; j++) dp[0][j] = j;
-        for (let i = 1; i <= m; i++) {
-          for (let j = 1; j <= n; j++) {
-            dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
-          }
-        }
-        return dp[m][n];
-      }
-      const normName = (s) => (s || '').toLowerCase().trim().replace(/\s+/g, ' ');
-      let dupTimer;
-      function checkNameDuplicate() {
-        clearTimeout(dupTimer);
-        dupTimer = setTimeout(() => {
-          const val = normName($('#fName').value);
-          const warn = $('#fNameWarn');
-          if (!val) { warn.style.display = 'none'; return; }
-          let exact = null, near = null, nearDist = Infinity;
-          for (const m of D.medicines) {
-            if (editingId && m.id === editingId) continue;
-            const mn = normName(m.name);
-            if (mn === val) { exact = m; break; }
-            const dist = levenshtein(mn, val);
-            const threshold = Math.max(2, Math.floor(val.length * 0.15));
-            if (dist <= threshold && dist < nearDist) { near = m; nearDist = dist; }
-          }
-          if (exact) {
-            warn.textContent = `⚠ A medicine named "${exact.name}" already exists (${exact.manufacturer || 'no manufacturer'}).`;
-            warn.className = 'small mt-1 text-danger'; warn.style.display = '';
-          } else if (near) {
-            warn.textContent = `⚠ Similar medicine exists: "${near.name}" (${near.manufacturer || 'no manufacturer'}) — check it's not a duplicate.`;
-            warn.className = 'small mt-1 text-warning'; warn.style.display = '';
-          } else {
-            warn.style.display = 'none';
-          }
-        }, 150);
-      }
-      function checkBarcodeConflict() {
-        const val = $('#fBarcode').value.trim();
-        const warn = $('#fBarcodeWarn');
-        if (!val) { warn.style.display = 'none'; return; }
-        const conflict = D.medicines.find((m) => m.barcode && m.barcode === val && (!editingId || m.id !== editingId));
-        if (conflict) {
-          warn.textContent = `⚠ This barcode is already used by "${conflict.name}".`;
-          warn.className = 'small mt-1 text-danger'; warn.style.display = '';
-        } else {
-          warn.style.display = 'none';
-        }
-      }
-      $('#fName').addEventListener('input', checkNameDuplicate);
-      $('#fBarcode').addEventListener('input', checkBarcodeConflict);
 
       $('#mmFormSave').addEventListener('click', async () => {
         if (!$('#fName').value.trim()) { MF.toast('Medicine name is required.', 'err', 'Validation'); return; }
@@ -379,13 +313,11 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
         const payload = {
           name: $('#fName').value.trim(), generic: $('#fGeneric').value, composition: $('#fComp').value,
           category: $('#fCategory').value, manufacturer: $('#fMfg').value, hsn: $('#fHsn').value,
-          genericGroup: $('#fGenericGroup').value.trim(), barcode: $('#fBarcode').value.trim(),
           unit: $('#fUnit').value, packSize: $('#fPack').value, gst: +$('#fGst').value, schedule: $('#fSchedule').value,
           packQty: +$('#fPackQty').value || 1, subUnit: $('#fSubUnit').value.trim(), allowLoose: $('#fAllowLoose').checked,
-          boxQty: $('#fBoxQty').value, boxUnit: $('#fBoxUnit').value.trim() || 'Box',
           mrp: +$('#fMrp').value, retailRate: +$('#fRetail').value || +$('#fMrp').value, purchaseRate: +$('#fPtr').value || 0,
           wholesaleRate: +$('#fWholesale').value || (+$('#fMrp').value * 0.9), minStock: +$('#fMin').value,
-          reorderLevel: +$('#fReorder').value, rxRequired: $('#fRx').checked, expiryAlertDays: $('#fExpiryAlert').value,
+          reorderLevel: +$('#fReorder').value, rxRequired: $('#fRx').checked,
           status: $('#fActive').checked ? 'Active' : 'Inactive'
         };
         if (MF.Api.live) {
@@ -401,7 +333,6 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
         }
         MF.toast(payload.name + (editingId ? ' updated successfully.' : ' added to the medicine master.'), 'success', editingId ? 'Medicine saved' : 'Medicine created');
         bootstrap.Modal.getInstance($('#mmFormModal')).hide();
-        buildLookups();
         render();
       });
 
