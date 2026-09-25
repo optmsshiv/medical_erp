@@ -25,6 +25,26 @@ function findConflict(string $name, ?int $excludeId = null): ?array
     return null;
 }
 
+/** id if it exists, else the previous name (`from`, or `name` on the query string). 0 if none match. */
+function resolveManufacturerId(array $input = [], array $query = []): int
+{
+    $id = (int) ($input['id'] ?? $query['id'] ?? 0);
+    if ($id && Manufacturer::find($id)) {
+        return $id;
+    }
+    $from = trim((string) ($input['from'] ?? $query['from'] ?? $query['name'] ?? ''));
+    if ($from !== '') {
+        $row = Manufacturer::first('name', '=', $from);
+        return $row ? (int) $row['id'] : 0;
+    }
+    $name = trim((string) ($input['name'] ?? ''));
+    if ($name !== '') {
+        $row = Manufacturer::first('name', '=', $name);
+        return $row ? (int) $row['id'] : 0;
+    }
+    return 0;
+}
+
 function textLen(string $value): int
 {
     return function_exists('mb_strlen') ? mb_strlen($value) : strlen($value);
@@ -108,26 +128,34 @@ switch ($method) {
 
     case 'PUT':
         $input = json_decode(file_get_contents('php://input'), true) ?? [];
-        $id = (int) ($input['id'] ?? 0);
         $name = trim($input['name'] ?? '');
+        // Prefer id. Fall back to `from` (old name) so a save still finds the row
+        // when the page only knows the name. If neither matches, create it —
+        // a medicine-only name is not a 404.
+        $id = resolveManufacturerId($input);
         $current = $id ? Manufacturer::find($id) : null;
 
-        if (!$id || !$current) {
-            Json::error('Manufacturer not found.', 404);
-        }
         if ($name === '') {
             Json::error('Manufacturer name is required.', 422);
+        }
+        if (!$current) {
+            if (findConflict($name)) {
+                Json::error("A manufacturer named \"{$name}\" already exists.", 422);
+            }
+            $id = Manufacturer::create(array_merge(['name' => $name], profileFromInput($input)));
+            Json::ok(['id' => $id, 'created' => true]);
+            break;
         }
         if ($conflict = findConflict($name, $id)) {
             Json::error("A manufacturer named \"{$name}\" already exists.", 422);
         }
 
         Manufacturer::update($id, array_merge(['name' => $name], profileFromInput($input, $current)));
-        Json::ok();
+        Json::ok(['id' => $id]);
         break;
 
     case 'DELETE':
-        $id = (int) ($_GET['id'] ?? 0);
+        $id = resolveManufacturerId([], $_GET);
 
         if (!$id || !Manufacturer::find($id)) {
             Json::error('Manufacturer not found.', 404);

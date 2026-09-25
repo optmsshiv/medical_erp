@@ -57,7 +57,7 @@ require __DIR__ . '/middleware/auth.php';
         <div class="card-mf p-3 mb-3">
           <div class="input-group">
             <span class="input-group-text"><i class="bi bi-search"></i></span>
-            <input class="form-control" id="mfSearch" placeholder="Search name, contact, phone, GSTIN…">
+            <input class="form-control" id="mfSearch" name="mf-list-filter" placeholder="Search name, contact, phone, GSTIN…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true">
           </div>
         </div>
 
@@ -97,31 +97,31 @@ require __DIR__ . '/middleware/auth.php';
           <h5 class="modal-title" id="mfFormTitle">Add Manufacturer</h5>
           <button class="btn-close" data-bs-dismiss="modal" type="button"></button>
         </div>
-        <div class="modal-body">
+        <form class="modal-body" id="mfForm" autocomplete="off">
           <div class="row g-3">
             <div class="col-md-6">
               <label class="form-label" for="mfName">Manufacturer name <span class="req">*</span></label>
-              <input class="form-control" id="mfName" placeholder="e.g. Cipla">
+              <input class="form-control" id="mfName" name="mf-company" placeholder="e.g. Cipla" autocomplete="section-mfg organization" data-lpignore="true" data-1p-ignore="true">
             </div>
             <div class="col-md-6">
               <label class="form-label" for="mfContact">Contact person</label>
-              <input class="form-control" id="mfContact" placeholder="e.g. Rajesh Kumar">
+              <input class="form-control" id="mfContact" name="mf-contact" placeholder="e.g. Rajesh Kumar" autocomplete="section-mfg name" data-lpignore="true" data-1p-ignore="true">
             </div>
             <div class="col-md-6">
               <label class="form-label" for="mfPhone">Phone</label>
-              <input class="form-control" id="mfPhone" inputmode="tel" placeholder="e.g. 98765 43210">
+              <input class="form-control" id="mfPhone" name="mf-phone" inputmode="tel" placeholder="e.g. 98765 43210" autocomplete="section-mfg tel" data-lpignore="true" data-1p-ignore="true">
             </div>
             <div class="col-md-6">
               <label class="form-label" for="mfGstin">GSTIN</label>
-              <input class="form-control text-uppercase" id="mfGstin" maxlength="15" placeholder="15-character GSTIN" autocomplete="off">
+              <input class="form-control text-uppercase" id="mfGstin" name="mf-gstin" maxlength="15" placeholder="15-character GSTIN" autocomplete="off" data-lpignore="true" data-1p-ignore="true">
             </div>
             <div class="col-12">
               <label class="form-label" for="mfAddress">Address</label>
-              <textarea class="form-control" id="mfAddress" rows="2" placeholder="City, state"></textarea>
+              <textarea class="form-control" id="mfAddress" name="mf-address" rows="2" placeholder="City, state" autocomplete="section-mfg street-address" data-lpignore="true" data-1p-ignore="true"></textarea>
             </div>
           </div>
           <div class="text-2 small mt-3">Renaming updates every medicine that uses this name. Contact details stay on the manufacturer, not on each medicine.</div>
-        </div>
+        </form>
         <div class="modal-footer">
           <button class="btn btn-light-mf" data-bs-dismiss="modal" type="button">Cancel</button>
           <button class="btn btn-mf" id="mfSave" type="button"><i class="bi bi-check2 me-1"></i>Save</button>
@@ -150,8 +150,10 @@ require __DIR__ . '/middleware/auth.php';
     (function () {
       const MF = window.MF, D = window.MF_DATA;
       const $ = (s) => document.querySelector(s);
-      const state = { q: '', page: 1, per: 8 };
+      const state = { q: '', page: 1, per: 8, apiRows: [] };
       let editing = null;
+      let editingId = null;
+      let searchLock = null;
 
       const nameOf = (x) => typeof x === 'string' ? x : (x && x.name) || '';
       const clean = (s) => (s || '').trim().replace(/\s+/g, ' ');
@@ -162,12 +164,38 @@ require __DIR__ . '/middleware/auth.php';
         }
         return D.manufacturerProfiles;
       }
+      function apiRow(name) {
+        const key = clean(name).toLowerCase();
+        return state.apiRows.find((r) => clean(r.name || '').toLowerCase() === key) || null;
+      }
+      function rowsFrom(res) {
+        const data = res && res.data;
+        if (Array.isArray(data)) return data;
+        if (data && Array.isArray(data.data)) return data.data;
+        return [];
+      }
+      function holdSearch() {
+        const el = $('#mfSearch');
+        if (!el || searchLock !== null) return;
+        searchLock = el.value;
+        el.readOnly = true;
+      }
+      function releaseSearch() {
+        const el = $('#mfSearch');
+        if (!el || searchLock === null) return;
+        if (el.value !== searchLock) el.value = searchLock;
+        el.readOnly = false;
+        state.q = searchLock;
+        searchLock = null;
+      }
       function profileOf(name) {
+        const row = apiRow(name);
         const saved = profiles()[name] || {};
         const raw = (D.manufacturers || []).find((x) => nameOf(x) === name);
-        const fromObj = raw && typeof raw === 'object' ? raw : {};
+        const fromObj = row || (raw && typeof raw === 'object' ? raw : {});
         return {
-          contact: clean(saved.contact || fromObj.contact || fromObj.contactPerson || ''),
+          id: row ? row.id : (fromObj.id || null),
+          contact: clean(saved.contact || fromObj.contact_person || fromObj.contact || fromObj.contactPerson || ''),
           phone: clean(saved.phone || fromObj.phone || fromObj.mobile || ''),
           gstin: String(saved.gstin || fromObj.gstin || fromObj.GSTIN || '').trim().toUpperCase(),
           address: String(saved.address || fromObj.address || '').trim()
@@ -194,9 +222,14 @@ require __DIR__ . '/middleware/auth.php';
         return `<a class="mf-phone" href="tel:${href}">${MF.esc(phone)}</a>`;
       }
       function allNames() {
-        const stored = (D.manufacturers || []).map(nameOf).filter(Boolean);
+        const stored = [...(D.manufacturers || []).map(nameOf), ...state.apiRows.map((r) => r.name)].filter(Boolean);
         const used = (D.medicines || []).map((m) => m.manufacturer).filter(Boolean);
         return [...new Set([...stored, ...used])].sort((a, b) => a.localeCompare(b));
+      }
+      async function loadManufacturers() {
+        if (!MF.Api.live) { state.apiRows = []; return; }
+        const res = await MF.Api.get('manufacturers.php');
+        state.apiRows = rowsFrom(res);
       }
       function medsOf(name) { return (D.medicines || []).filter((m) => m.manufacturer === name); }
       function rowStats(name) {
@@ -244,10 +277,10 @@ require __DIR__ . '/middleware/auth.php';
                 <button type="button" class="btn btn-icon btn-light-mf mf-kebab" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-label="Actions"><i class="bi bi-three-dots-vertical"></i></button>
                 <ul class="dropdown-menu dropdown-menu-end mf-act-menu">
                   <li><button type="button" class="dropdown-item" data-a="view" data-name="${MF.esc(name)}"><i class="bi bi-eye"></i><span>View medicines</span></button></li>
-                  <li><button type="button" class="dropdown-item" data-a="edit" data-name="${MF.esc(name)}"><i class="bi bi-pencil"></i><span>Edit</span></button></li>
+                  <li><button type="button" class="dropdown-item" data-a="edit" data-name="${MF.esc(name)}" data-id="${p.id || ''}"><i class="bi bi-pencil"></i><span>Edit</span></button></li>
                   <li><a class="dropdown-item" href="medicine-master.php?mfg=${encodeURIComponent(name)}"><i class="bi bi-capsule"></i><span>Open in master</span></a></li>
                   <li><hr class="dropdown-divider"></li>
-                  <li><button type="button" class="dropdown-item text-danger" data-a="del" data-name="${MF.esc(name)}"><i class="bi bi-trash3"></i><span>Delete</span></button></li>
+                  <li><button type="button" class="dropdown-item text-danger" data-a="del" data-name="${MF.esc(name)}" data-id="${p.id || ''}"><i class="bi bi-trash3"></i><span>Delete</span></button></li>
                 </ul>
               </div>
             </td>
@@ -259,21 +292,24 @@ require __DIR__ . '/middleware/auth.php';
         $('#mfPager').querySelectorAll('[data-pg]').forEach((b) => b.addEventListener('click', () => { state.page = +b.dataset.pg; render(); }));
         $('#mfBody').querySelectorAll('[data-a]').forEach((b) => b.addEventListener('click', () => {
           const name = b.dataset.name, a = b.dataset.a;
+          const id = b.dataset.id ? +b.dataset.id : null;
           if (a === 'view') openView(name);
-          if (a === 'edit') openForm(name);
-          if (a === 'del') remove(name);
+          if (a === 'edit') openForm(name, id);
+          if (a === 'del') remove(name, id);
         }));
       }
 
-      function openForm(name) {
+      function openForm(name, id) {
         editing = name || null;
-        const p = editing ? profileOf(editing) : { contact: '', phone: '', gstin: '', address: '' };
+        const p = editing ? profileOf(editing) : { id: null, contact: '', phone: '', gstin: '', address: '' };
+        editingId = id || p.id || null;
         $('#mfFormTitle').textContent = editing ? 'Edit manufacturer' : 'Add Manufacturer';
         $('#mfName').value = editing || '';
         $('#mfContact').value = p.contact;
         $('#mfPhone').value = p.phone;
         $('#mfGstin').value = p.gstin;
         $('#mfAddress').value = p.address;
+        holdSearch();
         new bootstrap.Modal($('#mfFormModal')).show();
         setTimeout(() => $('#mfName').focus(), 200);
       }
@@ -324,10 +360,19 @@ require __DIR__ . '/middleware/auth.php';
         const renamed = editing && editing !== next;
         if (MF.Api.live) {
           try {
-            const body = { name: next, contact: profile.contact, phone: profile.phone, gstin: profile.gstin, address: profile.address };
-            if (editing) await MF.Api.put('manufacturers.php', { from: editing, ...body });
+            const row = editing ? apiRow(editing) : null;
+            const id = editingId || (row && row.id) || null;
+            const body = {
+              name: next,
+              contact_person: profile.contact,
+              phone: profile.phone,
+              gstin: profile.gstin,
+              address: profile.address
+            };
+            if (editing) await MF.Api.put('manufacturers.php', { id: id || 0, from: editing, ...body });
             else await MF.Api.post('manufacturers.php', body);
             await MF.rehydrate();
+            await loadManufacturers();
           } catch (e) { MF.toast(e.message, 'err', 'Save failed'); return; }
         } else if (!Array.isArray(D.manufacturers)) {
           D.manufacturers = [];
@@ -344,17 +389,26 @@ require __DIR__ . '/middleware/auth.php';
         writeProfile(next, profile);
         const verb = !editing ? 'added' : (renamed ? 'renamed' : 'updated');
         MF.toast(!editing ? `${next} added.` : (renamed ? `${editing} renamed to ${next}.` : `${next} updated.`), 'success', verb[0].toUpperCase() + verb.slice(1));
+        releaseSearch();
         bootstrap.Modal.getInstance($('#mfFormModal'))?.hide();
         render();
       }
-      async function remove(name) {
+      async function remove(name, id) {
         const n = medsOf(name).length;
         if (n) { MF.toast(`${name} is used by ${n} medicine${n === 1 ? '' : 's'}. Rename it, or move those medicines first.`, 'warn', 'In use'); return; }
         const ok = await MF.confirm({ title: `Delete ${name}?`, message: 'This only removes the unused manufacturer from the list.', confirmText: 'Delete', tone: 'danger' });
         if (!ok) return;
         if (MF.Api.live) {
-          try { await MF.Api.del('manufacturers.php?name=' + encodeURIComponent(name)); await MF.rehydrate(); }
-          catch (e) { MF.toast(e.message, 'err', 'Delete failed'); return; }
+          const row = apiRow(name);
+          const delId = id || (row && row.id) || 0;
+          try {
+            const qs = delId
+              ? 'id=' + encodeURIComponent(delId)
+              : 'name=' + encodeURIComponent(name);
+            await MF.Api.del('manufacturers.php?' + qs);
+            await MF.rehydrate();
+            await loadManufacturers();
+          } catch (e) { MF.toast(e.message, 'err', 'Delete failed'); return; }
         } else {
           D.manufacturers = (D.manufacturers || []).filter((x) => nameOf(x) !== name);
         }
@@ -363,10 +417,19 @@ require __DIR__ . '/middleware/auth.php';
         render();
       }
 
-      $('#mfSearch').addEventListener('input', () => { state.q = $('#mfSearch').value; state.page = 1; render(); });
+      $('#mfSearch').addEventListener('input', () => {
+        if (searchLock !== null) { $('#mfSearch').value = searchLock; return; }
+        state.q = $('#mfSearch').value;
+        state.page = 1;
+        render();
+      });
+      $('#mfSearch').addEventListener('focus', () => { if (searchLock === null) $('#mfSearch').readOnly = false; });
+      $('#mfForm').addEventListener('submit', (e) => { e.preventDefault(); save(); });
+      $('#mfFormModal').addEventListener('show.bs.modal', holdSearch);
+      $('#mfFormModal').addEventListener('hidden.bs.modal', releaseSearch);
       $('#mfAdd').addEventListener('click', () => openForm(null));
       $('#mfSave').addEventListener('click', save);
-      $('#mfName').addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
+      $('#mfName').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
       $('#mfExport').addEventListener('click', () => {
         const q = state.q.toLowerCase();
         MF.exportCSV('manufacturers.csv',
@@ -384,6 +447,8 @@ require __DIR__ . '/middleware/auth.php';
 
       document.addEventListener('DOMContentLoaded', async () => {
         await MF.boot();
+        try { await loadManufacturers(); }
+        catch (e) { MF.toast(e.message, 'err', 'Could not load manufacturers'); }
         render();
       });
     })();
