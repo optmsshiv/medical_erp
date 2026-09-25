@@ -34,6 +34,7 @@ require __DIR__ . '/middleware/auth.php';
     .mf-gstin { font-size:.78rem; font-weight:700; letter-spacing:.03em; color:#16325c; white-space:nowrap; }
     .mf-addr { max-width:220px; color:#516278; font-size:.82rem; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
     .mf-wide { min-width:1180px; }
+    .mf-ledger-note { color:#8b9bb0; font-size:.78rem; line-height:1.45; padding:0 1rem 1rem; margin:0; }
   </style>
 </head>
 <body data-page="manufacturers">
@@ -87,6 +88,7 @@ require __DIR__ . '/middleware/auth.php';
             <span class="text-2 small" id="mfPageInfo"></span>
             <div class="ms-auto"><ul class="pagination pagination-sm mb-0" id="mfPager"></ul></div>
           </div>
+          <p class="mf-ledger-note">Medicine count and stock value are computed live from the batch ledger (purchase rate × on-hand qty).</p>
         </div>
       </main>
     </div>

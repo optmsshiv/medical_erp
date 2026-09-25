@@ -31,6 +31,7 @@ require __DIR__ . '/middleware/auth.php';
     .mf-cat { display:flex; align-items:center; gap:10px; min-width:180px; }
     .mf-cat-ico { width:32px; height:32px; border-radius:10px; background:#e8eef8; color:#16325c; display:inline-flex; align-items:center; justify-content:center; flex:0 0 32px; font-size:15px; }
     .mf-sub { color:#8b9bb0; font-size:.72rem; font-weight:600; margin-top:1px; }
+    .mf-ledger-note { color:#8b9bb0; font-size:.78rem; line-height:1.45; padding:0 1rem 1rem; margin:0; }
   </style>
 </head>
 <body data-page="categories">
@@ -55,7 +56,7 @@ require __DIR__ . '/middleware/auth.php';
         <div class="card-mf p-3 mb-3">
           <div class="input-group">
             <span class="input-group-text"><i class="bi bi-search"></i></span>
-            <input class="form-control" id="catSearch" placeholder="Search category…">
+            <input class="form-control" id="catSearch" name="cat-list-filter" placeholder="Search category…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true">
           </div>
         </div>
 
@@ -81,6 +82,7 @@ require __DIR__ . '/middleware/auth.php';
             <span class="text-2 small" id="catPageInfo"></span>
             <div class="ms-auto"><ul class="pagination pagination-sm mb-0" id="catPager"></ul></div>
           </div>
+          <p class="mf-ledger-note">Categories are configurable — counts, stock value and 30-day sales are computed live from the medicine master and batch ledger.</p>
         </div>
       </main>
     </div>
@@ -93,11 +95,11 @@ require __DIR__ . '/middleware/auth.php';
           <h5 class="modal-title" id="catFormTitle">Add Category</h5>
           <button class="btn-close" data-bs-dismiss="modal" type="button"></button>
         </div>
-        <div class="modal-body">
+        <form class="modal-body" id="catForm" autocomplete="off">
           <label class="form-label" for="catName">Category name <span class="req">*</span></label>
-          <input class="form-control" id="catName" placeholder="e.g. Analgesic">
+          <input class="form-control" id="catName" name="cat-label" placeholder="e.g. Analgesic" autocomplete="off" data-lpignore="true" data-1p-ignore="true">
           <div class="text-2 small mt-2">Renaming updates every medicine in this category. It also updates the category list on Add Medicine.</div>
-        </div>
+        </form>
         <div class="modal-footer">
           <button class="btn btn-light-mf" data-bs-dismiss="modal" type="button">Cancel</button>
           <button class="btn btn-mf" id="catSave" type="button"><i class="bi bi-check2 me-1"></i>Save</button>
@@ -128,6 +130,21 @@ require __DIR__ . '/middleware/auth.php';
       const $ = (s) => document.querySelector(s);
       const state = { q: '', page: 1, per: 8 };
       let editing = null;
+      let searchLock = null;
+      function holdSearch() {
+        const el = $('#catSearch');
+        if (!el || searchLock !== null) return;
+        searchLock = el.value;
+        el.readOnly = true;
+      }
+      function releaseSearch() {
+        const el = $('#catSearch');
+        if (!el || searchLock === null) return;
+        if (el.value !== searchLock) el.value = searchLock;
+        el.readOnly = false;
+        state.q = searchLock;
+        searchLock = null;
+      }
 
       const nameOf = (x) => typeof x === 'string' ? x : (x && x.name) || '';
       const clean = (s) => (s || '').trim().replace(/\s+/g, ' ');
@@ -319,6 +336,7 @@ require __DIR__ . '/middleware/auth.php';
         editing = name || null;
         $('#catFormTitle').textContent = editing ? 'Rename category' : 'Add Category';
         $('#catName').value = editing || '';
+        holdSearch();
         new bootstrap.Modal($('#catFormModal')).show();
         setTimeout(() => $('#catName').focus(), 200);
       }
@@ -367,6 +385,7 @@ require __DIR__ . '/middleware/auth.php';
           }
         }
         MF.toast(editing ? `${editing} renamed to ${next}.` : `${next} added.`, 'success', editing ? 'Renamed' : 'Added');
+        releaseSearch();
         bootstrap.Modal.getInstance($('#catFormModal'))?.hide();
         render();
       }
@@ -385,10 +404,18 @@ require __DIR__ . '/middleware/auth.php';
         render();
       }
 
-      $('#catSearch').addEventListener('input', () => { state.q = $('#catSearch').value; state.page = 1; render(); });
+      $('#catSearch').addEventListener('input', () => {
+        if (searchLock !== null) { $('#catSearch').value = searchLock; return; }
+        state.q = $('#catSearch').value;
+        state.page = 1;
+        render();
+      });
+      $('#catForm').addEventListener('submit', (e) => { e.preventDefault(); save(); });
+      $('#catFormModal').addEventListener('show.bs.modal', holdSearch);
+      $('#catFormModal').addEventListener('hidden.bs.modal', releaseSearch);
       $('#catAdd').addEventListener('click', () => openForm(null));
       $('#catSave').addEventListener('click', save);
-      $('#catName').addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
+      $('#catName').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
       $('#catExport').addEventListener('click', () => {
         const salesMap = salesByCategory();
         MF.exportCSV('categories.csv',
