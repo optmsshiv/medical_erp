@@ -34,7 +34,22 @@ require __DIR__ . '/middleware/auth.php';
     .mf-gstin { font-size:.78rem; font-weight:700; letter-spacing:.03em; color:#16325c; white-space:nowrap; }
     .mf-addr { max-width:220px; color:#516278; font-size:.82rem; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
     .mf-wide { min-width:1180px; }
-    .mf-ledger-note { color:#8b9bb0; font-size:.78rem; line-height:1.45; padding:0 1rem 1rem; margin:0; }
+    .mf-ledger { border:1px solid #e3ebf4; border-radius:16px; background:#fff; overflow:hidden; box-shadow:0 1px 2px rgba(22,50,92,.04), 0 10px 28px rgba(22,50,92,.04); }
+    .mf-ledger-search { display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid #e7eef6; background:#fff; }
+    .mf-ledger-search > i { color:#8b9bb0; font-size:15px; }
+    .mf-ledger-search input { border:0; outline:0; box-shadow:none !important; background:transparent; width:100%; padding:4px 0; font-size:.92rem; color:#1b2430; }
+    .mf-ledger-search input::placeholder { color:#9aa8b8; }
+    .mf-ledger .table-mf { margin:0; }
+    .mf-ledger .table-mf thead th { background:#f7f9fc; color:#7b8798; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; border-bottom:1px solid #e7eef6; padding:12px 14px; white-space:nowrap; }
+    .mf-ledger .table-mf tbody td { border-bottom:1px solid #f0f4f8; padding:13px 14px; vertical-align:middle; }
+    .mf-ledger .table-mf tbody tr:last-child td { border-bottom:0; }
+    .mf-ledger .table-mf tbody tr:hover td { background:#f8fbfe; }
+    .mf-ledger-foot { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:12px 16px; border-top:1px solid #e3ebf4; background:#fff; }
+    .mf-ledger-foot .pagination { gap:4px; }
+    .mf-ledger-foot .page-link { border:1px solid #e3ebf4; color:#516278; border-radius:8px; min-width:32px; text-align:center; font-weight:650; padding:.3rem .55rem; }
+    .mf-ledger-foot .page-item.active .page-link { background:#16325c; border-color:#16325c; color:#fff; }
+    .mf-ledger-foot .page-link:hover { background:#f4f7fb; color:#16325c; }
+    .mf-ledger-note { color:#8b9bb0; font-size:.78rem; line-height:1.45; padding:10px 16px 12px; margin:0; border-top:1px solid #eef3f8; background:#fbfcfe; }
   </style>
 </head>
 <body data-page="manufacturers">
@@ -56,14 +71,11 @@ require __DIR__ . '/middleware/auth.php';
 
         <div class="row g-3 mb-3" id="mfStats"></div>
 
-        <div class="card-mf p-3 mb-3">
-          <div class="input-group">
-            <span class="input-group-text"><i class="bi bi-search"></i></span>
-            <input class="form-control" id="mfSearch" name="mf-list-filter" placeholder="Search name, contact, email, phone, GSTIN…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true">
+        <div class="card-mf mf-ledger">
+          <div class="mf-ledger-search">
+            <i class="bi bi-search"></i>
+            <input id="mfSearch" name="mf-list-filter" placeholder="Search name, contact, email, phone, GSTIN…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true">
           </div>
-        </div>
-
-        <div class="card-mf">
           <div class="table-scroll" style="max-height:none;overflow:visible">
             <table class="table table-mf mf-wide">
               <thead>
@@ -84,9 +96,9 @@ require __DIR__ . '/middleware/auth.php';
               <tbody id="mfBody"></tbody>
             </table>
           </div>
-          <div class="d-flex flex-wrap align-items-center gap-2 p-3 border-top">
+          <div class="mf-ledger-foot">
             <span class="text-2 small" id="mfPageInfo"></span>
-            <div class="ms-auto"><ul class="pagination pagination-sm mb-0" id="mfPager"></ul></div>
+            <ul class="pagination pagination-sm mb-0" id="mfPager"></ul>
           </div>
           <p class="mf-ledger-note">Medicine count and stock value are computed live from the batch ledger (purchase rate × on-hand qty).</p>
         </div>
