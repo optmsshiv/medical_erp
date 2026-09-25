@@ -1,217 +1,276 @@
 <?php
 session_start();
 require __DIR__ . '/middleware/tenant.php';
-require __DIR__ . '/core/Auth.php';
-if (!Auth::check()) {
-    header('Location: login.php');
-    exit;
-}
+require __DIR__ . '/middleware/auth.php';
 ?>
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Manufacturers · Optms Rx</title>
-<link rel="icon" href="assets/images/logo.svg">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700;800&display=swap" rel="stylesheet">
-<link href="assets/css/style.css" rel="stylesheet">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manufacturers · Optms Rx</title>
+  <link rel="icon" href="assets/images/logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="assets/css/style.css" rel="stylesheet">
+  <style>
+    .mf-stat { background:#f8fafc; border:1px solid #e7edf4; border-radius:14px; padding:12px 14px; }
+    .mf-stat span { display:block; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#6c757d; }
+    .mf-stat strong { display:block; margin-top:3px; font-size:1.2rem; font-weight:750; letter-spacing:-.02em; color:#1b2430; }
+    .mf-stat.accent { background:#e8eef8; border-color:#d7e2f2; }
+    .mf-kebab { width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; padding:0; }
+    .mf-act-menu { min-width:196px; padding:6px; border:1px solid #e7edf4; border-radius:12px; box-shadow:0 12px 32px rgba(16,32,64,.14); z-index:1080; }
+    .mf-act-menu .dropdown-item { display:flex; align-items:center; gap:10px; font-size:.84rem; font-weight:600; border-radius:8px; padding:.48rem .65rem; }
+    .mf-act-menu .dropdown-item i { width:1.05rem; color:#16325c; }
+    .mf-act-menu .dropdown-item:hover { background:#f4f7fb; }
+    .mf-act-menu .dropdown-item.text-danger i { color:inherit; }
+    .mf-name { font-weight:700; color:#1b2430; }
+    .mf-chip { display:inline-flex; align-items:center; background:#f4f7fb; color:#16325c; border-radius:999px; padding:2px 8px; font-size:.72rem; font-weight:700; margin:0 4px 4px 0; }
+  </style>
 </head>
 <body data-page="manufacturers">
-<div class="mf-layout">
-  <aside class="mf-sidebar" id="mf-sidebar"></aside>
-
-  <div class="mf-body">
-    <header class="mf-topbar" id="mf-topbar"></header>
-
-    <main class="mf-main">
-      <div class="page-head">
-        <div>
-          <h1 class="page-title"><i class="bi bi-buildings text-mf-primary me-1"></i>Manufacturers</h1>
-          <p class="page-sub">Manage the manufacturer/brand list used across Products, Purchase Entry and reports.</p>
-        </div>
-        <div class="ms-auto d-flex gap-2">
-          <button class="btn btn-mf" id="btnAddMfr"><i class="bi bi-plus-lg me-1"></i>Add Manufacturer</button>
-        </div>
-      </div>
-
-      <div class="card-mf">
-        <div class="card-head">
-          <h2 class="card-title"><i class="bi bi-list-ul"></i>All Manufacturers</h2>
-          <div class="card-tools">
-            <div class="input-group input-group-sm" style="width:240px">
-              <span class="input-group-text"><i class="bi bi-search"></i></span>
-              <input type="text" class="form-control" id="mfrSearch" placeholder="Search manufacturers...">
-            </div>
+  <div class="mf-layout">
+    <aside class="mf-sidebar" id="mf-sidebar"></aside>
+    <div class="mf-body">
+      <header class="mf-topbar" id="mf-topbar"></header>
+      <main class="mf-main">
+        <div class="page-head">
+          <div>
+            <h1 class="page-title"><i class="bi bi-buildings me-2 text-success"></i>Manufacturers</h1>
+            <p class="page-sub" id="mfCount"></p>
+          </div>
+          <div class="ms-auto d-flex gap-2">
+            <button class="btn btn-light-mf" id="mfExport" type="button"><i class="bi bi-download me-1"></i>Export CSV</button>
+            <button class="btn btn-mf" id="mfAdd" type="button"><i class="bi bi-plus-lg me-1"></i>Add Manufacturer</button>
           </div>
         </div>
-        <div class="table-scroll">
-          <table class="table-mf table align-middle mb-0">
-            <thead>
-              <tr>
-                <th style="width:60px">#</th>
-                <th>Manufacturer</th>
-                <th>Medicines</th>
-                <th style="width:110px" class="text-end">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="mfrTableBody">
-              <tr><td colspan="4"><div class="empty-state"><i class="bi bi-hourglass-split"></i>Loading manufacturers...</div></td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </main>
-  </div>
-</div>
 
-<!-- Add / Edit modal -->
-<div class="modal fade" id="mfrModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered modal-mf-sm">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="mfrModalTitle"><i class="bi bi-buildings me-2 text-success"></i>Add Manufacturer</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <input type="hidden" id="mfrId">
-        <label class="form-label">Manufacturer Name <span class="req">*</span></label>
-        <input type="text" class="form-control" id="mfrName" placeholder="e.g. Cipla Ltd" maxlength="120" autocomplete="off">
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-light-mf" data-bs-dismiss="modal">Cancel</button>
-        <button class="btn btn-mf" id="btnSaveMfr"><i class="bi bi-check-lg me-1"></i>Save</button>
+        <div class="row g-3 mb-3" id="mfStats"></div>
+
+        <div class="card-mf p-3 mb-3">
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input class="form-control" id="mfSearch" placeholder="Search manufacturer…">
+          </div>
+        </div>
+
+        <div class="card-mf">
+          <div class="table-scroll" style="max-height:none;overflow:visible">
+            <table class="table table-mf">
+              <thead>
+                <tr>
+                  <th>Manufacturer</th>
+                  <th class="text-end">Medicines</th>
+                  <th>Categories</th>
+                  <th class="text-end">Stock</th>
+                  <th class="text-end">MRP value</th>
+                  <th class="text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="mfBody"></tbody>
+            </table>
+          </div>
+          <div class="d-flex flex-wrap align-items-center gap-2 p-3 border-top">
+            <span class="text-2 small" id="mfPageInfo"></span>
+            <div class="ms-auto"><ul class="pagination pagination-sm mb-0" id="mfPager"></ul></div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div class="modal fade" id="mfFormModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="mfFormTitle">Add Manufacturer</h5>
+          <button class="btn-close" data-bs-dismiss="modal" type="button"></button>
+        </div>
+        <div class="modal-body">
+          <label class="form-label" for="mfName">Manufacturer name <span class="req">*</span></label>
+          <input class="form-control" id="mfName" placeholder="e.g. Cipla">
+          <div class="text-2 small mt-2">Renaming updates every medicine that uses this name.</div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-light-mf" data-bs-dismiss="modal" type="button">Cancel</button>
+          <button class="btn btn-mf" id="mfSave" type="button"><i class="bi bi-check2 me-1"></i>Save</button>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="assets/js/config.js"></script>
-<script src="assets/js/data.js"></script>
-<script src="assets/js/app.js"></script>
-<script>
-(function () {
-  let manufacturers = [];
-  let editing = null;
-  let mfrModal;
+  <div class="modal fade" id="mfViewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="mfViewTitle">Manufacturer</h5>
+          <button class="btn-close" data-bs-dismiss="modal" type="button"></button>
+        </div>
+        <div class="modal-body p-0" id="mfViewBody"></div>
+      </div>
+    </div>
+  </div>
 
-  function rowHtml(m, i) {
-    const count = Number(m.medicine_count || 0);
-    return `
-      <tr data-id="${m.id}">
-        <td class="text-2">${i + 1}</td>
-        <td class="td-title">${MF.esc(m.name)}</td>
-        <td>${count > 0
-          ? `<span class="badge badge-soft-primary">${MF.num(count)} medicine${count === 1 ? '' : 's'}</span>`
-          : `<span class="text-2 small-xs">Unused</span>`}</td>
-        <td class="text-end row-actions">
-          <button class="btn btn-icon btn-light-mf btn-sm mfr-edit" title="Edit"><i class="bi bi-pencil"></i></button>
-          <button class="btn btn-icon btn-light-mf btn-sm text-danger mfr-del" title="Delete"><i class="bi bi-trash"></i></button>
-        </td>
-      </tr>`;
-  }
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    (function () {
+      const MF = window.MF, D = window.MF_DATA;
+      const $ = (s) => document.querySelector(s);
+      const state = { q: '', page: 1, per: 8 };
+      let editing = null;
 
-  function render(list) {
-    const body = document.getElementById('mfrTableBody');
-    if (!list.length) {
-      body.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="bi bi-buildings"></i>No manufacturers yet.<br><span class="small">Click "Add Manufacturer" to create the first one.</span></div></td></tr>`;
-      return;
-    }
-    body.innerHTML = list.map(rowHtml).join('');
-    body.querySelectorAll('.mfr-edit').forEach((b) => b.addEventListener('click', (e) => openEdit(e.target.closest('tr').dataset.id)));
-    body.querySelectorAll('.mfr-del').forEach((b) => b.addEventListener('click', (e) => handleDelete(e.target.closest('tr').dataset.id)));
-  }
-
-  function applySearch() {
-    const q = document.getElementById('mfrSearch').value.trim().toLowerCase();
-    render(!q ? manufacturers : manufacturers.filter((c) => c.name.toLowerCase().includes(q)));
-  }
-
-  async function load() {
-    try {
-      const res = await MF.Api.get('manufacturers.php');
-      manufacturers = (res.data || []).sort((a, b) => a.name.localeCompare(b.name));
-    } catch (e) {
-      MF.toast(e.message || 'Could not load manufacturers', 'err', 'Load failed');
-      manufacturers = [];
-    }
-    applySearch();
-  }
-
-  function openAdd() {
-    editing = null;
-    document.getElementById('mfrModalTitle').innerHTML = '<i class="bi bi-buildings me-2 text-success"></i>Add Manufacturer';
-    document.getElementById('mfrId').value = '';
-    document.getElementById('mfrName').value = '';
-    mfrModal.show();
-  }
-
-  function openEdit(id) {
-    const c = manufacturers.find((x) => x.id == id);
-    if (!c) return;
-    editing = c;
-    document.getElementById('mfrModalTitle').innerHTML = '<i class="bi bi-pencil me-2 text-success"></i>Edit Manufacturer';
-    document.getElementById('mfrId').value = c.id;
-    document.getElementById('mfrName').value = c.name;
-    mfrModal.show();
-  }
-
-  async function save() {
-    const name = document.getElementById('mfrName').value.trim();
-    if (!name) { MF.toast('Manufacturer name is required', 'warn'); return; }
-
-    const btn = document.getElementById('btnSaveMfr');
-    btn.disabled = true;
-    try {
-      if (editing) {
-        await MF.Api.put('manufacturers.php', { id: editing.id, name });
-        MF.toast('Manufacturer updated', 'success');
-      } else {
-        await MF.Api.post('manufacturers.php', { name });
-        MF.toast('Manufacturer added', 'success');
+      const nameOf = (x) => typeof x === 'string' ? x : (x && x.name) || '';
+      const clean = (s) => (s || '').trim().replace(/\s+/g, ' ');
+      function allNames() {
+        const stored = (D.manufacturers || []).map(nameOf).filter(Boolean);
+        const used = (D.medicines || []).map((m) => m.manufacturer).filter(Boolean);
+        return [...new Set([...stored, ...used])].sort((a, b) => a.localeCompare(b));
       }
-      mfrModal.hide();
-      await load();
-    } catch (e) {
-      MF.toast(e.message || 'Could not save manufacturer', 'err', 'Save failed');
-    } finally {
-      btn.disabled = false;
-    }
-  }
+      function medsOf(name) { return (D.medicines || []).filter((m) => m.manufacturer === name); }
+      function rowStats(name) {
+        const meds = medsOf(name);
+        const stock = meds.reduce((s, m) => s + MF.stockOf(m.id), 0);
+        const cats = [...new Set(meds.map((m) => m.category).filter(Boolean))];
+        const mrp = meds.reduce((s, m) => s + MF.batchesOf(m.id).reduce((a, b) => a + (Number(b.qty) || 0) * (Number(b.mrp) || 0), 0), 0);
+        return { meds, stock, cats, mrp };
+      }
 
-  async function handleDelete(id) {
-    const c = manufacturers.find((x) => x.id == id);
-    if (!c) return;
-    const ok = await MF.confirm({
-      title: `Delete "${c.name}"?`,
-      message: 'This can\'t be undone.',
-      confirmText: 'Delete',
-      tone: 'danger',
-    });
-    if (!ok) return;
+      function render() {
+        const q = state.q.toLowerCase();
+        const list = allNames().filter((n) => !q || n.toLowerCase().includes(q));
+        const pages = Math.max(1, Math.ceil(list.length / state.per));
+        state.page = Math.min(state.page, pages);
+        const slice = list.slice((state.page - 1) * state.per, state.page * state.per);
+        const unassigned = (D.medicines || []).filter((m) => !m.manufacturer).length;
+        $('#mfCount').textContent = `${list.length} manufacturer${list.length === 1 ? '' : 's'}`;
+        $('#mfStats').innerHTML = `
+          <div class="col-6 col-md-3"><div class="mf-stat accent"><span>Manufacturers</span><strong>${MF.num(allNames().length)}</strong></div></div>
+          <div class="col-6 col-md-3"><div class="mf-stat"><span>Medicines linked</span><strong>${MF.num((D.medicines || []).length - unassigned)}</strong></div></div>
+          <div class="col-6 col-md-3"><div class="mf-stat"><span>Unassigned</span><strong>${MF.num(unassigned)}</strong></div></div>
+          <div class="col-6 col-md-3"><div class="mf-stat"><span>Showing</span><strong>${MF.num(list.length)}</strong></div></div>`;
+        $('#mfBody').innerHTML = slice.map((name) => {
+          const s = rowStats(name);
+          const chips = s.cats.slice(0, 3).map((c) => `<span class="mf-chip">${MF.esc(c)}</span>`).join('') + (s.cats.length > 3 ? `<span class="text-2 small">+${s.cats.length - 3}</span>` : '');
+          return `<tr>
+            <td><div class="mf-name">${MF.esc(name)}</div></td>
+            <td class="text-end num fw-semibold">${MF.num(s.meds.length)}</td>
+            <td>${chips || '<span class="text-2">—</span>'}</td>
+            <td class="text-end num">${MF.num(s.stock)}</td>
+            <td class="text-end num">${MF.fmt(s.mrp)}</td>
+            <td class="text-end">
+              <div class="dropdown">
+                <button type="button" class="btn btn-icon btn-light-mf mf-kebab" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-label="Actions"><i class="bi bi-three-dots-vertical"></i></button>
+                <ul class="dropdown-menu dropdown-menu-end mf-act-menu">
+                  <li><button type="button" class="dropdown-item" data-a="view" data-name="${MF.esc(name)}"><i class="bi bi-eye"></i><span>View medicines</span></button></li>
+                  <li><button type="button" class="dropdown-item" data-a="edit" data-name="${MF.esc(name)}"><i class="bi bi-pencil"></i><span>Rename</span></button></li>
+                  <li><a class="dropdown-item" href="medicine-master.php?mfg=${encodeURIComponent(name)}"><i class="bi bi-capsule"></i><span>Open in master</span></a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><button type="button" class="dropdown-item text-danger" data-a="del" data-name="${MF.esc(name)}"><i class="bi bi-trash3"></i><span>Delete</span></button></li>
+                </ul>
+              </div>
+            </td>
+          </tr>`;
+        }).join('') || `<tr><td colspan="6"><div class="empty-state"><i class="bi bi-buildings"></i>No manufacturers match.</div></td></tr>`;
+        $('#mfPageInfo').textContent = `Showing ${slice.length ? (state.page - 1) * state.per + 1 : 0}–${(state.page - 1) * state.per + slice.length} of ${list.length}`;
+        $('#mfPager').innerHTML = Array.from({ length: pages }, (_, i) =>
+          `<li class="page-item ${i + 1 === state.page ? 'active' : ''}"><button class="page-link" type="button" data-pg="${i + 1}">${i + 1}</button></li>`).join('');
+        $('#mfPager').querySelectorAll('[data-pg]').forEach((b) => b.addEventListener('click', () => { state.page = +b.dataset.pg; render(); }));
+        $('#mfBody').querySelectorAll('[data-a]').forEach((b) => b.addEventListener('click', () => {
+          const name = b.dataset.name, a = b.dataset.a;
+          if (a === 'view') openView(name);
+          if (a === 'edit') openForm(name);
+          if (a === 'del') remove(name);
+        }));
+      }
 
-    try {
-      await MF.Api.del('manufacturers.php?id=' + c.id);
-      MF.toast('Manufacturer deleted', 'success');
-      await load();
-    } catch (e) {
-      MF.toast(e.message || 'Could not delete manufacturer', 'err', 'Delete failed');
-    }
-  }
+      function openForm(name) {
+        editing = name || null;
+        $('#mfFormTitle').textContent = editing ? 'Rename manufacturer' : 'Add Manufacturer';
+        $('#mfName').value = editing || '';
+        new bootstrap.Modal($('#mfFormModal')).show();
+        setTimeout(() => $('#mfName').focus(), 200);
+      }
+      function openView(name) {
+        const s = rowStats(name);
+        $('#mfViewTitle').textContent = name;
+        $('#mfViewBody').innerHTML = `
+          <div class="p-3 border-bottom d-flex flex-wrap gap-4">
+            <div><div class="kpi-label">Medicines</div><div class="fw-bold num">${MF.num(s.meds.length)}</div></div>
+            <div><div class="kpi-label">Stock</div><div class="fw-bold num">${MF.num(s.stock)}</div></div>
+            <div><div class="kpi-label">MRP value</div><div class="fw-bold num">${MF.fmt(s.mrp)}</div></div>
+            <div class="ms-auto"><a class="btn btn-mf-soft btn-sm" href="medicine-master.php?mfg=${encodeURIComponent(name)}"><i class="bi bi-capsule me-1"></i>Open in master</a></div>
+          </div>
+          <table class="table table-mf mb-0">
+            <thead><tr><th>Medicine</th><th>Category</th><th class="text-end">Stock</th><th class="text-end">MRP</th></tr></thead>
+            <tbody>${s.meds.map((m) => `<tr>
+              <td><div class="td-title">${MF.esc(m.name)}</div><div class="td-sub">${MF.esc(m.composition || '')}</div></td>
+              <td class="text-2">${MF.esc(m.category || '—')}</td>
+              <td class="text-end num">${MF.num(MF.stockOf(m.id))} ${MF.esc(m.unit || '')}</td>
+              <td class="text-end num">${MF.fmt(m.mrp, 2)}</td>
+            </tr>`).join('') || '<tr><td colspan="4"><div class="empty-state"><i class="bi bi-capsule"></i>No medicines use this manufacturer yet.</div></td></tr>'}</tbody>
+          </table>`;
+        new bootstrap.Modal($('#mfViewModal')).show();
+      }
+      async function save() {
+        const next = clean($('#mfName').value);
+        if (!next) { MF.toast('Manufacturer name is required.', 'err', 'Validation'); return; }
+        const dup = allNames().some((n) => n.toLowerCase() === next.toLowerCase() && n !== editing);
+        if (dup) { MF.toast('A manufacturer with that name already exists.', 'warn', 'Duplicate'); return; }
+        if (MF.Api.live) {
+          try {
+            if (editing) await MF.Api.put('manufacturers.php', { from: editing, name: next });
+            else await MF.Api.post('manufacturers.php', { name: next });
+            await MF.rehydrate();
+          } catch (e) { MF.toast(e.message, 'err', 'Save failed'); return; }
+        } else {
+          if (!Array.isArray(D.manufacturers)) D.manufacturers = [];
+          if (editing) {
+            D.manufacturers = D.manufacturers.map((x) => nameOf(x) === editing ? next : x);
+            (D.medicines || []).forEach((m) => { if (m.manufacturer === editing) m.manufacturer = next; });
+          } else if (!D.manufacturers.some((x) => nameOf(x).toLowerCase() === next.toLowerCase())) {
+            D.manufacturers.push(next);
+          }
+        }
+        MF.toast(editing ? `${editing} renamed to ${next}.` : `${next} added.`, 'success', editing ? 'Renamed' : 'Added');
+        bootstrap.Modal.getInstance($('#mfFormModal'))?.hide();
+        render();
+      }
+      async function remove(name) {
+        const n = medsOf(name).length;
+        if (n) { MF.toast(`${name} is used by ${n} medicine${n === 1 ? '' : 's'}. Rename it, or move those medicines first.`, 'warn', 'In use'); return; }
+        const ok = await MF.confirm({ title: `Delete ${name}?`, message: 'This only removes the unused manufacturer from the list.', confirmText: 'Delete', tone: 'danger' });
+        if (!ok) return;
+        if (MF.Api.live) {
+          try { await MF.Api.del('manufacturers.php?name=' + encodeURIComponent(name)); await MF.rehydrate(); }
+          catch (e) { MF.toast(e.message, 'err', 'Delete failed'); return; }
+        } else {
+          D.manufacturers = (D.manufacturers || []).filter((x) => nameOf(x) !== name);
+        }
+        MF.toast(name + ' removed.', 'success', 'Deleted');
+        render();
+      }
 
-  document.addEventListener('DOMContentLoaded', async () => {
-    mfrModal = new bootstrap.Modal(document.getElementById('mfrModal'));
-    document.getElementById('btnAddMfr').addEventListener('click', openAdd);
-    document.getElementById('btnSaveMfr').addEventListener('click', save);
-    document.getElementById('mfrSearch').addEventListener('input', applySearch);
-    document.getElementById('mfrName').addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
-    await MF.boot();
-    await load();
-  });
-})();
-</script>
+      $('#mfSearch').addEventListener('input', () => { state.q = $('#mfSearch').value; state.page = 1; render(); });
+      $('#mfAdd').addEventListener('click', () => openForm(null));
+      $('#mfSave').addEventListener('click', save);
+      $('#mfName').addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
+      $('#mfExport').addEventListener('click', () => MF.exportCSV('manufacturers.csv',
+        ['Manufacturer', 'Medicines', 'Categories', 'Stock', 'MRP value'],
+        allNames().filter((n) => !state.q || n.toLowerCase().includes(state.q.toLowerCase())).map((n) => {
+          const s = rowStats(n);
+          return [n, s.meds.length, s.cats.join(', '), s.stock, s.mrp];
+        })));
+
+      document.addEventListener('DOMContentLoaded', async () => {
+        await MF.boot();
+        render();
+      });
+    })();
+  </script>
 </body>
 </html>

@@ -1,217 +1,276 @@
 <?php
 session_start();
 require __DIR__ . '/middleware/tenant.php';
-require __DIR__ . '/core/Auth.php';
-if (!Auth::check()) {
-    header('Location: login.php');
-    exit;
-}
+require __DIR__ . '/middleware/auth.php';
 ?>
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Medicine Categories · Optms Rx</title>
-<link rel="icon" href="assets/images/logo.svg">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700;800&display=swap" rel="stylesheet">
-<link href="assets/css/style.css" rel="stylesheet">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Medicine Categories · Optms Rx</title>
+  <link rel="icon" href="assets/images/logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="assets/css/style.css" rel="stylesheet">
+  <style>
+    .mf-stat { background:#f8fafc; border:1px solid #e7edf4; border-radius:14px; padding:12px 14px; }
+    .mf-stat span { display:block; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#6c757d; }
+    .mf-stat strong { display:block; margin-top:3px; font-size:1.2rem; font-weight:750; letter-spacing:-.02em; color:#1b2430; }
+    .mf-stat.accent { background:#e8eef8; border-color:#d7e2f2; }
+    .mf-kebab { width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; padding:0; }
+    .mf-act-menu { min-width:196px; padding:6px; border:1px solid #e7edf4; border-radius:12px; box-shadow:0 12px 32px rgba(16,32,64,.14); z-index:1080; }
+    .mf-act-menu .dropdown-item { display:flex; align-items:center; gap:10px; font-size:.84rem; font-weight:600; border-radius:8px; padding:.48rem .65rem; }
+    .mf-act-menu .dropdown-item i { width:1.05rem; color:#16325c; }
+    .mf-act-menu .dropdown-item:hover { background:#f4f7fb; }
+    .mf-act-menu .dropdown-item.text-danger i { color:inherit; }
+    .mf-name { font-weight:700; color:#1b2430; }
+    .mf-chip { display:inline-flex; align-items:center; background:#f4f7fb; color:#16325c; border-radius:999px; padding:2px 8px; font-size:.72rem; font-weight:700; margin:0 4px 4px 0; }
+  </style>
 </head>
 <body data-page="categories">
-<div class="mf-layout">
-  <aside class="mf-sidebar" id="mf-sidebar"></aside>
-
-  <div class="mf-body">
-    <header class="mf-topbar" id="mf-topbar"></header>
-
-    <main class="mf-main">
-      <div class="page-head">
-        <div>
-          <h1 class="page-title"><i class="bi bi-tags text-mf-primary me-1"></i>Medicine Categories</h1>
-          <p class="page-sub">Organize medicines into categories used across Products, POS filters and reports.</p>
-        </div>
-        <div class="ms-auto d-flex gap-2">
-          <button class="btn btn-mf" id="btnAddCategory"><i class="bi bi-plus-lg me-1"></i>Add Category</button>
-        </div>
-      </div>
-
-      <div class="card-mf">
-        <div class="card-head">
-          <h2 class="card-title"><i class="bi bi-list-ul"></i>All Categories</h2>
-          <div class="card-tools">
-            <div class="input-group input-group-sm" style="width:240px">
-              <span class="input-group-text"><i class="bi bi-search"></i></span>
-              <input type="text" class="form-control" id="catSearch" placeholder="Search categories...">
-            </div>
+  <div class="mf-layout">
+    <aside class="mf-sidebar" id="mf-sidebar"></aside>
+    <div class="mf-body">
+      <header class="mf-topbar" id="mf-topbar"></header>
+      <main class="mf-main">
+        <div class="page-head">
+          <div>
+            <h1 class="page-title"><i class="bi bi-tags me-2 text-success"></i>Medicine Categories</h1>
+            <p class="page-sub" id="catCount"></p>
+          </div>
+          <div class="ms-auto d-flex gap-2">
+            <button class="btn btn-light-mf" id="catExport" type="button"><i class="bi bi-download me-1"></i>Export CSV</button>
+            <button class="btn btn-mf" id="catAdd" type="button"><i class="bi bi-plus-lg me-1"></i>Add Category</button>
           </div>
         </div>
-        <div class="table-scroll">
-          <table class="table-mf table align-middle mb-0">
-            <thead>
-              <tr>
-                <th style="width:60px">#</th>
-                <th>Category</th>
-                <th>Medicines</th>
-                <th style="width:110px" class="text-end">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="catTableBody">
-              <tr><td colspan="4"><div class="empty-state"><i class="bi bi-hourglass-split"></i>Loading categories...</div></td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </main>
-  </div>
-</div>
 
-<!-- Add / Edit modal -->
-<div class="modal fade" id="catModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered modal-mf-sm">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="catModalTitle"><i class="bi bi-tags me-2 text-success"></i>Add Category</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <input type="hidden" id="catId">
-        <label class="form-label">Category Name <span class="req">*</span></label>
-        <input type="text" class="form-control" id="catName" placeholder="e.g. Antibiotics" maxlength="120" autocomplete="off">
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-light-mf" data-bs-dismiss="modal">Cancel</button>
-        <button class="btn btn-mf" id="btnSaveCategory"><i class="bi bi-check-lg me-1"></i>Save</button>
+        <div class="row g-3 mb-3" id="catStats"></div>
+
+        <div class="card-mf p-3 mb-3">
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input class="form-control" id="catSearch" placeholder="Search category…">
+          </div>
+        </div>
+
+        <div class="card-mf">
+          <div class="table-scroll" style="max-height:none;overflow:visible">
+            <table class="table table-mf">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th class="text-end">Medicines</th>
+                  <th>Manufacturers</th>
+                  <th class="text-end">Stock</th>
+                  <th class="text-end">MRP value</th>
+                  <th class="text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="catBody"></tbody>
+            </table>
+          </div>
+          <div class="d-flex flex-wrap align-items-center gap-2 p-3 border-top">
+            <span class="text-2 small" id="catPageInfo"></span>
+            <div class="ms-auto"><ul class="pagination pagination-sm mb-0" id="catPager"></ul></div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div class="modal fade" id="catFormModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="catFormTitle">Add Category</h5>
+          <button class="btn-close" data-bs-dismiss="modal" type="button"></button>
+        </div>
+        <div class="modal-body">
+          <label class="form-label" for="catName">Category name <span class="req">*</span></label>
+          <input class="form-control" id="catName" placeholder="e.g. Analgesic">
+          <div class="text-2 small mt-2">Renaming updates every medicine in this category. It also updates the category list on Add Medicine.</div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-light-mf" data-bs-dismiss="modal" type="button">Cancel</button>
+          <button class="btn btn-mf" id="catSave" type="button"><i class="bi bi-check2 me-1"></i>Save</button>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="assets/js/config.js"></script>
-<script src="assets/js/data.js"></script>
-<script src="assets/js/app.js"></script>
-<script>
-(function () {
-  let categories = [];
-  let editing = null;
-  let catModal;
+  <div class="modal fade" id="catViewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="catViewTitle">Category</h5>
+          <button class="btn-close" data-bs-dismiss="modal" type="button"></button>
+        </div>
+        <div class="modal-body p-0" id="catViewBody"></div>
+      </div>
+    </div>
+  </div>
 
-  function rowHtml(c, i) {
-    const count = Number(c.medicine_count || 0);
-    return `
-      <tr data-id="${c.id}">
-        <td class="text-2">${i + 1}</td>
-        <td class="td-title">${MF.esc(c.name)}</td>
-        <td>${count > 0
-          ? `<span class="badge badge-soft-primary">${MF.num(count)} medicine${count === 1 ? '' : 's'}</span>`
-          : `<span class="text-2 small-xs">Unused</span>`}</td>
-        <td class="text-end row-actions">
-          <button class="btn btn-icon btn-light-mf btn-sm cat-edit" title="Edit"><i class="bi bi-pencil"></i></button>
-          <button class="btn btn-icon btn-light-mf btn-sm text-danger cat-del" title="Delete"><i class="bi bi-trash"></i></button>
-        </td>
-      </tr>`;
-  }
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    (function () {
+      const MF = window.MF, D = window.MF_DATA;
+      const $ = (s) => document.querySelector(s);
+      const state = { q: '', page: 1, per: 8 };
+      let editing = null;
 
-  function render(list) {
-    const body = document.getElementById('catTableBody');
-    if (!list.length) {
-      body.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="bi bi-tags"></i>No categories yet.<br><span class="small">Click "Add Category" to create the first one.</span></div></td></tr>`;
-      return;
-    }
-    body.innerHTML = list.map(rowHtml).join('');
-    body.querySelectorAll('.cat-edit').forEach((b) => b.addEventListener('click', (e) => openEdit(e.target.closest('tr').dataset.id)));
-    body.querySelectorAll('.cat-del').forEach((b) => b.addEventListener('click', (e) => handleDelete(e.target.closest('tr').dataset.id)));
-  }
-
-  function applySearch() {
-    const q = document.getElementById('catSearch').value.trim().toLowerCase();
-    render(!q ? categories : categories.filter((c) => c.name.toLowerCase().includes(q)));
-  }
-
-  async function load() {
-    try {
-      const res = await MF.Api.get('categories.php');
-      categories = (res.data || []).sort((a, b) => a.name.localeCompare(b.name));
-    } catch (e) {
-      MF.toast(e.message || 'Could not load categories', 'err', 'Load failed');
-      categories = [];
-    }
-    applySearch();
-  }
-
-  function openAdd() {
-    editing = null;
-    document.getElementById('catModalTitle').innerHTML = '<i class="bi bi-tags me-2 text-success"></i>Add Category';
-    document.getElementById('catId').value = '';
-    document.getElementById('catName').value = '';
-    catModal.show();
-  }
-
-  function openEdit(id) {
-    const c = categories.find((x) => x.id == id);
-    if (!c) return;
-    editing = c;
-    document.getElementById('catModalTitle').innerHTML = '<i class="bi bi-pencil me-2 text-success"></i>Edit Category';
-    document.getElementById('catId').value = c.id;
-    document.getElementById('catName').value = c.name;
-    catModal.show();
-  }
-
-  async function save() {
-    const name = document.getElementById('catName').value.trim();
-    if (!name) { MF.toast('Category name is required', 'warn'); return; }
-
-    const btn = document.getElementById('btnSaveCategory');
-    btn.disabled = true;
-    try {
-      if (editing) {
-        await MF.Api.put('categories.php', { id: editing.id, name });
-        MF.toast('Category updated', 'success');
-      } else {
-        await MF.Api.post('categories.php', { name });
-        MF.toast('Category added', 'success');
+      const nameOf = (x) => typeof x === 'string' ? x : (x && x.name) || '';
+      const clean = (s) => (s || '').trim().replace(/\s+/g, ' ');
+      function allNames() {
+        const stored = (D.categories || []).map(nameOf).filter(Boolean);
+        const used = (D.medicines || []).map((m) => m.category).filter(Boolean);
+        return [...new Set([...stored, ...used])].sort((a, b) => a.localeCompare(b));
       }
-      catModal.hide();
-      await load();
-    } catch (e) {
-      MF.toast(e.message || 'Could not save category', 'err', 'Save failed');
-    } finally {
-      btn.disabled = false;
-    }
-  }
+      function medsOf(name) { return (D.medicines || []).filter((m) => m.category === name); }
+      function rowStats(name) {
+        const meds = medsOf(name);
+        const stock = meds.reduce((s, m) => s + MF.stockOf(m.id), 0);
+        const mfgs = [...new Set(meds.map((m) => m.manufacturer).filter(Boolean))];
+        const mrp = meds.reduce((s, m) => s + MF.batchesOf(m.id).reduce((a, b) => a + (Number(b.qty) || 0) * (Number(b.mrp) || 0), 0), 0);
+        return { meds, stock, mfgs, mrp };
+      }
 
-  async function handleDelete(id) {
-    const c = categories.find((x) => x.id == id);
-    if (!c) return;
-    const ok = await MF.confirm({
-      title: `Delete "${c.name}"?`,
-      message: 'This can\'t be undone.',
-      confirmText: 'Delete',
-      tone: 'danger',
-    });
-    if (!ok) return;
+      function render() {
+        const q = state.q.toLowerCase();
+        const list = allNames().filter((n) => !q || n.toLowerCase().includes(q));
+        const pages = Math.max(1, Math.ceil(list.length / state.per));
+        state.page = Math.min(state.page, pages);
+        const slice = list.slice((state.page - 1) * state.per, state.page * state.per);
+        const unassigned = (D.medicines || []).filter((m) => !m.category).length;
+        $('#catCount').textContent = `${list.length} categor${list.length === 1 ? 'y' : 'ies'}`;
+        $('#catStats').innerHTML = `
+          <div class="col-6 col-md-3"><div class="mf-stat accent"><span>Categories</span><strong>${MF.num(allNames().length)}</strong></div></div>
+          <div class="col-6 col-md-3"><div class="mf-stat"><span>Medicines linked</span><strong>${MF.num((D.medicines || []).length - unassigned)}</strong></div></div>
+          <div class="col-6 col-md-3"><div class="mf-stat"><span>Unassigned</span><strong>${MF.num(unassigned)}</strong></div></div>
+          <div class="col-6 col-md-3"><div class="mf-stat"><span>Showing</span><strong>${MF.num(list.length)}</strong></div></div>`;
+        $('#catBody').innerHTML = slice.map((name) => {
+          const s = rowStats(name);
+          const chips = s.mfgs.slice(0, 3).map((c) => `<span class="mf-chip">${MF.esc(c)}</span>`).join('') + (s.mfgs.length > 3 ? `<span class="text-2 small">+${s.mfgs.length - 3}</span>` : '');
+          return `<tr>
+            <td><div class="mf-name">${MF.esc(name)}</div></td>
+            <td class="text-end num fw-semibold">${MF.num(s.meds.length)}</td>
+            <td>${chips || '<span class="text-2">—</span>'}</td>
+            <td class="text-end num">${MF.num(s.stock)}</td>
+            <td class="text-end num">${MF.fmt(s.mrp)}</td>
+            <td class="text-end">
+              <div class="dropdown">
+                <button type="button" class="btn btn-icon btn-light-mf mf-kebab" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-label="Actions"><i class="bi bi-three-dots-vertical"></i></button>
+                <ul class="dropdown-menu dropdown-menu-end mf-act-menu">
+                  <li><button type="button" class="dropdown-item" data-a="view" data-name="${MF.esc(name)}"><i class="bi bi-eye"></i><span>View medicines</span></button></li>
+                  <li><button type="button" class="dropdown-item" data-a="edit" data-name="${MF.esc(name)}"><i class="bi bi-pencil"></i><span>Rename</span></button></li>
+                  <li><a class="dropdown-item" href="medicine-master.php?category=${encodeURIComponent(name)}"><i class="bi bi-capsule"></i><span>Open in master</span></a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><button type="button" class="dropdown-item text-danger" data-a="del" data-name="${MF.esc(name)}"><i class="bi bi-trash3"></i><span>Delete</span></button></li>
+                </ul>
+              </div>
+            </td>
+          </tr>`;
+        }).join('') || `<tr><td colspan="6"><div class="empty-state"><i class="bi bi-tags"></i>No categories match.</div></td></tr>`;
+        $('#catPageInfo').textContent = `Showing ${slice.length ? (state.page - 1) * state.per + 1 : 0}–${(state.page - 1) * state.per + slice.length} of ${list.length}`;
+        $('#catPager').innerHTML = Array.from({ length: pages }, (_, i) =>
+          `<li class="page-item ${i + 1 === state.page ? 'active' : ''}"><button class="page-link" type="button" data-pg="${i + 1}">${i + 1}</button></li>`).join('');
+        $('#catPager').querySelectorAll('[data-pg]').forEach((b) => b.addEventListener('click', () => { state.page = +b.dataset.pg; render(); }));
+        $('#catBody').querySelectorAll('[data-a]').forEach((b) => b.addEventListener('click', () => {
+          const name = b.dataset.name, a = b.dataset.a;
+          if (a === 'view') openView(name);
+          if (a === 'edit') openForm(name);
+          if (a === 'del') remove(name);
+        }));
+      }
 
-    try {
-      await MF.Api.del('categories.php?id=' + c.id);
-      MF.toast('Category deleted', 'success');
-      await load();
-    } catch (e) {
-      MF.toast(e.message || 'Could not delete category', 'err', 'Delete failed');
-    }
-  }
+      function openForm(name) {
+        editing = name || null;
+        $('#catFormTitle').textContent = editing ? 'Rename category' : 'Add Category';
+        $('#catName').value = editing || '';
+        new bootstrap.Modal($('#catFormModal')).show();
+        setTimeout(() => $('#catName').focus(), 200);
+      }
+      function openView(name) {
+        const s = rowStats(name);
+        $('#catViewTitle').textContent = name;
+        $('#catViewBody').innerHTML = `
+          <div class="p-3 border-bottom d-flex flex-wrap gap-4">
+            <div><div class="kpi-label">Medicines</div><div class="fw-bold num">${MF.num(s.meds.length)}</div></div>
+            <div><div class="kpi-label">Stock</div><div class="fw-bold num">${MF.num(s.stock)}</div></div>
+            <div><div class="kpi-label">MRP value</div><div class="fw-bold num">${MF.fmt(s.mrp)}</div></div>
+            <div class="ms-auto"><a class="btn btn-mf-soft btn-sm" href="medicine-master.php?category=${encodeURIComponent(name)}"><i class="bi bi-capsule me-1"></i>Open in master</a></div>
+          </div>
+          <table class="table table-mf mb-0">
+            <thead><tr><th>Medicine</th><th>Manufacturer</th><th class="text-end">Stock</th><th class="text-end">MRP</th></tr></thead>
+            <tbody>${s.meds.map((m) => `<tr>
+              <td><div class="td-title">${MF.esc(m.name)}</div><div class="td-sub">${MF.esc(m.composition || '')}</div></td>
+              <td class="text-2">${MF.esc(m.manufacturer || '—')}</td>
+              <td class="text-end num">${MF.num(MF.stockOf(m.id))} ${MF.esc(m.unit || '')}</td>
+              <td class="text-end num">${MF.fmt(m.mrp, 2)}</td>
+            </tr>`).join('') || '<tr><td colspan="4"><div class="empty-state"><i class="bi bi-capsule"></i>No medicines in this category yet.</div></td></tr>'}</tbody>
+          </table>`;
+        new bootstrap.Modal($('#catViewModal')).show();
+      }
+      async function save() {
+        const next = clean($('#catName').value);
+        if (!next) { MF.toast('Category name is required.', 'err', 'Validation'); return; }
+        const dup = allNames().some((n) => n.toLowerCase() === next.toLowerCase() && n !== editing);
+        if (dup) { MF.toast('A category with that name already exists.', 'warn', 'Duplicate'); return; }
+        if (MF.Api.live) {
+          try {
+            if (editing) await MF.Api.put('categories.php', { from: editing, name: next });
+            else await MF.Api.post('categories.php', { name: next });
+            await MF.rehydrate();
+          } catch (e) { MF.toast(e.message, 'err', 'Save failed'); return; }
+        } else {
+          if (!Array.isArray(D.categories)) D.categories = [];
+          if (editing) {
+            D.categories = D.categories.map((x) => nameOf(x) === editing ? next : x);
+            (D.medicines || []).forEach((m) => { if (m.category === editing) m.category = next; });
+          } else if (!D.categories.some((x) => nameOf(x).toLowerCase() === next.toLowerCase())) {
+            D.categories.push(next);
+          }
+        }
+        MF.toast(editing ? `${editing} renamed to ${next}.` : `${next} added.`, 'success', editing ? 'Renamed' : 'Added');
+        bootstrap.Modal.getInstance($('#catFormModal'))?.hide();
+        render();
+      }
+      async function remove(name) {
+        const n = medsOf(name).length;
+        if (n) { MF.toast(`${name} is used by ${n} medicine${n === 1 ? '' : 's'}. Rename it, or move those medicines first.`, 'warn', 'In use'); return; }
+        const ok = await MF.confirm({ title: `Delete ${name}?`, message: 'This only removes the unused category from the list.', confirmText: 'Delete', tone: 'danger' });
+        if (!ok) return;
+        if (MF.Api.live) {
+          try { await MF.Api.del('categories.php?name=' + encodeURIComponent(name)); await MF.rehydrate(); }
+          catch (e) { MF.toast(e.message, 'err', 'Delete failed'); return; }
+        } else {
+          D.categories = (D.categories || []).filter((x) => nameOf(x) !== name);
+        }
+        MF.toast(name + ' removed.', 'success', 'Deleted');
+        render();
+      }
 
-  document.addEventListener('DOMContentLoaded', async () => {
-    catModal = new bootstrap.Modal(document.getElementById('catModal'));
-    document.getElementById('btnAddCategory').addEventListener('click', openAdd);
-    document.getElementById('btnSaveCategory').addEventListener('click', save);
-    document.getElementById('catSearch').addEventListener('input', applySearch);
-    document.getElementById('catName').addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
-    await MF.boot();
-    await load();
-  });
-})();
-</script>
+      $('#catSearch').addEventListener('input', () => { state.q = $('#catSearch').value; state.page = 1; render(); });
+      $('#catAdd').addEventListener('click', () => openForm(null));
+      $('#catSave').addEventListener('click', save);
+      $('#catName').addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
+      $('#catExport').addEventListener('click', () => MF.exportCSV('categories.csv',
+        ['Category', 'Medicines', 'Manufacturers', 'Stock', 'MRP value'],
+        allNames().filter((n) => !state.q || n.toLowerCase().includes(state.q.toLowerCase())).map((n) => {
+          const s = rowStats(n);
+          return [n, s.meds.length, s.mfgs.join(', '), s.stock, s.mrp];
+        })));
+
+      document.addEventListener('DOMContentLoaded', async () => {
+        await MF.boot();
+        render();
+      });
+    })();
+  </script>
 </body>
 </html>
