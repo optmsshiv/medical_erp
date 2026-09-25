@@ -462,7 +462,6 @@
       await MF.rehydrate(); // refresh D.batches so stock levels are current
       $('#posCustomer').value = walkInId();
       renderCart();
-      searchMeds($('#posSearch').value); // redraw Quick picks / search cards with the new stock
     } catch (err) {
       MF.toast(err.message || 'Could not complete the sale.', 'danger', 'Sale failed');
     } finally {
