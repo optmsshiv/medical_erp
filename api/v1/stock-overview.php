@@ -22,7 +22,7 @@ function overviewRows(): array
 {
     $sql = 'SELECT medicine_id, medicine_name, brand_name, category_name, manufacturer_name, unit,
                    qty, available, reserved, damaged, purchase_rate, mrp, batch_count,
-                   stock_value, mrp_value, min_stock, next_expiry
+                   stock_value, mrp_value, min_stock, next_expiry, next_batch_no
             FROM v_stock_overview';
     try {
         return Manufacturer::query($sql);
@@ -46,7 +46,14 @@ function overviewRows(): array
                 COALESCE(SUM(b.quantity * b.purchase_rate), 0) AS stock_value,
                 COALESCE(SUM(b.quantity * b.mrp), 0) AS mrp_value,
                 COALESCE(m.min_stock, 0) AS min_stock,
-                MIN(CASE WHEN b.quantity > 0 THEN b.expiry_date END) AS next_expiry
+                MIN(CASE WHEN b.quantity > 0 THEN b.expiry_date END) AS next_expiry,
+                (
+                  SELECT b2.batch_no
+                  FROM batches b2
+                  WHERE b2.medicine_id = m.id AND b2.quantity > 0
+                  ORDER BY b2.expiry_date ASC, b2.id ASC
+                  LIMIT 1
+                ) AS next_batch_no
              FROM medicines m
              LEFT JOIN batches b ON b.medicine_id = m.id
              LEFT JOIN categories c ON c.id = m.category_id
@@ -144,6 +151,7 @@ $ledger = array_map(fn ($row) => [
     'purchase_rate' => (float) ($row['purchase_rate'] ?? 0),
     'mrp' => (float) ($row['mrp'] ?? 0),
     'next_expiry' => $row['next_expiry'] ?? null,
+    'next_batch_no' => $row['next_batch_no'] ?? '',
     'stock_value' => $row['stock_value'],
     'position' => $row['position'],
 ], $rows);

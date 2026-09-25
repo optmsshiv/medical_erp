@@ -15,6 +15,10 @@ require __DIR__ . '/middleware/auth.php';
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link href="assets/css/style.css" rel="stylesheet">
+  <style>
+    .so-batch { display:inline-flex; align-items:center; gap:4px; margin-top:4px; background:#f4f7fb; color:#16325c; border:1px solid #e4ebf4; border-radius:4px; padding:2px 6px; font-size:11px; font-weight:700; letter-spacing:.01em; }
+    .so-batch i { font-size:12px; }
+  </style>
 </head>
 <body data-page="stock-overview">
   <div class="mf-layout">
@@ -72,6 +76,7 @@ require __DIR__ . '/middleware/auth.php';
                       <th class="text-end">Damaged</th>
                       <th class="text-end">Purchase rate</th>
                       <th class="text-end">MRP</th>
+                      <th class="text-end">Stock value</th>
                       <th>Position</th>
                     </tr>
                   </thead>
@@ -102,7 +107,10 @@ require __DIR__ . '/middleware/auth.php';
           const reserved = batches.reduce((s, b) => s + (Number(b.reserved) || 0), 0);
           const stockValue = batches.reduce((s, b) => s + (Number(b.qty) || Number(b.quantity) || 0) * (Number(b.purchaseRate) || Number(b.purchase_rate) || 0), 0);
           const mrpValue = batches.reduce((s, b) => s + (Number(b.qty) || Number(b.quantity) || 0) * (Number(b.mrp) || 0), 0);
-          const next = batches.filter((b) => ((Number(b.qty) || Number(b.quantity) || 0) > 0) && (b.expiry || b.expiry_date)).map((b) => b.expiry || b.expiry_date).sort()[0] || null;
+          const nextBatch = batches
+            .filter((b) => ((Number(b.qty) || Number(b.quantity) || 0) > 0) && (b.expiry || b.expiry_date))
+            .sort((a, b) => String(a.expiry || a.expiry_date).localeCompare(String(b.expiry || b.expiry_date)))[0] || null;
+          const next = nextBatch ? (nextBatch.expiry || nextBatch.expiry_date) : null;
           const days = next ? MF.daysTo(next) : null;
           let position = 'In stock';
           if (qty <= 0) position = 'Out of stock';
@@ -114,7 +122,8 @@ require __DIR__ . '/middleware/auth.php';
             category_name: m.category || 'Unassigned', manufacturer_name: m.manufacturer || 'Unassigned', unit: m.unit || 'Strip',
             qty, available: Math.max(qty - reserved, 0), reserved, damaged: Number(m.damaged) || 0,
             purchase_rate: Number(m.purchaseRate) || Number(m.purchase_rate) || 0, mrp: Number(m.mrp) || 0,
-            next_expiry: next, stock_value: stockValue, mrp_value: mrpValue, batch_count: batches.length, position
+            next_expiry: next, next_batch_no: nextBatch ? (nextBatch.batchNo || nextBatch.batch_no || '') : '',
+            stock_value: stockValue, mrp_value: mrpValue, batch_count: batches.length, position
           };
         });
         const sum = (key) => lines.reduce((s, r) => s + (Number(r[key]) || 0), 0);
@@ -195,26 +204,30 @@ require __DIR__ . '/middleware/auth.php';
           : '<div class="empty-state"><i class="bi bi-buildings"></i>No manufacturer stock yet.</div>';
 
         const ledger = data.ledger || [];
-        const meta = (r) => [r.category_name, r.brand_name].filter(Boolean).join(' · ');
-        const expiryCell = (iso) => {
-          if (!iso) return '<span class="text-2">—</span>';
-          const days = MF.daysTo(String(iso).slice(0, 10));
-          const cls = days < 0 ? 'text-danger' : days <= 90 ? 'text-warning' : '';
-          return `<span class="num ${cls}">${MF.fmtDate(String(iso).slice(0, 10))}</span>`;
+        const meta = (r) => [r.category_name, r.manufacturer_name].filter((v) => v && v !== 'Unassigned').join(' · ');
+        const expiryCell = (r) => {
+          const iso = r.next_expiry;
+          if (!iso && !r.next_batch_no) return '<span class="text-2">—</span>';
+          const days = iso ? MF.daysTo(String(iso).slice(0, 10)) : null;
+          const cls = days == null ? '' : days < 0 ? 'text-danger' : days <= 90 ? 'text-warning' : '';
+          const date = iso ? `<div class="num ${cls}">${MF.fmtDate(String(iso).slice(0, 10))}</div>` : '';
+          const batch = r.next_batch_no ? `<span class="so-batch"><i class="bi bi-upc"></i>${MF.esc(r.next_batch_no)}</span>` : '';
+          return date + batch;
         };
         $('#soLedger').innerHTML = ledger.length ? ledger.map((r) => `<tr>
           <td>
             <div class="fw-semibold">${MF.esc(r.medicine_name)}</div>
             ${meta(r) ? `<div class="text-2 small-xs">${MF.esc(meta(r))}</div>` : ''}
           </td>
-          <td>${expiryCell(r.next_expiry)}</td>
+          <td>${expiryCell(r)}</td>
           <td class="text-end"><div class="num fw-semibold">${MF.num(r.available)}</div><div class="text-2 small-xs">strips</div></td>
           <td class="text-end num">${MF.num(r.reserved)}</td>
           <td class="text-end num">${MF.num(r.damaged)}</td>
           <td class="text-end num">${MF.fmt(r.purchase_rate, 2)}</td>
           <td class="text-end num">${MF.fmt(r.mrp, 2)}</td>
+          <td class="text-end num">${MF.fmt(r.stock_value)}</td>
           <td>${MF.badge(r.position, tone(r.position))}</td>
-        </tr>`).join('') : `<tr><td colspan="8"><div class="empty-state"><i class="bi bi-box-seam"></i>No stock yet.</div></td></tr>`;
+        </tr>`).join('') : `<tr><td colspan="9"><div class="empty-state"><i class="bi bi-box-seam"></i>No stock yet.</div></td></tr>`;
       }
 
       document.addEventListener('DOMContentLoaded', async () => {
