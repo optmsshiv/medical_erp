@@ -30,12 +30,12 @@ function overviewRows(): array
                 COALESCE(c.name, \'Unassigned\') AS category_name,
                 COALESCE(mf.name, \'Unassigned\') AS manufacturer_name,
                 m.unit AS unit,
-                COALESCE(SUM(b.qty), 0) AS qty,
+                COALESCE(SUM(b.quantity), 0) AS qty,
                 COUNT(b.id) AS batch_count,
-                COALESCE(SUM(b.qty * b.purchase_rate), 0) AS stock_value,
-                COALESCE(SUM(b.qty * b.mrp), 0) AS mrp_value,
+                COALESCE(SUM(b.quantity * b.purchase_rate), 0) AS stock_value,
+                COALESCE(SUM(b.quantity * b.mrp), 0) AS mrp_value,
                 COALESCE(m.min_stock, 0) AS min_stock,
-                MIN(CASE WHEN b.qty > 0 THEN b.expiry END) AS next_expiry
+                MIN(CASE WHEN b.quantity > 0 THEN b.expiry_date END) AS next_expiry
              FROM medicines m
              LEFT JOIN batches b ON b.medicine_id = m.id
              LEFT JOIN categories c ON c.id = m.category_id
