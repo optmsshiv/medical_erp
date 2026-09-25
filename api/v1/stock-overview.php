@@ -20,17 +20,28 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
  */
 function overviewRows(): array
 {
-    $sql = 'SELECT medicine_id, medicine_name, category_name, manufacturer_name, unit,
-                   qty, batch_count, stock_value, mrp_value, min_stock, next_expiry
+    $sql = 'SELECT medicine_id, medicine_name, brand_name, category_name, manufacturer_name, unit,
+                   qty, available, reserved, damaged, purchase_rate, mrp, batch_count,
+                   stock_value, mrp_value, min_stock, next_expiry
             FROM v_stock_overview';
     try {
         return Manufacturer::query($sql);
     } catch (Throwable $e) {
         $fallback = 'SELECT m.id AS medicine_id, m.name AS medicine_name,
+                m.brand_name AS brand_name,
                 COALESCE(c.name, \'Unassigned\') AS category_name,
                 COALESCE(mf.name, \'Unassigned\') AS manufacturer_name,
                 m.unit AS unit,
                 COALESCE(SUM(b.quantity), 0) AS qty,
+                GREATEST(COALESCE(SUM(b.quantity), 0) - COALESCE(SUM(b.reserved), 0), 0) AS available,
+                COALESCE(SUM(b.reserved), 0) AS reserved,
+                COALESCE((
+                  SELECT SUM(ABS(sa.qty_change))
+                  FROM stock_adjustments sa
+                  WHERE sa.medicine_id = m.id AND sa.reason = \'Damage\'
+                ), 0) AS damaged,
+                COALESCE(m.purchase_rate, 0) AS purchase_rate,
+                COALESCE(m.mrp, 0) AS mrp,
                 COUNT(b.id) AS batch_count,
                 COALESCE(SUM(b.quantity * b.purchase_rate), 0) AS stock_value,
                 COALESCE(SUM(b.quantity * b.mrp), 0) AS mrp_value,
@@ -40,7 +51,7 @@ function overviewRows(): array
              LEFT JOIN batches b ON b.medicine_id = m.id
              LEFT JOIN categories c ON c.id = m.category_id
              LEFT JOIN manufacturers mf ON mf.id = m.manufacturer_id
-             GROUP BY m.id, m.name, c.name, mf.name, m.unit, m.min_stock';
+             GROUP BY m.id, m.name, m.brand_name, c.name, mf.name, m.unit, m.min_stock, m.purchase_rate, m.mrp';
         return Manufacturer::query($fallback);
     }
 }
@@ -120,21 +131,26 @@ $group = function (string $field) use ($rows): array {
     return $list;
 };
 
-$attention = array_values(array_filter($rows, fn ($row) => $row['position'] !== 'In stock'));
-$attention = array_slice($attention, 0, 8);
-$attention = array_map(fn ($row) => [
+$ledger = array_map(fn ($row) => [
     'medicine_id' => (int) $row['medicine_id'],
     'medicine_name' => $row['medicine_name'],
+    'brand_name' => $row['brand_name'] ?? '',
     'category_name' => $row['category_name'],
     'unit' => $row['unit'],
     'qty' => $row['qty'],
+    'available' => (float) ($row['available'] ?? $row['qty']),
+    'reserved' => (float) ($row['reserved'] ?? 0),
+    'damaged' => (float) ($row['damaged'] ?? 0),
+    'purchase_rate' => (float) ($row['purchase_rate'] ?? 0),
+    'mrp' => (float) ($row['mrp'] ?? 0),
+    'next_expiry' => $row['next_expiry'] ?? null,
     'stock_value' => $row['stock_value'],
     'position' => $row['position'],
-], $attention);
+], $rows);
 
 Json::ok(['data' => [
     'summary' => $summary,
     'by_category' => $group('category_name'),
     'by_manufacturer' => array_slice($group('manufacturer_name'), 0, 6),
-    'attention' => $attention,
+    'ledger' => $ledger,
 ]]);
