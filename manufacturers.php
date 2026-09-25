@@ -28,6 +28,11 @@ require __DIR__ . '/middleware/auth.php';
     .mf-act-menu .dropdown-item.text-danger i { color:inherit; }
     .mf-name { font-weight:700; color:#1b2430; }
     .mf-chip { display:inline-flex; align-items:center; background:#f4f7fb; color:#16325c; border-radius:999px; padding:2px 8px; font-size:.72rem; font-weight:700; margin:0 4px 4px 0; }
+    .mf-phone { white-space:nowrap; font-weight:600; color:#1b2430; text-decoration:none; }
+    .mf-phone:hover { color:#16325c; }
+    .mf-gstin { font-size:.78rem; font-weight:700; letter-spacing:.03em; color:#16325c; white-space:nowrap; }
+    .mf-addr { max-width:220px; color:#516278; font-size:.82rem; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .mf-wide { min-width:1080px; }
   </style>
 </head>
 <body data-page="manufacturers">
@@ -52,16 +57,20 @@ require __DIR__ . '/middleware/auth.php';
         <div class="card-mf p-3 mb-3">
           <div class="input-group">
             <span class="input-group-text"><i class="bi bi-search"></i></span>
-            <input class="form-control" id="mfSearch" placeholder="Search manufacturer…">
+            <input class="form-control" id="mfSearch" placeholder="Search name, contact, phone, GSTIN…">
           </div>
         </div>
 
         <div class="card-mf">
           <div class="table-scroll" style="max-height:none;overflow:visible">
-            <table class="table table-mf">
+            <table class="table table-mf mf-wide">
               <thead>
                 <tr>
                   <th>Manufacturer</th>
+                  <th>Contact person</th>
+                  <th>Phone</th>
+                  <th>GSTIN</th>
+                  <th>Address</th>
                   <th class="text-end">Medicines</th>
                   <th>Categories</th>
                   <th class="text-end">Stock</th>
@@ -82,16 +91,36 @@ require __DIR__ . '/middleware/auth.php';
   </div>
 
   <div class="modal fade" id="mfFormModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title" id="mfFormTitle">Add Manufacturer</h5>
           <button class="btn-close" data-bs-dismiss="modal" type="button"></button>
         </div>
         <div class="modal-body">
-          <label class="form-label" for="mfName">Manufacturer name <span class="req">*</span></label>
-          <input class="form-control" id="mfName" placeholder="e.g. Cipla">
-          <div class="text-2 small mt-2">Renaming updates every medicine that uses this name.</div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="mfName">Manufacturer name <span class="req">*</span></label>
+              <input class="form-control" id="mfName" placeholder="e.g. Cipla">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="mfContact">Contact person</label>
+              <input class="form-control" id="mfContact" placeholder="e.g. Rajesh Kumar">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="mfPhone">Phone</label>
+              <input class="form-control" id="mfPhone" inputmode="tel" placeholder="e.g. 98765 43210">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="mfGstin">GSTIN</label>
+              <input class="form-control text-uppercase" id="mfGstin" maxlength="15" placeholder="15-character GSTIN" autocomplete="off">
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="mfAddress">Address</label>
+              <textarea class="form-control" id="mfAddress" rows="2" placeholder="City, state"></textarea>
+            </div>
+          </div>
+          <div class="text-2 small mt-3">Renaming updates every medicine that uses this name. Contact details stay on the manufacturer, not on each medicine.</div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-light-mf" data-bs-dismiss="modal" type="button">Cancel</button>
@@ -126,6 +155,44 @@ require __DIR__ . '/middleware/auth.php';
 
       const nameOf = (x) => typeof x === 'string' ? x : (x && x.name) || '';
       const clean = (s) => (s || '').trim().replace(/\s+/g, ' ');
+      const GSTIN_RE = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
+      function profiles() {
+        if (!D.manufacturerProfiles || typeof D.manufacturerProfiles !== 'object' || Array.isArray(D.manufacturerProfiles)) {
+          D.manufacturerProfiles = {};
+        }
+        return D.manufacturerProfiles;
+      }
+      function profileOf(name) {
+        const saved = profiles()[name] || {};
+        const raw = (D.manufacturers || []).find((x) => nameOf(x) === name);
+        const fromObj = raw && typeof raw === 'object' ? raw : {};
+        return {
+          contact: clean(saved.contact || fromObj.contact || fromObj.contactPerson || ''),
+          phone: clean(saved.phone || fromObj.phone || fromObj.mobile || ''),
+          gstin: String(saved.gstin || fromObj.gstin || fromObj.GSTIN || '').trim().toUpperCase(),
+          address: String(saved.address || fromObj.address || '').trim()
+        };
+      }
+      function writeProfile(name, profile) {
+        profiles()[name] = profile;
+        const raw = (D.manufacturers || []).find((x) => nameOf(x) === name);
+        if (raw && typeof raw === 'object') Object.assign(raw, profile);
+      }
+      function dropProfile(name) { delete profiles()[name]; }
+      function readFormProfile() {
+        return {
+          contact: clean($('#mfContact').value),
+          phone: clean($('#mfPhone').value),
+          gstin: ($('#mfGstin').value || '').trim().toUpperCase(),
+          address: ($('#mfAddress').value || '').trim()
+        };
+      }
+      function dash(v) { return v ? MF.esc(v) : '<span class="text-2">—</span>'; }
+      function phoneCell(phone) {
+        if (!phone) return '<span class="text-2">—</span>';
+        const href = phone.replace(/[^\d+]/g, '');
+        return `<a class="mf-phone" href="tel:${href}">${MF.esc(phone)}</a>`;
+      }
       function allNames() {
         const stored = (D.manufacturers || []).map(nameOf).filter(Boolean);
         const used = (D.medicines || []).map((m) => m.manufacturer).filter(Boolean);
@@ -142,7 +209,12 @@ require __DIR__ . '/middleware/auth.php';
 
       function render() {
         const q = state.q.toLowerCase();
-        const list = allNames().filter((n) => !q || n.toLowerCase().includes(q));
+        const matches = (n) => {
+          if (!q) return true;
+          const p = profileOf(n);
+          return [n, p.contact, p.phone, p.gstin, p.address].join(' ').toLowerCase().includes(q);
+        };
+        const list = allNames().filter(matches);
         const pages = Math.max(1, Math.ceil(list.length / state.per));
         state.page = Math.min(state.page, pages);
         const slice = list.slice((state.page - 1) * state.per, state.page * state.per);
@@ -156,8 +228,13 @@ require __DIR__ . '/middleware/auth.php';
         $('#mfBody').innerHTML = slice.map((name) => {
           const s = rowStats(name);
           const chips = s.cats.slice(0, 3).map((c) => `<span class="mf-chip">${MF.esc(c)}</span>`).join('') + (s.cats.length > 3 ? `<span class="text-2 small">+${s.cats.length - 3}</span>` : '');
+          const p = profileOf(name);
           return `<tr>
             <td><div class="mf-name">${MF.esc(name)}</div></td>
+            <td>${dash(p.contact)}</td>
+            <td>${phoneCell(p.phone)}</td>
+            <td>${p.gstin ? `<span class="mf-gstin">${MF.esc(p.gstin)}</span>` : '<span class="text-2">—</span>'}</td>
+            <td>${p.address ? `<div class="mf-addr" title="${MF.esc(p.address)}">${MF.esc(p.address)}</div>` : '<span class="text-2">—</span>'}</td>
             <td class="text-end num fw-semibold">${MF.num(s.meds.length)}</td>
             <td>${chips || '<span class="text-2">—</span>'}</td>
             <td class="text-end num">${MF.num(s.stock)}</td>
@@ -167,7 +244,7 @@ require __DIR__ . '/middleware/auth.php';
                 <button type="button" class="btn btn-icon btn-light-mf mf-kebab" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-label="Actions"><i class="bi bi-three-dots-vertical"></i></button>
                 <ul class="dropdown-menu dropdown-menu-end mf-act-menu">
                   <li><button type="button" class="dropdown-item" data-a="view" data-name="${MF.esc(name)}"><i class="bi bi-eye"></i><span>View medicines</span></button></li>
-                  <li><button type="button" class="dropdown-item" data-a="edit" data-name="${MF.esc(name)}"><i class="bi bi-pencil"></i><span>Rename</span></button></li>
+                  <li><button type="button" class="dropdown-item" data-a="edit" data-name="${MF.esc(name)}"><i class="bi bi-pencil"></i><span>Edit</span></button></li>
                   <li><a class="dropdown-item" href="medicine-master.php?mfg=${encodeURIComponent(name)}"><i class="bi bi-capsule"></i><span>Open in master</span></a></li>
                   <li><hr class="dropdown-divider"></li>
                   <li><button type="button" class="dropdown-item text-danger" data-a="del" data-name="${MF.esc(name)}"><i class="bi bi-trash3"></i><span>Delete</span></button></li>
@@ -175,7 +252,7 @@ require __DIR__ . '/middleware/auth.php';
               </div>
             </td>
           </tr>`;
-        }).join('') || `<tr><td colspan="6"><div class="empty-state"><i class="bi bi-buildings"></i>No manufacturers match.</div></td></tr>`;
+        }).join('') || `<tr><td colspan="10"><div class="empty-state"><i class="bi bi-buildings"></i>No manufacturers match.</div></td></tr>`;
         $('#mfPageInfo').textContent = `Showing ${slice.length ? (state.page - 1) * state.per + 1 : 0}–${(state.page - 1) * state.per + slice.length} of ${list.length}`;
         $('#mfPager').innerHTML = Array.from({ length: pages }, (_, i) =>
           `<li class="page-item ${i + 1 === state.page ? 'active' : ''}"><button class="page-link" type="button" data-pg="${i + 1}">${i + 1}</button></li>`).join('');
@@ -190,15 +267,29 @@ require __DIR__ . '/middleware/auth.php';
 
       function openForm(name) {
         editing = name || null;
-        $('#mfFormTitle').textContent = editing ? 'Rename manufacturer' : 'Add Manufacturer';
+        const p = editing ? profileOf(editing) : { contact: '', phone: '', gstin: '', address: '' };
+        $('#mfFormTitle').textContent = editing ? 'Edit manufacturer' : 'Add Manufacturer';
         $('#mfName').value = editing || '';
+        $('#mfContact').value = p.contact;
+        $('#mfPhone').value = p.phone;
+        $('#mfGstin').value = p.gstin;
+        $('#mfAddress').value = p.address;
         new bootstrap.Modal($('#mfFormModal')).show();
         setTimeout(() => $('#mfName').focus(), 200);
       }
       function openView(name) {
         const s = rowStats(name);
+        const p = profileOf(name);
         $('#mfViewTitle').textContent = name;
         $('#mfViewBody').innerHTML = `
+          <div class="p-3 border-bottom">
+            <div class="row g-3">
+              <div class="col-md-3"><div class="kpi-label">Contact person</div><div class="fw-semibold">${dash(p.contact)}</div></div>
+              <div class="col-md-3"><div class="kpi-label">Phone</div><div class="fw-semibold">${phoneCell(p.phone)}</div></div>
+              <div class="col-md-3"><div class="kpi-label">GSTIN</div><div class="fw-semibold">${p.gstin ? `<span class="mf-gstin">${MF.esc(p.gstin)}</span>` : '<span class="text-2">—</span>'}</div></div>
+              <div class="col-md-3"><div class="kpi-label">Address</div><div class="fw-semibold">${dash(p.address)}</div></div>
+            </div>
+          </div>
           <div class="p-3 border-bottom d-flex flex-wrap gap-4">
             <div><div class="kpi-label">Medicines</div><div class="fw-bold num">${MF.num(s.meds.length)}</div></div>
             <div><div class="kpi-label">Stock</div><div class="fw-bold num">${MF.num(s.stock)}</div></div>
@@ -218,25 +309,41 @@ require __DIR__ . '/middleware/auth.php';
       }
       async function save() {
         const next = clean($('#mfName').value);
+        const profile = readFormProfile();
         if (!next) { MF.toast('Manufacturer name is required.', 'err', 'Validation'); return; }
+        if (profile.gstin && !GSTIN_RE.test(profile.gstin)) {
+          MF.toast('GSTIN must be 15 characters, like 27AABCU9603R1ZM.', 'err', 'Validation');
+          return;
+        }
+        if (profile.phone && profile.phone.replace(/\D/g, '').length < 6) {
+          MF.toast('Enter a valid phone number.', 'err', 'Validation');
+          return;
+        }
         const dup = allNames().some((n) => n.toLowerCase() === next.toLowerCase() && n !== editing);
         if (dup) { MF.toast('A manufacturer with that name already exists.', 'warn', 'Duplicate'); return; }
+        const renamed = editing && editing !== next;
         if (MF.Api.live) {
           try {
-            if (editing) await MF.Api.put('manufacturers.php', { from: editing, name: next });
-            else await MF.Api.post('manufacturers.php', { name: next });
+            const body = { name: next, contact: profile.contact, phone: profile.phone, gstin: profile.gstin, address: profile.address };
+            if (editing) await MF.Api.put('manufacturers.php', { from: editing, ...body });
+            else await MF.Api.post('manufacturers.php', body);
             await MF.rehydrate();
           } catch (e) { MF.toast(e.message, 'err', 'Save failed'); return; }
-        } else {
-          if (!Array.isArray(D.manufacturers)) D.manufacturers = [];
-          if (editing) {
-            D.manufacturers = D.manufacturers.map((x) => nameOf(x) === editing ? next : x);
-            (D.medicines || []).forEach((m) => { if (m.manufacturer === editing) m.manufacturer = next; });
-          } else if (!D.manufacturers.some((x) => nameOf(x).toLowerCase() === next.toLowerCase())) {
-            D.manufacturers.push(next);
-          }
+        } else if (!Array.isArray(D.manufacturers)) {
+          D.manufacturers = [];
         }
-        MF.toast(editing ? `${editing} renamed to ${next}.` : `${next} added.`, 'success', editing ? 'Renamed' : 'Added');
+        if (editing) {
+          if (!MF.Api.live) {
+            D.manufacturers = D.manufacturers.map((x) => nameOf(x) === editing ? (typeof x === 'string' ? next : Object.assign(x, { name: next })) : x);
+            (D.medicines || []).forEach((m) => { if (m.manufacturer === editing) m.manufacturer = next; });
+          }
+          if (renamed) dropProfile(editing);
+        } else if (!MF.Api.live && !D.manufacturers.some((x) => nameOf(x).toLowerCase() === next.toLowerCase())) {
+          D.manufacturers.push(next);
+        }
+        writeProfile(next, profile);
+        const verb = !editing ? 'added' : (renamed ? 'renamed' : 'updated');
+        MF.toast(!editing ? `${next} added.` : (renamed ? `${editing} renamed to ${next}.` : `${next} updated.`), 'success', verb[0].toUpperCase() + verb.slice(1));
         bootstrap.Modal.getInstance($('#mfFormModal'))?.hide();
         render();
       }
@@ -251,6 +358,7 @@ require __DIR__ . '/middleware/auth.php';
         } else {
           D.manufacturers = (D.manufacturers || []).filter((x) => nameOf(x) !== name);
         }
+        dropProfile(name);
         MF.toast(name + ' removed.', 'success', 'Deleted');
         render();
       }
@@ -259,12 +367,20 @@ require __DIR__ . '/middleware/auth.php';
       $('#mfAdd').addEventListener('click', () => openForm(null));
       $('#mfSave').addEventListener('click', save);
       $('#mfName').addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
-      $('#mfExport').addEventListener('click', () => MF.exportCSV('manufacturers.csv',
-        ['Manufacturer', 'Medicines', 'Categories', 'Stock', 'MRP value'],
-        allNames().filter((n) => !state.q || n.toLowerCase().includes(state.q.toLowerCase())).map((n) => {
-          const s = rowStats(n);
-          return [n, s.meds.length, s.cats.join(', '), s.stock, s.mrp];
-        })));
+      $('#mfExport').addEventListener('click', () => {
+        const q = state.q.toLowerCase();
+        MF.exportCSV('manufacturers.csv',
+          ['Manufacturer', 'Contact person', 'Phone', 'GSTIN', 'Address', 'Medicines', 'Categories', 'Stock', 'MRP value'],
+          allNames().filter((n) => {
+            if (!q) return true;
+            const p = profileOf(n);
+            return [n, p.contact, p.phone, p.gstin, p.address].join(' ').toLowerCase().includes(q);
+          }).map((n) => {
+            const s = rowStats(n);
+            const p = profileOf(n);
+            return [n, p.contact, p.phone, p.gstin, p.address, s.meds.length, s.cats.join(', '), s.stock, s.mrp];
+          }));
+      });
 
       document.addEventListener('DOMContentLoaded', async () => {
         await MF.boot();

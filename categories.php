@@ -28,6 +28,9 @@ require __DIR__ . '/middleware/auth.php';
     .mf-act-menu .dropdown-item.text-danger i { color:inherit; }
     .mf-name { font-weight:700; color:#1b2430; }
     .mf-chip { display:inline-flex; align-items:center; background:#f4f7fb; color:#16325c; border-radius:999px; padding:2px 8px; font-size:.72rem; font-weight:700; margin:0 4px 4px 0; }
+    .mf-cat { display:flex; align-items:center; gap:10px; min-width:180px; }
+    .mf-cat-ico { width:32px; height:32px; border-radius:10px; background:#e8eef8; color:#16325c; display:inline-flex; align-items:center; justify-content:center; flex:0 0 32px; font-size:15px; }
+    .mf-sub { color:#8b9bb0; font-size:.72rem; font-weight:600; margin-top:1px; }
   </style>
 </head>
 <body data-page="categories">
@@ -63,6 +66,8 @@ require __DIR__ . '/middleware/auth.php';
                 <tr>
                   <th>Category</th>
                   <th class="text-end">Medicines</th>
+                  <th class="text-end">Batches</th>
+                  <th class="text-end">Sales(30D)</th>
                   <th>Manufacturers</th>
                   <th class="text-end">Stock</th>
                   <th class="text-end">MRP value</th>
@@ -126,22 +131,142 @@ require __DIR__ . '/middleware/auth.php';
 
       const nameOf = (x) => typeof x === 'string' ? x : (x && x.name) || '';
       const clean = (s) => (s || '').trim().replace(/\s+/g, ' ');
+      const CAT_RULES = [
+        [/analges|pain|nsaid|antipyretic|fever/i, 'bandaid'],
+        [/antibiotic|antibacterial/i, 'shield-plus'],
+        [/antacid|gastro|digest|ulcer/i, 'capsule'],
+        [/cardiac|heart|hyperten|\bbp\b/i, 'heart-pulse'],
+        [/diabet|insulin/i, 'droplet'],
+        [/respirat|cough|cold|asthma|inhal/i, 'lungs'],
+        [/vitamin|supplement|nutra/i, 'sun'],
+        [/derma|skin|ointment|cream/i, 'moisture'],
+        [/eye|ophthal/i, 'eye'],
+        [/ent|ear|nasal|throat/i, 'ear'],
+        [/pediatric|paediatric|baby|child/i, 'emoji-smile'],
+        [/ayur|herbal|homeo/i, 'flower1'],
+        [/vaccin|immun/i, 'syringe'],
+        [/neuro|psych|cns/i, 'lightning-charge'],
+        [/allerg|histamine/i, 'wind'],
+        [/fungal|viral|infection/i, 'virus'],
+        [/surg|dressing|consumable/i, 'scissors'],
+        [/inject|infusion|\biv\b/i, 'prescription2']
+      ];
+      const CAT_FALLBACK = ['capsule-pill', 'tags', 'clipboard2-pulse', 'prescription2', 'box-seam'];
+      function catIcon(name) {
+        const raw = (D.categories || []).find((x) => nameOf(x) === name);
+        if (raw && typeof raw === 'object' && raw.icon) return String(raw.icon).replace(/^bi-/, '');
+        const hit = CAT_RULES.find(([re]) => re.test(name));
+        if (hit) return hit[1];
+        let h = 0;
+        for (const ch of name) h = (h + ch.charCodeAt(0)) % CAT_FALLBACK.length;
+        return CAT_FALLBACK[h];
+      }
       function allNames() {
         const stored = (D.categories || []).map(nameOf).filter(Boolean);
         const used = (D.medicines || []).map((m) => m.category).filter(Boolean);
         return [...new Set([...stored, ...used])].sort((a, b) => a.localeCompare(b));
       }
       function medsOf(name) { return (D.medicines || []).filter((m) => m.category === name); }
-      function rowStats(name) {
+      function dayOf(v) {
+        const m = String(v || '').match(/\d{4}-\d{2}-\d{2}/);
+        return m ? m[0] : '';
+      }
+      function salesWindow() {
+        const end = MF.today();
+        const start = new Date(end + 'T00:00:00Z');
+        start.setUTCDate(start.getUTCDate() - 30);
+        return { start: start.toISOString().slice(0, 10), end };
+      }
+      function lineQty(line) {
+        return Number(line.qty ?? line.quantity ?? line.soldQty ?? line.units ?? 0) || 0;
+      }
+      function lineAmount(line) {
+        if (line.amount != null) return Number(line.amount) || 0;
+        if (line.net != null) return Number(line.net) || 0;
+        if (line.total != null) return Number(line.total) || 0;
+        if (line.lineTotal != null) return Number(line.lineTotal) || 0;
+        const rate = Number(line.rate ?? line.price ?? line.mrp ?? 0) || 0;
+        const disc = Number(line.discPct ?? line.discountPct ?? 0) || 0;
+        return lineQty(line) * rate * (1 - disc / 100);
+      }
+      function lineMedId(line) {
+        return line.medId ?? line.medicineId ?? line.medicine_id ?? line.itemId ?? null;
+      }
+      function invoiceLines(inv) {
+        return inv.items || inv.lines || inv.rows || inv.medicines || inv.details || [];
+      }
+      function salesByCategory() {
+        const map = new Map();
+        const bump = (medId, qty, amount) => {
+          const med = (D.medicines || []).find((m) => m.id == medId);
+          if (!med || !med.category) return;
+          const cur = map.get(med.category) || { qty: 0, amount: 0 };
+          cur.qty += qty;
+          cur.amount += amount;
+          map.set(med.category, cur);
+        };
+        const { start, end } = salesWindow();
+        const inWindow = (row) => {
+          const day = dayOf(row.date || row.invoiceDate || row.createdAt || row.dt);
+          return day && day >= start && day <= end;
+        };
+        const skip = (row) => /cancel|void|draft/i.test(String(row.status || ''));
+        const signOf = (row) => /return/i.test(String(row.type || row.docType || '')) ? -1 : 1;
+        const invoices = (Array.isArray(D.salesInvoices) && D.salesInvoices.length) ? D.salesInvoices : (Array.isArray(D.sales) ? D.sales : []);
+        invoices.forEach((inv) => {
+          if (!inv || skip(inv) || !inWindow(inv)) return;
+          const sign = signOf(inv);
+          invoiceLines(inv).forEach((line) => {
+            const id = lineMedId(line);
+            if (id == null) return;
+            bump(id, sign * lineQty(line), sign * lineAmount(line));
+          });
+        });
+        if (!map.size) {
+          [].concat(D.saleLines || [], D.salesLines || [], D.invoiceItems || []).forEach((line) => {
+            if (!line || skip(line) || !inWindow(line)) return;
+            const id = lineMedId(line);
+            if (id == null) return;
+            const sign = signOf(line);
+            bump(id, sign * lineQty(line), sign * lineAmount(line));
+          });
+        }
+        if (!map.size) {
+          (D.medicines || []).forEach((m) => {
+            const qty = m.sales30 ?? m.sold30 ?? m.qtySold30 ?? m.salesQty30;
+            const amount = m.salesValue30 ?? m.sales30Value ?? m.saleValue30;
+            if (qty == null && amount == null) return;
+            bump(m.id, Number(qty) || 0, Number(amount) || 0);
+          });
+        }
+        return map;
+      }
+      function salesCell(sale) {
+        const s = sale || { qty: 0, amount: 0 };
+        if (!s.qty && !s.amount) return '<span class="text-2">—</span>';
+        if (s.amount) {
+          return `<div class="num fw-semibold">${MF.fmt(s.amount)}</div>${s.qty ? `<div class="mf-sub">${MF.num(s.qty)} qty</div>` : ''}`;
+        }
+        return `<div class="num fw-semibold">${MF.num(s.qty)}</div><div class="mf-sub">qty</div>`;
+      }
+      function salesExport(sale) {
+        const s = sale || { qty: 0, amount: 0 };
+        if (s.amount) return Math.round(s.amount);
+        return s.qty || 0;
+      }
+      function rowStats(name, salesMap) {
         const meds = medsOf(name);
         const stock = meds.reduce((s, m) => s + MF.stockOf(m.id), 0);
+        const batches = meds.reduce((s, m) => s + MF.batchesOf(m.id).length, 0);
         const mfgs = [...new Set(meds.map((m) => m.manufacturer).filter(Boolean))];
         const mrp = meds.reduce((s, m) => s + MF.batchesOf(m.id).reduce((a, b) => a + (Number(b.qty) || 0) * (Number(b.mrp) || 0), 0), 0);
-        return { meds, stock, mfgs, mrp };
+        const sale = (salesMap && salesMap.get(name)) || { qty: 0, amount: 0 };
+        return { meds, stock, batches, mfgs, mrp, sale };
       }
 
       function render() {
         const q = state.q.toLowerCase();
+        const salesMap = salesByCategory();
         const list = allNames().filter((n) => !q || n.toLowerCase().includes(q));
         const pages = Math.max(1, Math.ceil(list.length / state.per));
         state.page = Math.min(state.page, pages);
@@ -154,11 +279,13 @@ require __DIR__ . '/middleware/auth.php';
           <div class="col-6 col-md-3"><div class="mf-stat"><span>Unassigned</span><strong>${MF.num(unassigned)}</strong></div></div>
           <div class="col-6 col-md-3"><div class="mf-stat"><span>Showing</span><strong>${MF.num(list.length)}</strong></div></div>`;
         $('#catBody').innerHTML = slice.map((name) => {
-          const s = rowStats(name);
+          const s = rowStats(name, salesMap);
           const chips = s.mfgs.slice(0, 3).map((c) => `<span class="mf-chip">${MF.esc(c)}</span>`).join('') + (s.mfgs.length > 3 ? `<span class="text-2 small">+${s.mfgs.length - 3}</span>` : '');
           return `<tr>
-            <td><div class="mf-name">${MF.esc(name)}</div></td>
+            <td><div class="mf-cat"><span class="mf-cat-ico" aria-hidden="true"><i class="bi bi-${catIcon(name)}"></i></span><div class="mf-name">${MF.esc(name)}</div></div></td>
             <td class="text-end num fw-semibold">${MF.num(s.meds.length)}</td>
+            <td class="text-end num">${MF.num(s.batches)}</td>
+            <td class="text-end">${salesCell(s.sale)}</td>
             <td>${chips || '<span class="text-2">—</span>'}</td>
             <td class="text-end num">${MF.num(s.stock)}</td>
             <td class="text-end num">${MF.fmt(s.mrp)}</td>
@@ -175,7 +302,7 @@ require __DIR__ . '/middleware/auth.php';
               </div>
             </td>
           </tr>`;
-        }).join('') || `<tr><td colspan="6"><div class="empty-state"><i class="bi bi-tags"></i>No categories match.</div></td></tr>`;
+        }).join('') || `<tr><td colspan="8"><div class="empty-state"><i class="bi bi-tags"></i>No categories match.</div></td></tr>`;
         $('#catPageInfo').textContent = `Showing ${slice.length ? (state.page - 1) * state.per + 1 : 0}–${(state.page - 1) * state.per + slice.length} of ${list.length}`;
         $('#catPager').innerHTML = Array.from({ length: pages }, (_, i) =>
           `<li class="page-item ${i + 1 === state.page ? 'active' : ''}"><button class="page-link" type="button" data-pg="${i + 1}">${i + 1}</button></li>`).join('');
@@ -196,11 +323,14 @@ require __DIR__ . '/middleware/auth.php';
         setTimeout(() => $('#catName').focus(), 200);
       }
       function openView(name) {
-        const s = rowStats(name);
+        const s = rowStats(name, salesByCategory());
         $('#catViewTitle').textContent = name;
         $('#catViewBody').innerHTML = `
-          <div class="p-3 border-bottom d-flex flex-wrap gap-4">
+          <div class="p-3 border-bottom d-flex flex-wrap gap-4 align-items-center">
+            <span class="mf-cat-ico"><i class="bi bi-${catIcon(name)}"></i></span>
             <div><div class="kpi-label">Medicines</div><div class="fw-bold num">${MF.num(s.meds.length)}</div></div>
+            <div><div class="kpi-label">Batches</div><div class="fw-bold num">${MF.num(s.batches)}</div></div>
+            <div><div class="kpi-label">Sales(30D)</div><div class="fw-bold num">${s.sale.amount ? MF.fmt(s.sale.amount) : (s.sale.qty ? MF.num(s.sale.qty) + ' qty' : '—')}</div></div>
             <div><div class="kpi-label">Stock</div><div class="fw-bold num">${MF.num(s.stock)}</div></div>
             <div><div class="kpi-label">MRP value</div><div class="fw-bold num">${MF.fmt(s.mrp)}</div></div>
             <div class="ms-auto"><a class="btn btn-mf-soft btn-sm" href="medicine-master.php?category=${encodeURIComponent(name)}"><i class="bi bi-capsule me-1"></i>Open in master</a></div>
@@ -259,12 +389,15 @@ require __DIR__ . '/middleware/auth.php';
       $('#catAdd').addEventListener('click', () => openForm(null));
       $('#catSave').addEventListener('click', save);
       $('#catName').addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
-      $('#catExport').addEventListener('click', () => MF.exportCSV('categories.csv',
-        ['Category', 'Medicines', 'Manufacturers', 'Stock', 'MRP value'],
-        allNames().filter((n) => !state.q || n.toLowerCase().includes(state.q.toLowerCase())).map((n) => {
-          const s = rowStats(n);
-          return [n, s.meds.length, s.mfgs.join(', '), s.stock, s.mrp];
-        })));
+      $('#catExport').addEventListener('click', () => {
+        const salesMap = salesByCategory();
+        MF.exportCSV('categories.csv',
+          ['Category', 'Medicines', 'Batches', 'Sales(30D)', 'Manufacturers', 'Stock', 'MRP value'],
+          allNames().filter((n) => !state.q || n.toLowerCase().includes(state.q.toLowerCase())).map((n) => {
+            const s = rowStats(n, salesMap);
+            return [n, s.meds.length, s.batches, salesExport(s.sale), s.mfgs.join(', '), s.stock, s.mrp];
+          }));
+      });
 
       document.addEventListener('DOMContentLoaded', async () => {
         await MF.boot();
