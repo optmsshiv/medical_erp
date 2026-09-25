@@ -295,8 +295,8 @@ window.MF = window.MF || {};
       { label: 'Batch Management', icon: 'collection', page: 'batch-management', href: 'batch-management.php' },
       { label: 'Expiry Management', icon: 'calendar2-x', page: 'expiry-management', href: 'expiry-management.php' },
       { label: 'Low Stock', icon: 'exclamation-triangle', href: 'medicine-master.php?stock=low' },
-      { label: 'Stock Adjustment', icon: 'sliders', page: 'stock-adjustment', href: 'stock-adjustment.php' },
-      { label: 'Stock Transfer', icon: 'arrow-left-right', page: 'stock-transfer', href: 'stock-transfer.php' }
+      { label: 'Stock Adjustment', icon: 'sliders', stub: true },
+      { label: 'Stock Transfer', icon: 'arrow-left-right', stub: true }
     ]},
     {
       label: 'Pharmacy', icon: 'heart-pulse', items: [
