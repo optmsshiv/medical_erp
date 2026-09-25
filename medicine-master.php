@@ -59,7 +59,49 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
     }
     .mm-input .form-control:focus,
     .mm-input .form-select:focus { box-shadow:none; background:transparent; }
-    .mm-input .form-select { padding-right:1.6rem; }
+    .mm-input .form-select {
+      appearance:none; -webkit-appearance:none; -moz-appearance:none;
+      background-image:none !important; cursor:pointer; padding-right:.4rem;
+    }
+    .mm-input { position:relative; }
+    .mm-select-caret {
+      color:#8aa0b8; font-size:.72rem; pointer-events:none; margin-left:auto;
+      transition:transform .15s ease, color .15s ease;
+    }
+    .mm-input.is-open { border-color:#16325c; box-shadow:0 0 0 3px rgba(22,50,92,.12); }
+    .mm-input.is-open .mm-select-caret { transform:rotate(180deg); color:#16325c; }
+    .mm-select-hit {
+      position:absolute; inset:0; border:0; background:transparent; cursor:pointer; z-index:2;
+    }
+    .mm-select-plain { position:relative; }
+    .mm-select-plain .mm-select-hit { border-radius:inherit; }
+
+    /* Custom option list — same language as the action menu, not the browser popup */
+    .mm-select-menu {
+      position:fixed; z-index:2000; display:none; padding:6px;
+      background:#fff; border:1px solid #e7edf4; border-radius:12px;
+      box-shadow:0 16px 40px rgba(16,32,64,.16);
+      max-height:280px; overflow:auto;
+    }
+    .mm-select-menu.show { display:block; }
+    .mm-select-search {
+      display:flex; align-items:center; gap:6px; margin:2px 2px 6px;
+      padding:0 8px; height:34px; border-radius:8px; background:#f6f9fc; border:1px solid #e7edf4;
+    }
+    .mm-select-search i { color:#8aa0b8; font-size:.85rem; }
+    .mm-select-search input {
+      border:0; outline:0; background:transparent; width:100%; font:inherit; font-size:.82rem; color:#1b2430;
+    }
+    .mm-select-opt {
+      width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px;
+      border:0; background:transparent; border-radius:8px; padding:.48rem .7rem;
+      font:inherit; font-size:.84rem; font-weight:600; color:#1b2430; cursor:pointer; text-align:left;
+    }
+    .mm-select-opt i { color:#16325c; opacity:0; font-size:.95rem; }
+    .mm-select-opt:hover, .mm-select-opt.is-hot { background:#f4f7fb; }
+    .mm-select-opt.is-on { background:#e8eef8; color:#16325c; }
+    .mm-select-opt.is-on i { opacity:1; }
+    .mm-select-empty { padding:.6rem .7rem; color:#6c757d; font-size:.8rem; }
 
     /* Paired toggles — Stock & Status, and loose sale */
     .mm-switch-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
@@ -631,9 +673,149 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
         ['Name', 'Generic', 'Brand', 'Category', 'Manufacturer', 'HSN', 'GST%', 'Unit', 'MRP', 'Purchase', 'Wholesale', 'Stock', 'Substitutes'],
         filtered().map((m) => [m.name, m.generic, m.brandRef || '', m.category, m.manufacturer, m.hsn, m.gst, m.unit, m.mrp, m.purchaseRate, m.wholesaleRate, MF.stockOf(m.id), Array.isArray(m.substitutes) ? m.substitutes.join(', ') : (m.substitutes || '')])));
 
+      /* Premium select menus. Native <option> popups ignore our CSS, so the list is ours
+         and the closed field still uses the existing form-select / mm-input styles. */
+      const selectMenu = document.createElement('div');
+      selectMenu.className = 'mm-select-menu';
+      selectMenu.setAttribute('role', 'listbox');
+      document.body.appendChild(selectMenu);
+      let openSelect = null;
+      let hotIndex = -1;
+
+      function selectAnchor(sel) {
+        return sel.closest('.mm-input') || sel.closest('.mm-select-plain') || sel;
+      }
+      function closeSelectMenu() {
+        selectMenu.classList.remove('show');
+        selectMenu.innerHTML = '';
+        document.querySelectorAll('.mm-input.is-open, .mm-select-plain.is-open').forEach((el) => el.classList.remove('is-open'));
+        openSelect = null;
+        hotIndex = -1;
+      }
+      function placeSelectMenu(sel) {
+        const r = selectAnchor(sel).getBoundingClientRect();
+        const width = Math.max(r.width, 180);
+        selectMenu.style.width = width + 'px';
+        selectMenu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8)) + 'px';
+        selectMenu.classList.add('show');
+        const h = selectMenu.offsetHeight;
+        const gap = 6;
+        if (window.innerHeight - r.bottom < h + gap && r.top > h + gap) selectMenu.style.top = (r.top - h - gap) + 'px';
+        else selectMenu.style.top = (r.bottom + gap) + 'px';
+      }
+      function paintSelectMenu(filter) {
+        if (!openSelect) return;
+        const q = (filter || '').trim().toLowerCase();
+        const opts = [...openSelect.options].map((o, i) => ({ i, text: o.text, on: o.selected || o.value === openSelect.value }));
+        const shown = opts.filter((o) => !q || o.text.toLowerCase().includes(q));
+        const search = opts.length > 8
+          ? `<div class="mm-select-search"><i class="bi bi-search"></i><input type="text" placeholder="Search" value="${MF.esc(filter || '')}" aria-label="Search options"></div>`
+          : '';
+        selectMenu.innerHTML = search + (shown.length
+          ? shown.map((o, n) => `<button type="button" class="mm-select-opt${o.on ? ' is-on' : ''}${n === hotIndex ? ' is-hot' : ''}" role="option" data-i="${o.i}" aria-selected="${o.on}"><span>${MF.esc(o.text)}</span><i class="bi bi-check2"></i></button>`).join('')
+          : `<div class="mm-select-empty">No match</div>`);
+        const input = selectMenu.querySelector('input');
+        if (input) {
+          input.addEventListener('input', () => { hotIndex = 0; paintSelectMenu(input.value); });
+          input.addEventListener('keydown', (e) => {
+            if (!['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(e.key)) e.stopPropagation();
+          });
+          input.focus();
+          input.setSelectionRange(input.value.length, input.value.length);
+        }
+        selectMenu.querySelector('.is-on, .is-hot')?.scrollIntoView({ block: 'nearest' });
+      }
+      function openSelectMenu(sel) {
+        if (openSelect === sel) { closeSelectMenu(); return; }
+        closeSelectMenu();
+        openSelect = sel;
+        hotIndex = Math.max(0, [...sel.options].findIndex((o) => o.selected || o.value === sel.value));
+        selectAnchor(sel).classList.add('is-open');
+        paintSelectMenu('');
+        placeSelectMenu(sel);
+        selectMenu.querySelector('.is-on')?.focus();
+      }
+      function chooseSelect(index) {
+        if (!openSelect || !openSelect.options[index]) return;
+        openSelect.selectedIndex = index;
+        openSelect.dispatchEvent(new Event('input', { bubbles: true }));
+        openSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        closeSelectMenu();
+      }
+      function bindPremiumSelect(sel) {
+        if (!sel || sel.dataset.mmSelect) return;
+        sel.dataset.mmSelect = '1';
+        const shell = sel.closest('.mm-input');
+        if (shell) {
+          shell.classList.add('mm-select');
+          if (!shell.querySelector('.mm-select-caret')) {
+            const caret = document.createElement('i');
+            caret.className = 'bi bi-chevron-down mm-select-caret';
+            shell.appendChild(caret);
+          }
+          const hit = document.createElement('button');
+          hit.type = 'button';
+          hit.className = 'mm-select-hit';
+          hit.setAttribute('aria-label', sel.id || 'Choose');
+          hit.setAttribute('aria-haspopup', 'listbox');
+          shell.appendChild(hit);
+          hit.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openSelectMenu(sel); });
+        } else {
+          const wrap = document.createElement('div');
+          wrap.className = 'mm-select-plain';
+          sel.parentNode.insertBefore(wrap, sel);
+          wrap.appendChild(sel);
+          const hit = document.createElement('button');
+          hit.type = 'button';
+          hit.className = 'mm-select-hit';
+          hit.setAttribute('aria-haspopup', 'listbox');
+          wrap.appendChild(hit);
+          hit.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openSelectMenu(sel); });
+        }
+        sel.addEventListener('mousedown', (e) => e.preventDefault());
+      }
+      function bindPremiumSelects() {
+        document.querySelectorAll('select.form-select').forEach(bindPremiumSelect);
+      }
+      selectMenu.addEventListener('click', (e) => {
+        const btn = e.target.closest('.mm-select-opt');
+        if (!btn) return;
+        chooseSelect(+btn.dataset.i);
+      });
+      document.addEventListener('pointerdown', (e) => {
+        if (!openSelect) return;
+        if (selectMenu.contains(e.target)) return;
+        if (selectAnchor(openSelect).contains(e.target)) return;
+        closeSelectMenu();
+      });
+      document.addEventListener('keydown', (e) => {
+        if (!openSelect) return;
+        const buttons = [...selectMenu.querySelectorAll('.mm-select-opt')];
+        if (e.key === 'Escape') { e.preventDefault(); closeSelectMenu(); return; }
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (!buttons.length) return;
+          let cur = buttons.findIndex((b) => b.classList.contains('is-hot'));
+          if (cur < 0) cur = buttons.findIndex((b) => b.classList.contains('is-on'));
+          hotIndex = e.key === 'ArrowDown'
+            ? Math.min(buttons.length - 1, (cur < 0 ? -1 : cur) + 1)
+            : Math.max(0, (cur < 0 ? 0 : cur) - 1);
+          buttons.forEach((b, n) => b.classList.toggle('is-hot', n === hotIndex));
+          buttons[hotIndex]?.scrollIntoView({ block: 'nearest' });
+        }
+        if (e.key === 'Enter' && buttons.length) {
+          e.preventDefault();
+          const hot = buttons.find((b) => b.classList.contains('is-hot')) || buttons.find((b) => b.classList.contains('is-on')) || buttons[0];
+          chooseSelect(+hot.dataset.i);
+        }
+      });
+      window.addEventListener('resize', closeSelectMenu);
+      document.addEventListener('scroll', closeSelectMenu, true);
+
       document.addEventListener('DOMContentLoaded', async () => {
         await MF.boot();
         buildLookups();
+        bindPremiumSelects();
         const p = new URLSearchParams(location.search);
         if (p.get('stock') === 'low') { $('#mmStock').value = 'low'; state.stock = 'low'; }
         render();
@@ -641,5 +823,5 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
       });
     })();
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a40ad0b3da4a7a0d',t:'MTc5MDM0NzU1Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a40ae802ac4033c0',t:'MTc5MDM0ODUwOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
