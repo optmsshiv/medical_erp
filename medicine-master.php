@@ -27,6 +27,89 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
       border-bottom:1px solid #e9ecef;
     }
     .mm-section-title:not(:first-child){ margin-top:1.5rem; }
+
+    /* Packaging & Identification — grouped, icon fields. Every original field stays. */
+    .mm-pack { display:grid; gap:12px; }
+    .mm-pack-group {
+      background:#f8fafc;
+      border:1px solid #e7edf4;
+      border-radius:14px;
+      padding:12px 14px 14px;
+    }
+    .mm-pack-head {
+      display:flex; align-items:center; gap:8px;
+      font-size:.78rem; font-weight:700; color:#16325c; margin-bottom:10px;
+    }
+    .mm-pack-head i {
+      width:26px; height:26px; border-radius:8px; display:grid; place-items:center;
+      background:#e8eef8; font-size:.9rem;
+    }
+    .mm-input {
+      display:flex; align-items:center; gap:8px;
+      background:#fff; border:1px solid #e3e9f1; border-radius:10px;
+      padding:0 10px; min-height:42px;
+      transition:border-color .15s ease, box-shadow .15s ease;
+    }
+    .mm-input:focus-within { border-color:#16325c; box-shadow:0 0 0 3px rgba(22,50,92,.12); }
+    .mm-input > i { color:#8aa0b8; font-size:1rem; flex:0 0 auto; }
+    .mm-input .form-control,
+    .mm-input .form-select {
+      border:0; background:transparent; box-shadow:none;
+      padding-left:0; height:40px; min-height:40px;
+    }
+    .mm-input .form-control:focus,
+    .mm-input .form-select:focus { box-shadow:none; background:transparent; }
+    .mm-input .form-select { padding-right:1.6rem; }
+
+    /* Paired toggles — Stock & Status, and loose sale */
+    .mm-switch-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .mm-switch {
+      display:flex; align-items:center; gap:12px; margin:0; cursor:pointer;
+      padding:10px 12px; border:1px solid #e7edf4; border-radius:12px; background:#fff;
+      min-height:42px;
+    }
+    .mm-switch:hover { border-color:#cfd8e6; }
+    .mm-switch strong { display:block; font-size:.84rem; font-weight:650; color:#1b2430; line-height:1.2; }
+    .mm-switch small { display:block; color:#6c757d; font-size:.72rem; font-weight:500; margin-top:1px; }
+    .mm-switch input {
+      appearance:none; -webkit-appearance:none;
+      width:40px; height:22px; border-radius:99px; background:#d5dee8;
+      position:relative; flex:0 0 auto; margin:0; cursor:pointer;
+      transition:background .15s ease;
+    }
+    .mm-switch input::after {
+      content:""; position:absolute; top:2px; left:2px; width:18px; height:18px;
+      border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(16,32,64,.18);
+      transition:transform .15s ease;
+    }
+    .mm-switch input:checked { background:#16325c; }
+    .mm-switch input:checked::after { transform:translateX(18px); }
+    .mm-switch input:focus-visible { outline:2px solid #16325c; outline-offset:2px; }
+    .mm-switch-compact { height:42px; padding:6px 10px; }
+    .mm-switch-compact strong { font-size:.78rem; }
+    .mm-switch-compact small { font-size:.68rem; }
+
+    /* Ledger action menu */
+    .mm-kebab {
+      width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center;
+      border-radius:8px; padding:0;
+    }
+    .mm-kebab i { font-size:1.15rem; line-height:1; }
+    .mm-act-menu {
+      min-width:188px; padding:6px; border:1px solid #e7edf4; border-radius:12px;
+      box-shadow:0 12px 32px rgba(16,32,64,.14); z-index:1080;
+    }
+    .mm-act-menu .dropdown-item {
+      display:flex; align-items:center; gap:10px;
+      font-size:.84rem; font-weight:600; border-radius:8px; padding:.48rem .65rem;
+    }
+    .mm-act-menu .dropdown-item i { width:1.05rem; font-size:1rem; color:#16325c; }
+    .mm-act-menu .dropdown-item:hover { background:#f4f7fb; }
+    .mm-act-menu .dropdown-item.text-danger i { color:inherit; }
+    .mm-act-menu .dropdown-divider { margin:.35rem 0; }
+    @media (max-width: 575.98px) {
+      .mm-switch-row { grid-template-columns:1fr 1fr; }
+    }
   </style>
 </head>
 <body data-page="medicine-master">
@@ -78,7 +161,7 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
 
         <!-- Table -->
         <div class="card-mf">
-          <div class="table-scroll" style="max-height:none">
+          <div class="table-scroll" style="max-height:none;overflow:visible">
             <table class="table table-mf">
               <thead>
                 <tr>
@@ -103,7 +186,7 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
 
   <!-- Add / Edit modal -->
   <div class="modal fade" id="mmFormModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header"><h5 class="modal-title" id="mmFormTitle">Add Medicine</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
@@ -117,27 +200,101 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
             <div class="col-md-3"><label class="form-label">Category</label><select class="form-select" id="fCategory"></select></div>
             <div class="col-md-3"><label class="form-label">Manufacturer</label><select class="form-select" id="fMfg"></select></div>
             <div class="col-md-6"><label class="form-label">Generic Group</label><input class="form-control" id="fGenericGroup" list="fGenericGroupList" placeholder="e.g. Telmisartan 40mg — leave blank if none"><datalist id="fGenericGroupList"></datalist><div class="text-2 small mt-1">Medicines sharing a group are treated as substitutes of each other</div></div>
+            <div class="col-12"><label class="form-label" for="fSubstitutes">Substitutes (comma-separated)</label><input class="form-control" id="fSubstitutes" placeholder="e.g. Crocin, Dolo 650, Calpol"><div class="text-2 small mt-1">Other medicine names that can be offered in place of this one</div></div>
           </div>
 
           <div class="mm-section-title">Packaging &amp; Identification</div>
-          <div class="row g-3">
-            <div class="col-md-3 col-6"><label class="form-label">Schedule</label>
-              <select class="form-select" id="fSchedule"><option>OTC</option><option>H</option><option>H1</option></select></div>
-            <div class="col-md-3 col-6"><label class="form-label">HSN Code</label><input class="form-control" id="fHsn" value="3004"></div>
-            <div class="col-md-3 col-6"><label class="form-label">Barcode</label><input class="form-control" id="fBarcode" placeholder="8901234…"><div id="fBarcodeWarn" class="small mt-1" style="display:none"></div></div>
-            <div class="col-md-3 col-6"><label class="form-label">Unit</label>
-              <select class="form-select" id="fUnit"><option>Strip</option><option>Bottle</option><option>Tube</option><option>Sachet</option><option>Vial</option><option>Inhaler</option><option>Pen</option></select></div>
-            <div class="col-md-3 col-6"><label class="form-label">Pack / Strip Size</label><input class="form-control" id="fPack" placeholder="e.g. 15 Tablets"><div class="text-2 small mt-1">Total Pieces in 1 Pack</div></div>
-            <div class="col-md-3 col-6"><label class="form-label">Pack / Strip Qty</label><input type="number" min="1" class="form-control" id="fPackQty" value="1" placeholder="e.g. 10"></div>
-            <div class="col-md-3 col-6"><label class="form-label">Sub-unit</label><input class="form-control" id="fSubUnit" placeholder="e.g. Tablet"></div>
-            <div class="col-md-3 col-6 d-flex align-items-center">
-              <div class="form-check form-switch mt-4 pt-1">
-                <input class="form-check-input" type="checkbox" id="fAllowLoose">
-                <label class="form-check-label" for="fAllowLoose">Allow loose sale</label>
+          <div class="mm-pack">
+            <div class="mm-pack-group">
+              <div class="mm-pack-head"><i class="bi bi-fingerprint"></i> Identification</div>
+              <div class="row g-3">
+                <div class="col-md-4 col-6">
+                  <label class="form-label" for="fSchedule">Schedule</label>
+                  <div class="mm-input">
+                    <i class="bi bi-shield-check"></i>
+                    <select class="form-select" id="fSchedule"><option>OTC</option><option>H</option><option>H1</option></select>
+                  </div>
+                </div>
+                <div class="col-md-4 col-6">
+                  <label class="form-label" for="fHsn">HSN Code</label>
+                  <div class="mm-input">
+                    <i class="bi bi-hash"></i>
+                    <input class="form-control" id="fHsn" value="3004">
+                  </div>
+                </div>
+                <div class="col-md-4 col-12">
+                  <label class="form-label" for="fBarcode">Barcode</label>
+                  <div class="mm-input">
+                    <i class="bi bi-upc-scan"></i>
+                    <input class="form-control" id="fBarcode" placeholder="8901234…">
+                  </div>
+                  <div id="fBarcodeWarn" class="small mt-1" style="display:none"></div>
+                </div>
               </div>
             </div>
-            <div class="col-md-3 col-6"><label class="form-label">Box Qty</label><input type="number" min="1" class="form-control" id="fBoxQty" placeholder="e.g. 10"><div class="text-2">(packs/strips per box)</div></div>
-            <div class="col-md-3 col-6"><label class="form-label">Box Unit</label><input class="form-control" id="fBoxUnit" placeholder="Box" value="Box"></div>
+
+            <div class="mm-pack-group">
+              <div class="mm-pack-head"><i class="bi bi-capsule"></i> Pack contents</div>
+              <div class="row g-3 align-items-start">
+                <div class="col-lg-2 col-md-4 col-6">
+                  <label class="form-label" for="fUnit">Unit</label>
+                  <div class="mm-input">
+                    <i class="bi bi-tag"></i>
+                    <select class="form-select" id="fUnit"><option>Strip</option><option>Bottle</option><option>Tube</option><option>Sachet</option><option>Vial</option><option>Inhaler</option><option>Pen</option></select>
+                  </div>
+                </div>
+                <div class="col-lg-3 col-md-4 col-6">
+                  <label class="form-label" for="fPack">Pack / Strip Size</label>
+                  <div class="mm-input">
+                    <i class="bi bi-card-text"></i>
+                    <input class="form-control" id="fPack" placeholder="e.g. 15 Tablets">
+                  </div>
+                  <div class="text-2 small mt-1">Total pieces in 1 pack</div>
+                </div>
+                <div class="col-lg-2 col-md-4 col-6">
+                  <label class="form-label" for="fPackQty">Pack / Strip Qty</label>
+                  <div class="mm-input">
+                    <i class="bi bi-123"></i>
+                    <input type="number" min="1" class="form-control" id="fPackQty" value="1" placeholder="e.g. 10">
+                  </div>
+                </div>
+                <div class="col-lg-2 col-md-6 col-6">
+                  <label class="form-label" for="fSubUnit">Sub-unit</label>
+                  <div class="mm-input">
+                    <i class="bi bi-capsule"></i>
+                    <input class="form-control" id="fSubUnit" placeholder="e.g. Tablet">
+                  </div>
+                </div>
+                <div class="col-lg-3 col-md-6 col-12">
+                  <label class="form-label d-none d-lg-block" aria-hidden="true">&nbsp;</label>
+                  <label class="mm-switch mm-switch-compact">
+                    <input type="checkbox" id="fAllowLoose">
+                    <span><strong>Allow loose sale</strong><small>Sell single sub-units</small></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="mm-pack-group">
+              <div class="mm-pack-head"><i class="bi bi-box-seam"></i> Outer box</div>
+              <div class="row g-3">
+                <div class="col-md-4 col-6">
+                  <label class="form-label" for="fBoxQty">Box Qty</label>
+                  <div class="mm-input">
+                    <i class="bi bi-123"></i>
+                    <input type="number" min="1" class="form-control" id="fBoxQty" placeholder="e.g. 10">
+                  </div>
+                  <div class="text-2 small mt-1">Packs / strips per box</div>
+                </div>
+                <div class="col-md-4 col-6">
+                  <label class="form-label" for="fBoxUnit">Box Unit</label>
+                  <div class="mm-input">
+                    <i class="bi bi-box"></i>
+                    <input class="form-control" id="fBoxUnit" placeholder="Box" value="Box">
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="mm-section-title">Pricing &amp; Tax</div>
@@ -152,19 +309,19 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
 
           <div class="mm-section-title">Stock &amp; Status</div>
           <div class="row g-3">
-            <div class="col-md-3 col-6"><label class="form-label">Minimum Stock</label><input type="number" class="form-control" id="fMin" value="50"></div>
-            <div class="col-md-3 col-6"><label class="form-label">Reorder Level</label><input type="number" class="form-control" id="fReorder" value="100"></div>
-            <div class="col-md-3 col-6"><label class="form-label">Expiry Alert (days)</label><input type="number" min="1" class="form-control" id="fExpiryAlert" placeholder="Default: 90"></div>
-            <div class="col-md-3 col-6 d-flex align-items-center">
-              <div class="form-check form-switch mt-4 pt-1">
-                <input class="form-check-input" type="checkbox" id="fRx">
-                <label class="form-check-label" for="fRx">Prescription required</label>
-              </div>
-            </div>
-            <div class="col-md-3 col-6 d-flex align-items-center">
-              <div class="form-check form-switch mt-4 pt-1">
-                <input class="form-check-input" type="checkbox" id="fActive" checked>
-                <label class="form-check-label" for="fActive">Active</label>
+            <div class="col-md-4 col-6"><label class="form-label">Minimum Stock</label><input type="number" class="form-control" id="fMin" value="50"></div>
+            <div class="col-md-4 col-6"><label class="form-label">Reorder Level</label><input type="number" class="form-control" id="fReorder" value="100"></div>
+            <div class="col-md-4 col-12"><label class="form-label">Expiry Alert (days)</label><input type="number" min="1" class="form-control" id="fExpiryAlert" placeholder="Default: 90"></div>
+            <div class="col-12">
+              <div class="mm-switch-row">
+                <label class="mm-switch">
+                  <input type="checkbox" id="fRx">
+                  <span><strong>Prescription required</strong><small>Ask for a prescription at billing</small></span>
+                </label>
+                <label class="mm-switch">
+                  <input type="checkbox" id="fActive" checked>
+                  <span><strong>Active</strong><small>Inactive items stay out of POS</small></span>
+                </label>
               </div>
             </div>
           </div>
@@ -255,12 +412,18 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
             <td class="text-end num">${MF.fmt(m.wholesaleRate, 2)}</td>
             <td class="text-end num fw-semibold">${MF.num(st)}</td>
             <td>${MF.stockBadge(m)}</td>
-            <td class="text-end row-actions" style="white-space:nowrap">
-              <button class="btn btn-icon btn-light-mf" data-a="view" data-id="${m.id}" title="View"><i class="bi bi-eye"></i></button>
-              <button class="btn btn-icon btn-light-mf" data-a="edit" data-id="${m.id}" title="Edit"><i class="bi bi-pencil"></i></button>
-              <button class="btn btn-icon btn-light-mf" data-a="stock" data-id="${m.id}" title="Stock"><i class="bi bi-box-seam"></i></button>
-              <button class="btn btn-icon btn-light-mf" data-a="batches" data-id="${m.id}" title="Batches"><i class="bi bi-collection"></i></button>
-              <button class="btn btn-icon btn-light-mf text-danger" data-a="del" data-id="${m.id}" title="Delete"><i class="bi bi-trash3"></i></button>
+            <td class="text-end mm-act">
+              <div class="dropdown">
+                <button type="button" class="btn btn-icon btn-light-mf mm-kebab" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-label="Actions"><i class="bi bi-three-dots-vertical"></i></button>
+                <ul class="dropdown-menu dropdown-menu-end mm-act-menu">
+                  <li><button type="button" class="dropdown-item" data-a="view" data-id="${m.id}"><i class="bi bi-eye"></i><span>View</span></button></li>
+                  <li><button type="button" class="dropdown-item" data-a="edit" data-id="${m.id}"><i class="bi bi-pencil"></i><span>Edit</span></button></li>
+                  <li><button type="button" class="dropdown-item" data-a="stock" data-id="${m.id}"><i class="bi bi-box-seam"></i><span>Stock</span></button></li>
+                  <li><button type="button" class="dropdown-item" data-a="batches" data-id="${m.id}"><i class="bi bi-collection"></i><span>Batches</span></button></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><button type="button" class="dropdown-item text-danger" data-a="del" data-id="${m.id}"><i class="bi bi-trash3"></i><span>Delete</span></button></li>
+                </ul>
+              </div>
             </td>
           </tr>`;
         }).join('') || `<tr><td colspan="14"><div class="empty-state"><i class="bi bi-search"></i>No medicines match the current filters.</div></td></tr>`;
@@ -295,7 +458,8 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
             ${[['Manufacturer', m.manufacturer], ['HSN Code', m.hsn], ['GST', m.gst + '%'], ['Unit', `${m.unit} · ${m.packSize}`],
                ['MRP', MF.fmt(m.mrp, 2)], ['Purchase Rate (PTR)', MF.fmt(m.purchaseRate, 2)], ['Wholesale Rate', MF.fmt(m.wholesaleRate, 2)],
                ['Current Stock', st + ' ' + m.unit], ['Minimum Stock', m.minStock], ['Reorder Level', m.reorderLevel],
-               ['Rx Required', m.rxRequired ? 'Yes' : 'No'], ['Status', m.status]].map(([k, v]) =>
+               ['Rx Required', m.rxRequired ? 'Yes' : 'No'], ['Status', m.status],
+               ['Substitutes', m.substitutes ? MF.esc(Array.isArray(m.substitutes) ? m.substitutes.join(', ') : String(m.substitutes)) : '—']].map(([k, v]) =>
               `<div class="col-md-4 col-6"><div class="kpi-label">${k}</div><div class="fw-semibold">${v}</div></div>`).join('')}
           </div>`;
         new bootstrap.Modal($('#mmViewModal')).show();
@@ -307,6 +471,7 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
         $('#fName').value = m?.name || ''; $('#fGeneric').value = m?.generic || ''; $('#fComp').value = m?.composition || ''; $('#fBrand').value = m?.brandRef || '';
         $('#fCategory').value = m?.category || D.categories[0]; $('#fMfg').value = m?.manufacturer || D.manufacturers[0];
         $('#fGenericGroup').value = m?.genericGroup || '';
+        $('#fSubstitutes').value = !m || m.substitutes == null ? '' : (Array.isArray(m.substitutes) ? m.substitutes.join(', ') : String(m.substitutes));
         $('#fHsn').value = m?.hsn || '3004'; $('#fUnit').value = m?.unit || 'Strip'; $('#fPack').value = m?.packSize || '';
         $('#fBarcode').value = m?.barcode || '';
         $('#fPackQty').value = m?.packQty || 1; $('#fSubUnit').value = m?.subUnit || ''; $('#fAllowLoose').checked = !!m?.allowLoose;
@@ -381,7 +546,9 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
         const payload = {
           name: $('#fName').value.trim(), generic: $('#fGeneric').value, brandRef: $('#fBrand').value.trim(), composition: $('#fComp').value,
           category: $('#fCategory').value, manufacturer: $('#fMfg').value, hsn: $('#fHsn').value,
-          genericGroup: $('#fGenericGroup').value.trim(), barcode: $('#fBarcode').value.trim(),
+          genericGroup: $('#fGenericGroup').value.trim(),
+          substitutes: $('#fSubstitutes').value.split(',').map((s) => s.trim()).filter(Boolean).join(', '),
+          barcode: $('#fBarcode').value.trim(),
           unit: $('#fUnit').value, packSize: $('#fPack').value, gst: +$('#fGst').value, schedule: $('#fSchedule').value,
           packQty: +$('#fPackQty').value || 1, subUnit: $('#fSubUnit').value.trim(), allowLoose: $('#fAllowLoose').checked,
           boxQty: $('#fBoxQty').value, boxUnit: $('#fBoxUnit').value.trim() || 'Box',
@@ -461,8 +628,8 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
       });
       $('#mmAddBtn').addEventListener('click', () => openForm(null));
       $('#mmExport').addEventListener('click', () => MF.exportCSV('medicines.csv',
-        ['Name', 'Generic', 'Brand', 'Category', 'Manufacturer', 'HSN', 'GST%', 'Unit', 'MRP', 'Purchase', 'Wholesale', 'Stock'],
-        filtered().map((m) => [m.name, m.generic, m.brandRef || '', m.category, m.manufacturer, m.hsn, m.gst, m.unit, m.mrp, m.purchaseRate, m.wholesaleRate, MF.stockOf(m.id)])));
+        ['Name', 'Generic', 'Brand', 'Category', 'Manufacturer', 'HSN', 'GST%', 'Unit', 'MRP', 'Purchase', 'Wholesale', 'Stock', 'Substitutes'],
+        filtered().map((m) => [m.name, m.generic, m.brandRef || '', m.category, m.manufacturer, m.hsn, m.gst, m.unit, m.mrp, m.purchaseRate, m.wholesaleRate, MF.stockOf(m.id), Array.isArray(m.substitutes) ? m.substitutes.join(', ') : (m.substitutes || '')])));
 
       document.addEventListener('DOMContentLoaded', async () => {
         await MF.boot();
@@ -474,5 +641,5 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
       });
     })();
   </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a40ad0b3da4a7a0d',t:'MTc5MDM0NzU1Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>

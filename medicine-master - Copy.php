@@ -53,7 +53,7 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
             <div class="col-md-3">
               <div class="input-group">
                 <span class="input-group-text"><i class="bi bi-search"></i></span>
-                <input class="form-control" id="mmSearch" placeholder="Search name, generic, composition…">
+                <input class="form-control" id="mmSearch" placeholder="Search name, generic, brand, composition…">
               </div>
             </div>
             <div class="col-6 col-md-2"><select class="form-select" id="mmCategory"><option value="">All Categories</option></select></div>
@@ -82,7 +82,7 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
             <table class="table table-mf">
               <thead>
                 <tr>
-                  <th>Medicine Name</th><th>Generic Name</th><th>Category</th><th>Manufacturer</th>
+                  <th>Medicine Name</th><th>Generic Name</th><th>Brand</th><th>Category</th><th>Manufacturer</th>
                   <th>HSN</th><th class="text-center">GST</th><th>Unit</th>
                   <th class="text-end">MRP</th><th class="text-end">Retail</th><th class="text-end">Wholesale</th>
                   <th class="text-end">Stock</th><th>Status</th><th class="text-end">Actions</th>
@@ -113,6 +113,7 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
             <div class="col-md-6"><label class="form-label">Medicine Name <span class="req">*</span></label><input class="form-control" id="fName" placeholder="e.g. Paracetamol 500mg"><div id="fNameWarn" class="small mt-1" style="display:none"></div></div>
             <div class="col-md-6"><label class="form-label">Generic Name</label><input class="form-control" id="fGeneric" placeholder="e.g. Paracetamol"></div>
             <div class="col-md-6"><label class="form-label">Composition</label><input class="form-control" id="fComp"></div>
+            <div class="col-md-6"><label class="form-label">Brand Name</label><input class="form-control" id="fBrand" placeholder="e.g. Crocin Advance"></div>
             <div class="col-md-3"><label class="form-label">Category</label><select class="form-select" id="fCategory"></select></div>
             <div class="col-md-3"><label class="form-label">Manufacturer</label><select class="form-select" id="fMfg"></select></div>
             <div class="col-md-6"><label class="form-label">Generic Group</label><input class="form-control" id="fGenericGroup" list="fGenericGroupList" placeholder="e.g. Telmisartan 40mg — leave blank if none"><datalist id="fGenericGroupList"></datalist><div class="text-2 small mt-1">Medicines sharing a group are treated as substitutes of each other</div></div>
@@ -126,8 +127,8 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
             <div class="col-md-3 col-6"><label class="form-label">Barcode</label><input class="form-control" id="fBarcode" placeholder="8901234…"><div id="fBarcodeWarn" class="small mt-1" style="display:none"></div></div>
             <div class="col-md-3 col-6"><label class="form-label">Unit</label>
               <select class="form-select" id="fUnit"><option>Strip</option><option>Bottle</option><option>Tube</option><option>Sachet</option><option>Vial</option><option>Inhaler</option><option>Pen</option></select></div>
-            <div class="col-md-3 col-6"><label class="form-label">Pack Size</label><input class="form-control" id="fPack" placeholder="e.g. 15 Tablets"><div class="text-2 small mt-1">Total Pieces in 1 Pack</div></div>
-            <div class="col-md-3 col-6"><label class="form-label">Pack Qty</label><input type="number" min="1" class="form-control" id="fPackQty" value="1" placeholder="e.g. 10"></div>
+            <div class="col-md-3 col-6"><label class="form-label">Pack / Strip Size</label><input class="form-control" id="fPack" placeholder="e.g. 15 Tablets"><div class="text-2 small mt-1">Total Pieces in 1 Pack</div></div>
+            <div class="col-md-3 col-6"><label class="form-label">Pack / Strip Qty</label><input type="number" min="1" class="form-control" id="fPackQty" value="1" placeholder="e.g. 10"></div>
             <div class="col-md-3 col-6"><label class="form-label">Sub-unit</label><input class="form-control" id="fSubUnit" placeholder="e.g. Tablet"></div>
             <div class="col-md-3 col-6 d-flex align-items-center">
               <div class="form-check form-switch mt-4 pt-1">
@@ -135,7 +136,7 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
                 <label class="form-check-label" for="fAllowLoose">Allow loose sale</label>
               </div>
             </div>
-            <div class="col-md-3 col-6"><label class="form-label">Box Qty <span class="text-2">(packs/strips per box)</span></label><input type="number" min="1" class="form-control" id="fBoxQty" placeholder="e.g. 10"></div>
+            <div class="col-md-3 col-6"><label class="form-label">Box Qty</label><input type="number" min="1" class="form-control" id="fBoxQty" placeholder="e.g. 10"><div class="text-2">(packs/strips per box)</div></div>
             <div class="col-md-3 col-6"><label class="form-label">Box Unit</label><input class="form-control" id="fBoxUnit" placeholder="Box" value="Box"></div>
           </div>
 
@@ -221,7 +222,7 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
         const q = state.search.toLowerCase();
         return D.medicines.filter((m) => {
           const st = MF.stockOf(m.id);
-          if (q && !(m.name + m.generic + m.composition + m.manufacturer).toLowerCase().includes(q)) return false;
+          if (q && !(m.name + m.generic + (m.brandRef || '') + m.composition + m.manufacturer).toLowerCase().includes(q)) return false;
           if (state.category && m.category !== state.category) return false;
           if (state.mfg && m.manufacturer !== state.mfg) return false;
           if (state.schedule && m.schedule !== state.schedule) return false;
@@ -243,6 +244,7 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
           return `<tr>
             <td><div class="td-title">${MF.esc(m.name)}</div><div class="td-sub">${MF.esc(m.composition)}${m.rxRequired ? ' · <span class="rx-chip" style="font-size:.6rem">Rx</span>' : ''}</div></td>
             <td>${MF.esc(m.generic)}</td>
+            <td>${m.brandRef ? MF.esc(m.brandRef) : '<span class="text-2">—</span>'}</td>
             <td class="text-2">${m.category}</td>
             <td>${MF.esc(m.manufacturer)}</td>
             <td class="num text-2">${m.hsn}</td>
@@ -261,7 +263,7 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
               <button class="btn btn-icon btn-light-mf text-danger" data-a="del" data-id="${m.id}" title="Delete"><i class="bi bi-trash3"></i></button>
             </td>
           </tr>`;
-        }).join('') || `<tr><td colspan="13"><div class="empty-state"><i class="bi bi-search"></i>No medicines match the current filters.</div></td></tr>`;
+        }).join('') || `<tr><td colspan="14"><div class="empty-state"><i class="bi bi-search"></i>No medicines match the current filters.</div></td></tr>`;
 
         $('#mmPageInfo').textContent = `Showing ${slice.length ? (state.page - 1) * state.per + 1 : 0}–${(state.page - 1) * state.per + slice.length} of ${list.length}`;
         $('#mmPager').innerHTML = Array.from({ length: pages }, (_, i) =>
@@ -284,7 +286,7 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
           <div class="d-flex align-items-start gap-3 mb-3">
             <div class="kpi-icon tone-primary" style="width:48px;height:48px;flex-basis:48px;font-size:1.3rem"><i class="bi bi-capsule"></i></div>
             <div>
-              <h6 class="fw-bold mb-0">${MF.esc(m.name)} <span class="text-2 fw-normal">(${MF.esc(m.brandRef)})</span></h6>
+              <h6 class="fw-bold mb-0">${MF.esc(m.name)} ${m.brandRef ? `<span class="text-2 fw-normal">· ${MF.esc(m.brandRef)}</span>` : ''}</h6>
               <div class="text-2 small">${MF.esc(m.composition)} · ${m.category}</div>
             </div>
             <div class="ms-auto">${MF.stockBadge(m)} ${m.rxRequired ? MF.badge('Schedule ' + m.schedule, 'purple') : MF.badge(m.schedule, 'secondary')}</div>
@@ -302,7 +304,7 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
       function openForm(m) {
         editingId = m ? m.id : null;
         $('#mmFormTitle').textContent = m ? 'Edit Medicine — ' + m.name : 'Add Medicine';
-        $('#fName').value = m?.name || ''; $('#fGeneric').value = m?.generic || ''; $('#fComp').value = m?.composition || '';
+        $('#fName').value = m?.name || ''; $('#fGeneric').value = m?.generic || ''; $('#fComp').value = m?.composition || ''; $('#fBrand').value = m?.brandRef || '';
         $('#fCategory').value = m?.category || D.categories[0]; $('#fMfg').value = m?.manufacturer || D.manufacturers[0];
         $('#fGenericGroup').value = m?.genericGroup || '';
         $('#fHsn').value = m?.hsn || '3004'; $('#fUnit').value = m?.unit || 'Strip'; $('#fPack').value = m?.packSize || '';
@@ -377,7 +379,7 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
         if (!$('#fName').value.trim()) { MF.toast('Medicine name is required.', 'err', 'Validation'); return; }
         if (!$('#fMrp').value) { MF.toast('MRP is required.', 'err', 'Validation'); return; }
         const payload = {
-          name: $('#fName').value.trim(), generic: $('#fGeneric').value, composition: $('#fComp').value,
+          name: $('#fName').value.trim(), generic: $('#fGeneric').value, brandRef: $('#fBrand').value.trim(), composition: $('#fComp').value,
           category: $('#fCategory').value, manufacturer: $('#fMfg').value, hsn: $('#fHsn').value,
           genericGroup: $('#fGenericGroup').value.trim(), barcode: $('#fBarcode').value.trim(),
           unit: $('#fUnit').value, packSize: $('#fPack').value, gst: +$('#fGst').value, schedule: $('#fSchedule').value,
@@ -459,8 +461,8 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
       });
       $('#mmAddBtn').addEventListener('click', () => openForm(null));
       $('#mmExport').addEventListener('click', () => MF.exportCSV('medicines.csv',
-        ['Name', 'Generic', 'Category', 'Manufacturer', 'HSN', 'GST%', 'Unit', 'MRP', 'Purchase', 'Wholesale', 'Stock'],
-        filtered().map((m) => [m.name, m.generic, m.category, m.manufacturer, m.hsn, m.gst, m.unit, m.mrp, m.purchaseRate, m.wholesaleRate, MF.stockOf(m.id)])));
+        ['Name', 'Generic', 'Brand', 'Category', 'Manufacturer', 'HSN', 'GST%', 'Unit', 'MRP', 'Purchase', 'Wholesale', 'Stock'],
+        filtered().map((m) => [m.name, m.generic, m.brandRef || '', m.category, m.manufacturer, m.hsn, m.gst, m.unit, m.mrp, m.purchaseRate, m.wholesaleRate, MF.stockOf(m.id)])));
 
       document.addEventListener('DOMContentLoaded', async () => {
         await MF.boot();
