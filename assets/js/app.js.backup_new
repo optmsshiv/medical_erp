@@ -291,12 +291,12 @@ window.MF = window.MF || {};
     ]},
     { label: 'Inventory', icon: 'boxes', items: [
       { label: 'Products / Medicines', icon: 'capsule', page: 'medicine-master', href: 'medicine-master.php' },
-      { label: 'Stock Overview', icon: 'box-seam', href: 'reports.php?tab=stock&view=overview' },
+      { label: 'Stock Overview', icon: 'box-seam', page: 'stock-overview', href: 'stock.php' },
       { label: 'Batch Management', icon: 'collection', page: 'batch-management', href: 'batch-management.php' },
       { label: 'Expiry Management', icon: 'calendar2-x', page: 'expiry-management', href: 'expiry-management.php' },
       { label: 'Low Stock', icon: 'exclamation-triangle', href: 'medicine-master.php?stock=low' },
-      { label: 'Stock Adjustment', icon: 'sliders', stub: true },
-      { label: 'Stock Transfer', icon: 'arrow-left-right', stub: true }
+      { label: 'Stock Adjustment', icon: 'sliders', page: 'stock-overview', href: 'stock.php?tab=adjustment' },
+      { label: 'Stock Transfer', icon: 'arrow-left-right', page: 'stock-overview', href: 'stock.php?tab=transfer' }
     ]},
     {
       label: 'Pharmacy', icon: 'heart-pulse', items: [
