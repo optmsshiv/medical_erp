@@ -59,8 +59,12 @@
       .pos-stock-badge.low { background:#fff4dc; color:#a86400; }
       .pos-stock-badge.out { background:#fdeaea; color:#c62828; }
 
-      /* "Avail : 110/300" next to expiry pill */
-      .pos-avail { font-size:.72rem; color:#6c757d; white-space:nowrap; margin-left:4px; }
+      /* Tablet count sitting next to the expiry pill */
+      .pos-avail {
+        display:inline-flex; align-items:center; margin-left:2px; padding:2px 8px;
+        font-size:.72rem; font-weight:600; line-height:1.5; color:#157347;
+        background:#e6f6ec; border-radius:999px; white-space:nowrap;
+      }
     `;
     document.head.appendChild(st);
   }
@@ -86,24 +90,133 @@
     return 'success';
   }
 
-  /* ASSUMPTION: medicine record exposes a unit label as m.unit (e.g. "Tabs", "Strip").
-     Adjust this one line if your data.js uses a different field name. */
+  /* Pack label (Strip, Bottle, …). subUnit / packQty describe the pieces inside it. */
   function unitLabel(m) {
     return m && m.unit ? m.unit : 'units';
   }
 
-  /* Remaining sellable qty of a batch */
-  function batchAvail(b) {
-    return Math.max(0, (Number(b.qty) || 0) - (Number(b.reserved) || 0));
+  /* Piece label (Tab, Capsule, …). Falls back to "Tab" when a pack holds more than one piece. */
+  function pieceLabel(m) {
+    if (m && m.subUnit) return m.subUnit;
+    if (m && Number(m.packQty) > 1) return 'Tab';
+    return unitLabel(m);
   }
 
-  /* In stock / Low stock / Out of stock.
-     Uses Minimum Stock (the real "about to run out" floor) first, since Reorder
-     Level is a purchasing signal set higher on purpose and fires too early here.
-     Falls back to Reorder Level, then 10 units, if Minimum Stock isn't set. */
-  function stockBadge(m, stock) {
+  function packSize(m) {
+    const n = Number(m && m.packQty);
+    return n > 0 ? n : 1;
+  }
+
+  function withCount(n, label) {
+    const name = String(label || 'units');
+    if (Number(n) === 1) return name.replace(/s$/i, '') || name;
+    if (/s$/i.test(name)) return name;
+    return name + 's';
+  }
+
+  /* Strips + loose tablets already sitting in this cart for one medicine. */
+  function cartUsage(medId) {
+    let packs = 0, loose = 0;
+    state.cart.forEach((l) => {
+      if (l.medId != medId) return;
+      if (l.unit === 'loose') loose += Number(l.qty) || 0;
+      else packs += Number(l.qty) || 0;
+    });
+    return { packs, loose };
+  }
+
+  /* Sellable stock after the current cart, walked FEFO the same way a sale would.
+     strips  = sealed packs still closed
+     loose   = opened pieces not yet in the cart
+     tablets = strips × pack size + loose  (what we show next to the expiry date) */
+  function fefoState(medOrId) {
+    const med = medOrId && typeof medOrId === 'object' ? medOrId : MF.med(medOrId);
+    const packQty = packSize(med);
+    const usage = med ? cartUsage(med.id) : { packs: 0, loose: 0 };
+    const batches = (med ? MF.batchesOf(med.id) : [])
+      .filter((b) => MF.daysTo(b.expiry) >= 0)
+      .sort((a, b) => String(a.expiry).localeCompare(String(b.expiry)))
+      .map((b) => ({
+        id: b.id,
+        batch: b,
+        strips: Math.max(0, (Number(b.qty) || 0) - (Number(b.reserved) || 0)),
+        loose: Math.max(0, Number(b.looseQty) || 0)
+      }));
+
+    let packsLeft = usage.packs;
+    let looseLeft = usage.loose;
+    for (const b of batches) {
+      if (packsLeft <= 0) break;
+      const take = Math.min(b.strips, packsLeft);
+      b.strips -= take;
+      packsLeft -= take;
+    }
+    for (const b of batches) {
+      if (looseLeft <= 0) break;
+      const take = Math.min(b.loose, looseLeft);
+      b.loose -= take;
+      looseLeft -= take;
+    }
+    for (const b of batches) {
+      if (looseLeft <= 0) break;
+      if (b.strips <= 0) continue;
+      const take = Math.min(b.strips * packQty, looseLeft);
+      const open = Math.ceil(take / packQty);
+      b.strips -= open;
+      b.loose += open * packQty - take;
+      looseLeft -= take;
+    }
+
+    let strips = 0, loose = 0;
+    batches.forEach((b) => { strips += b.strips; loose += b.loose; });
+    return {
+      med, packQty, strips, loose,
+      tablets: strips * packQty + loose,
+      batches,
+      inCartPacks: usage.packs,
+      inCartLoose: usage.loose,
+      nextStrip: batches.find((b) => b.strips > 0) || null,
+      nextLoose: batches.find((b) => b.loose > 0 || b.strips > 0) || null
+    };
+  }
+
+  /* Extra qty this cart line can still take from its own batch (other lines on that batch already removed). */
+  function lineRoom(l) {
+    const med = MF.med(l.medId);
+    const packQty = packSize(med);
+    const raw = (D.batches || []).find((x) => x.id == l.batchId);
+    if (!raw || MF.daysTo(raw.expiry) < 0) return { strips: 0, tablets: 0 };
+    let strips = Math.max(0, (Number(raw.qty) || 0) - (Number(raw.reserved) || 0));
+    let loose = Math.max(0, Number(raw.looseQty) || 0);
+    state.cart.forEach((line) => {
+      if (line === l || line.batchId != l.batchId) return;
+      if (line.unit === 'loose') {
+        let need = Number(line.qty) || 0;
+        const take = Math.min(loose, need);
+        loose -= take;
+        need -= take;
+        if (need > 0 && strips > 0) {
+          const open = Math.min(strips, Math.ceil(need / packQty));
+          strips -= open;
+          loose += open * packQty - need;
+          if (loose < 0) loose = 0;
+        }
+      } else {
+        strips = Math.max(0, strips - (Number(line.qty) || 0));
+      }
+    });
+    if (l.unit === 'loose') {
+      return { strips: Math.max(0, strips), tablets: Math.max(0, strips * packQty + loose - (Number(l.qty) || 0)) };
+    }
+    return { strips: Math.max(0, strips - (Number(l.qty) || 0)), tablets: 0 };
+  }
+
+  /* In stock / Low stock / Out of stock — judged on strips still left after the cart. */
+  function stockBadge(m, live) {
+    const stock = live ? live.strips : 0;
+    const tablets = live ? live.tablets : 0;
     const low = Number(m.minStock ?? m.reorderLevel ?? 10);
-    const st = stock <= 0 ? ['out', 'Out of stock'] : stock <= low ? ['low', 'Low stock'] : ['in', 'In stock'];
+    const st = tablets <= 0 ? ['out', 'Out of stock'] : stock <= low ? ['low', 'Low stock'] : ['in', 'In stock'];
     return `<span class="pos-stock-badge ${st[0]}">${st[1]}</span>`;
   }
 
@@ -113,14 +226,17 @@
     return `<div class="pr-name">${MF.esc(m.name)}${brand}</div>`;
   }
 
-  function batchExpiryPills(b, m) {
+  /* Tablets (not strips) sit next to the expiry date. Count is live — cart qty already deducted. */
+  function batchExpiryPills(b, m, tablets) {
     if (!b) return '';
     const tone = expiryTone(b.expiry, m && m.expiryAlertDays);
+    const tabs = Math.max(0, Number(tablets) || 0);
+    const label = withCount(tabs, pieceLabel(m));
     return `
       <div class="d-flex align-items-center flex-wrap gap-1 mt-1">
         <span class="badge rounded-pill bg-light text-dark" title="Batch ${MF.esc(b.batchNo)}"><i class="bi bi-upc-scan"></i> ${MF.esc(b.batchNo)}</span>
-        <span class="badge rounded-pill bg-${tone}-subtle text-${tone}-emphasis">Exp : ${fmtExpiryDate(b.expiry)}</span>
-        <span class="pos-avail">Avail : ${MF.num(batchAvail(b))} ${MF.esc(unitLabel(m))}</span>
+        <span class="badge rounded-pill bg-${tone}-subtle text-${tone}-emphasis" title="Next batch to sell (FEFO)">Exp : ${fmtExpiryDate(b.expiry)}</span>
+        <span class="pos-avail" title="Tablets left across sellable batches, after items already in the cart">Avail : ${MF.num(tabs)} ${MF.esc(label)}</span>
       </div>`;
   }
 
@@ -142,30 +258,63 @@
   }
 
   /* Left-column MRP line: shown as its own row right under the batch/expiry pills. */
-  function mrpLine(m, stock) {
-    return `<div class="small-xs text-2 mt-1">MRP : ${MF.fmt(m.mrp, 2)}/${MF.esc(unitLabel(m))}${stockBadge(m, stock)}</div>`;
+  function mrpLine(m, live) {
+    return `<div class="small-xs text-2 mt-1">MRP : ${MF.fmt(m.mrp, 2)}/${MF.esc(unitLabel(m))}${stockBadge(m, live)}</div>`;
   }
 
-  /* Right-side block: available stock, and either the add button or a purple
+  /* Strip + tablet totals, both net of the cart. Hidden tablet half when a pack is a single piece. */
+  function stockText(m, live) {
+    const strips = `${MF.num(live.strips)} ${MF.esc(withCount(live.strips, unitLabel(m)))}`;
+    if (pieceLabel(m) === unitLabel(m) && live.tablets === live.strips) return `Stock : ${strips}`;
+    const tabs = `${MF.num(live.tablets)} ${MF.esc(withCount(live.tablets, pieceLabel(m)))}`;
+    return `Stock : ${strips} · ${tabs}`;
+  }
+
+  /* Right-side block: live strip stock, and either the add button or a purple
      order/substitute tile (styled like the payment-method tiles) when out of stock. */
-  function priceBlock(m, stock) {
-    const outOfStock = stock <= 0;
+  function priceBlock(m, live) {
+    const outOfStock = live.tablets <= 0;
+    const heldInCart = outOfStock && (live.inCartPacks > 0 || live.inCartLoose > 0);
     const sellPrice = Number(m.retailRate ?? m.mrp);
     const mrpNote = sellPrice !== Number(m.mrp)
       ? `<div class="small-xs text-2" style="text-decoration:line-through;">MRP ${MF.fmt(m.mrp, 2)}</div>` : '';
     const action = outOfStock
-      ? `<button type="button" class="btn pos-order-sub mt-1" data-med="${m.id}">
+      ? (heldInCart
+        ? `<div class="small-xs mt-1" style="color:#a86400;font-weight:600;">All remaining in cart</div>`
+        : `<button type="button" class="btn pos-order-sub mt-1" data-med="${m.id}">
            <i class="bi bi-arrow-repeat"></i>
            <span class="fw-semibold" style="font-size:.75rem;">Order / substitute</span>
-         </button>`
+         </button>`)
       : (m.allowLoose ? `<button type="button" class="btn btn-sm mt-1 pos-loose-add" data-med="${m.id}">
            <i class="bi bi-plus-circle"></i> Add ${MF.esc(m.subUnit || 'Loose')}
          </button>` : '');
     return `
         ${mrpNote}
         <div class="fw-bold num">${MF.fmt(sellPrice, 2)}</div>
-        <div class="small-xs text-2 mt-1">Stock : ${MF.num(stock)} ${MF.esc(unitLabel(m))}</div>
+        <div class="small-xs text-2 mt-1" title="Sellable strips and tablets left after this cart">${stockText(m, live)}</div>
         ${action}`;
+  }
+
+  /* One quick-pick / search card. Tablet count next to expiry, strip count on the right — both net of the cart. */
+  function resultCard(m) {
+    const live = fefoState(m);
+    // Earliest batch that still has anything to sell (loose pieces before a later sealed strip).
+    const shown = live.nextLoose || live.nextStrip;
+    const b = shown ? shown.batch : MF.pickBatch(m.id);
+    const noPack = live.strips <= 0;
+    return `
+      <div class="pos-result" role="button" tabindex="0" data-med="${m.id}" ${noPack ? 'disabled' : ''}>
+        <div class="kpi-icon tone-primary" style="width:38px;height:38px;flex-basis:38px;font-size:1rem"><i class="bi bi-capsule"></i></div>
+        <div class="flex-grow-1 text-start">
+          ${nameLine(m)}
+          <div class="pr-meta">${MF.esc(m.composition)}</div>
+          ${b ? batchExpiryPills(b, m, live.tablets) : `<div class="pr-meta text-danger mt-1">No sellable batch (expired stock only)</div>${subsLine(m)}`}
+          ${mrpLine(m, live)}
+        </div>
+        <div class="text-end">
+          ${priceBlock(m, live)}
+        </div>
+      </div>`;
   }
 
   /* ---------------- Medicine search ---------------- */
@@ -178,24 +327,7 @@
       MF.batchesOf(m.id).some((b) => b.batchNo.toLowerCase().includes(q))
     ).slice(0, 8);
     if (!hits.length) { box.innerHTML = `<div class="empty-state"><i class="bi bi-emoji-neutral"></i>No medicine matches “${MF.esc(q)}”.</div>`; return; }
-    box.innerHTML = hits.map((m) => {
-      const b = MF.pickBatch(m.id);
-      const stock = MF.stockOf(m.id);
-      const outOfStock = !b || stock <= 0;
-      return `
-      <div class="pos-result" role="button" tabindex="0" data-med="${m.id}" ${outOfStock ? 'disabled' : ''}>
-        <div class="kpi-icon tone-primary" style="width:38px;height:38px;flex-basis:38px;font-size:1rem"><i class="bi bi-capsule"></i></div>
-        <div class="flex-grow-1 text-start">
-          ${nameLine(m)}
-          <div class="pr-meta">${MF.esc(m.composition)}</div>
-          ${b ? batchExpiryPills(b, m) : `<div class="pr-meta text-danger mt-1">No sellable batch (expired stock only)</div>${subsLine(m)}`}
-          ${mrpLine(m, stock)}
-        </div>
-        <div class="text-end">
-          ${priceBlock(m, stock)}
-        </div>
-      </div>`;
-    }).join('');
+    box.innerHTML = hits.map(resultCard).join('');
     bindResultClicks(box);
   }
 
@@ -204,47 +336,41 @@
     if (!picks.length) return `<div class="empty-state"><i class="bi bi-capsule"></i>No medicines yet — add some in Medicine Master.</div>`;
     return `
       <div class="sr-group-label">Quick picks</div>
-      ${picks.map((m) => {
-        const id = m.id;
-        const b = MF.pickBatch(id);
-        const stock = MF.stockOf(id);
-        const outOfStock = stock <= 0;
-        return `<div class="pos-result" role="button" tabindex="0" data-med="${id}" ${outOfStock ? 'disabled' : ''}>
-          <div class="kpi-icon tone-primary" style="width:38px;height:38px;flex-basis:38px;font-size:1rem"><i class="bi bi-capsule"></i></div>
-          <div class="flex-grow-1 text-start">
-            ${nameLine(m)}
-            <div class="pr-meta">${MF.esc(m.composition)}</div>
-            ${batchExpiryPills(b, m)}
-            ${mrpLine(m, stock)}
-          </div>
-          <div class="text-end">
-            ${priceBlock(m, stock)}
-          </div>
-        </div>`;
-      }).join('')}
+      ${picks.map(resultCard).join('')}
       <p class="text-2 small mt-3 mb-0"><i class="bi bi-lightbulb me-1"></i>Search by medicine name, generic name, composition, batch no or barcode.</p>`;
   }
 
   /* ---------------- Cart ---------------- */
   function addToCart(medId, unit = 'pack') {
     const med = MF.med(medId);
-    const batch = MF.pickBatch(medId);
-    if (!batch) { MF.toast('No sellable batch available for ' + med.name, 'warn', 'Stock'); return; }
-    if (unit === 'loose' && !med.allowLoose) { MF.toast('Loose sale is not enabled for ' + med.name, 'warn', 'Stock'); return; }
-    const sell = Number(med.retailRate ?? med.mrp);
-    const rate = unit === 'loose' ? sell / (med.packQty || 1) : sell;
-    const avail = unit === 'loose' ? MF.looseAvailable(medId) : batch.qty - batch.reserved;
-    const unitName = unit === 'loose' ? (med.subUnit || 'units') : 'units';
-    const line = state.cart.find((l) => l.batchId === batch.id && l.unit === unit);
-    if (line) {
-      if (line.qty >= avail) { MF.toast(`Only ${avail} ${unitName} available`, 'warn', 'Stock limit'); return; }
-      line.qty++;
-    } else {
-      if (avail <= 0) { MF.toast(`No ${unitName} available for ` + med.name, 'warn', 'Stock'); return; }
-      state.cart.push({ medId, batchId: batch.id, qty: 1, rate, mrp: med.mrp, discPct: 0, unit });
+    if (!med) return;
+    const pack = unit !== 'loose';
+    if (!pack && !med.allowLoose) { MF.toast('Loose sale is not enabled for ' + med.name, 'warn', 'Stock'); return; }
+    const live = fefoState(med);
+    if (pack && live.strips <= 0) {
+      MF.toast(`No ${withCount(2, unitLabel(med))} available for ${med.name}`, 'warn', 'Stock');
+      return;
     }
+    if (!pack && live.tablets <= 0) {
+      MF.toast(`No ${withCount(2, pieceLabel(med))} available for ${med.name}`, 'warn', 'Stock');
+      return;
+    }
+    const slot = pack ? live.nextStrip : live.nextLoose;
+    if (!slot) { MF.toast('No sellable batch available for ' + med.name, 'warn', 'Stock'); return; }
+    const sell = Number(med.retailRate ?? med.mrp);
+    const rate = pack ? sell : sell / packSize(med);
+    const line = state.cart.find((l) => l.batchId == slot.id && (pack ? l.unit !== 'loose' : l.unit === 'loose'));
+    if (line) line.qty++;
+    else state.cart.push({ medId, batchId: slot.id, qty: 1, rate, mrp: med.mrp, discPct: 0, unit: pack ? 'pack' : 'loose' });
     if (med.rxRequired) MF.toast(med.name + ' is Schedule ' + med.schedule + ' — verify prescription', 'info', 'Rx item');
     renderCart();
+  }
+
+  /* "2 Strips · 20 Tabs" (or just tablets, for a loose line) — recomputed from the stepper qty. */
+  function lineMeasure(l, med) {
+    if (l.unit === 'loose') return `${MF.num(l.qty)} ${MF.esc(withCount(l.qty, pieceLabel(med)))}`;
+    const tabs = l.qty * packSize(med);
+    return `${MF.num(l.qty)} ${MF.esc(withCount(l.qty, unitLabel(med)))} · ${MF.num(tabs)} ${MF.esc(withCount(tabs, pieceLabel(med)))}`;
   }
 
   function calcLine(l) {
@@ -282,13 +408,14 @@
           <thead><tr><th>Medicine</th><th class="text-center">Qty</th><th class="text-end">Rate</th><th class="text-center">Disc%</th><th class="text-end">Amount</th><th></th></tr></thead>
           <tbody>
           ${state.cart.map((l, i) => {
-            const med = MF.med(l.medId);
-            const b = D.batches.find((x) => x.id === l.batchId);
-            const c = calcLine(l);
-            return `<tr>
+        const med = MF.med(l.medId);
+        const b = D.batches.find((x) => x.id === l.batchId);
+        const c = calcLine(l);
+        return `<tr>
               <td style="min-width:170px">
                 <div class="td-title">${MF.esc(med.name)}</div>
-                <div class="td-sub num">B: ${b.batchNo} · Exp ${MF.fmtMonthYear(b.expiry)} · GST ${med.gst}%${l.unit === 'loose' ? ` · Loose (${MF.esc(med.subUnit || 'unit')})` : ''}</div>
+                <div class="td-sub num">B: ${b.batchNo} · Exp ${MF.fmtMonthYear(b.expiry)} · GST ${med.gst}%${l.unit === 'loose' ? ` · Loose` : ''}</div>
+                <div class="td-sub num">${lineMeasure(l, med)}</div>
               </td>
               <td class="text-center">
                 <div class="qty-stepper">
@@ -304,18 +431,27 @@
               <td class="text-end num fw-semibold">${MF.fmt(c.net, 2)}</td>
               <td><button class="btn btn-icon btn-light-mf text-danger" data-a="rm" data-i="${i}" title="Remove"><i class="bi bi-trash3"></i></button></td>
             </tr>`;
-          }).join('')}
+      }).join('')}
           </tbody>
         </table>
         </div>`;
       box.querySelectorAll('[data-a]').forEach((el) => {
         el.addEventListener(el.tagName === 'INPUT' ? 'change' : 'click', () => {
           const i = +el.dataset.i, l = state.cart[i], a = el.dataset.a;
-          const b = D.batches.find((x) => x.id === l.batchId);
-          const cap = l.unit === 'loose' ? MF.looseAvailable(l.medId) : b.qty - b.reserved;
-          if (a === 'inc') { if (l.qty >= cap) { MF.toast(`Batch limit reached (${cap} avail)`, 'warn', 'Stock'); } else l.qty++; }
+          const med = MF.med(l.medId);
+          const room = lineRoom(l);
+          if (a === 'inc') {
+            const left = l.unit === 'loose' ? room.tablets : room.strips;
+            if (left <= 0) {
+              const word = l.unit === 'loose' ? withCount(l.qty, pieceLabel(med)) : withCount(l.qty, unitLabel(med));
+              MF.toast(`Only ${l.qty} ${word} left in this batch`, 'warn', 'Stock');
+            } else l.qty++;
+          }
           if (a === 'dec') l.qty = Math.max(1, l.qty - 1);
-          if (a === 'qty') l.qty = Math.max(1, Math.min(cap, parseInt(el.value) || 1));
+          if (a === 'qty') {
+            const extra = l.unit === 'loose' ? room.tablets : room.strips;
+            l.qty = Math.max(1, Math.min(l.qty + extra, parseInt(el.value) || 1));
+          }
           if (a === 'disc') l.discPct = Math.max(0, Math.min(100, parseFloat(el.value) || 0));
           if (a === 'rm') state.cart.splice(i, 1);
           renderCart(); renderSummary();
@@ -324,6 +460,14 @@
     }
     renderSummary();
     renderRxChip();
+    refreshPicks();
+  }
+
+  /* Redraw Quick picks / search cards so strip + tablet counts follow the cart. */
+  function refreshPicks() {
+    const input = $('#posSearch');
+    if (!input || !$('#posResults')) return;
+    searchMeds(input.value || '');
   }
 
   function renderSummary() {
@@ -426,9 +570,9 @@
       <table class="table table-sm table-bordered small">
         <thead><tr><th>Item</th><th class="text-center">Qty</th><th class="text-end">Rate</th><th class="text-end">Amt</th></tr></thead>
         <tbody>${state.cart.map((l) => {
-          const m = MF.med(l.medId), c = calcLine(l);
-          return `<tr><td>${MF.esc(m.name)}</td><td class="text-center">${l.qty}</td><td class="text-end num">${MF.fmt(l.rate, 2)}</td><td class="text-end num">${MF.fmt(c.net, 2)}</td></tr>`;
-        }).join('')}</tbody>
+      const m = MF.med(l.medId), c = calcLine(l);
+      return `<tr><td>${MF.esc(m.name)}</td><td class="text-center">${l.qty}</td><td class="text-end num">${MF.fmt(l.rate, 2)}</td><td class="text-end num">${MF.fmt(c.net, 2)}</td></tr>`;
+    }).join('')}</tbody>
       </table>
       <div class="ms-auto" style="max-width:260px">
         <div class="sum-row"><span class="text-2">Subtotal</span><span class="num">${MF.fmt(t.subtotal, 2)}</span></div>
