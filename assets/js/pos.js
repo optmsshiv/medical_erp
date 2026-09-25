@@ -92,23 +92,17 @@
     return m && m.unit ? m.unit : 'units';
   }
 
-  /* ASSUMPTION: a batch records its original quantity in one of these fields
-     (b.totalQty / receivedQty / purchasedQty / initialQty). Falls back to b.qty if none exist.
-     Adjust this one helper if your data.js uses a different name. */
-  function batchTotal(b) {
-    const t = b.totalQty ?? b.receivedQty ?? b.purchasedQty ?? b.initialQty ?? b.qty;
-    return Math.max(Number(t) || 0, Number(b.qty) || 0);
-  }
-
   /* Remaining sellable qty of a batch */
   function batchAvail(b) {
     return Math.max(0, (Number(b.qty) || 0) - (Number(b.reserved) || 0));
   }
 
   /* In stock / Low stock / Out of stock.
-     ASSUMPTION: low-stock threshold is m.reorderLevel or m.minStock, else 10 units. */
+     Uses Minimum Stock (the real "about to run out" floor) first, since Reorder
+     Level is a purchasing signal set higher on purpose and fires too early here.
+     Falls back to Reorder Level, then 10 units, if Minimum Stock isn't set. */
   function stockBadge(m, stock) {
-    const low = Number(m.reorderLevel ?? m.minStock ?? 10);
+    const low = Number(m.minStock ?? m.reorderLevel ?? 10);
     const st = stock <= 0 ? ['out', 'Out of stock'] : stock <= low ? ['low', 'Low stock'] : ['in', 'In stock'];
     return `<span class="pos-stock-badge ${st[0]}">${st[1]}</span>`;
   }
@@ -126,7 +120,7 @@
       <div class="d-flex align-items-center flex-wrap gap-1 mt-1">
         <span class="badge rounded-pill bg-light text-dark" title="Batch ${MF.esc(b.batchNo)}"><i class="bi bi-upc-scan"></i> ${MF.esc(b.batchNo)}</span>
         <span class="badge rounded-pill bg-${tone}-subtle text-${tone}-emphasis">Exp : ${fmtExpiryDate(b.expiry)}</span>
-        <span class="pos-avail">Avail : ${MF.num(batchAvail(b))}/${MF.num(batchTotal(b))}</span>
+        <span class="pos-avail">Avail : ${MF.num(batchAvail(b))} ${MF.esc(unitLabel(m))}</span>
       </div>`;
   }
 
@@ -156,6 +150,9 @@
      order/substitute tile (styled like the payment-method tiles) when out of stock. */
   function priceBlock(m, stock) {
     const outOfStock = stock <= 0;
+    const sellPrice = Number(m.retailRate ?? m.mrp);
+    const mrpNote = sellPrice !== Number(m.mrp)
+      ? `<div class="small-xs text-2" style="text-decoration:line-through;">MRP ${MF.fmt(m.mrp, 2)}</div>` : '';
     const action = outOfStock
       ? `<button type="button" class="btn pos-order-sub mt-1" data-med="${m.id}">
            <i class="bi bi-arrow-repeat"></i>
@@ -165,7 +162,8 @@
            <i class="bi bi-plus-circle"></i> Add ${MF.esc(m.subUnit || 'Loose')}
          </button>` : '');
     return `
-        <div class="fw-bold num">${MF.fmt(m.mrp, 2)}</div>
+        ${mrpNote}
+        <div class="fw-bold num">${MF.fmt(sellPrice, 2)}</div>
         <div class="small-xs text-2 mt-1">Stock : ${MF.num(stock)} ${MF.esc(unitLabel(m))}</div>
         ${action}`;
   }
@@ -233,7 +231,8 @@
     const batch = MF.pickBatch(medId);
     if (!batch) { MF.toast('No sellable batch available for ' + med.name, 'warn', 'Stock'); return; }
     if (unit === 'loose' && !med.allowLoose) { MF.toast('Loose sale is not enabled for ' + med.name, 'warn', 'Stock'); return; }
-    const rate = unit === 'loose' ? med.mrp / (med.packQty || 1) : med.mrp;
+    const sell = Number(med.retailRate ?? med.mrp);
+    const rate = unit === 'loose' ? sell / (med.packQty || 1) : sell;
     const avail = unit === 'loose' ? MF.looseAvailable(medId) : batch.qty - batch.reserved;
     const unitName = unit === 'loose' ? (med.subUnit || 'units') : 'units';
     const line = state.cart.find((l) => l.batchId === batch.id && l.unit === unit);
