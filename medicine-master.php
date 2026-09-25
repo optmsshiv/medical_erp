@@ -127,8 +127,8 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
             <div class="col-md-3 col-6"><label class="form-label">Barcode</label><input class="form-control" id="fBarcode" placeholder="8901234…"><div id="fBarcodeWarn" class="small mt-1" style="display:none"></div></div>
             <div class="col-md-3 col-6"><label class="form-label">Unit</label>
               <select class="form-select" id="fUnit"><option>Strip</option><option>Bottle</option><option>Tube</option><option>Sachet</option><option>Vial</option><option>Inhaler</option><option>Pen</option></select></div>
-            <div class="col-md-3 col-6"><label class="form-label">Pack Size</label><input class="form-control" id="fPack" placeholder="e.g. 15 Tablets"><div class="text-2 small mt-1">Total Pieces in 1 Pack</div></div>
-            <div class="col-md-3 col-6"><label class="form-label">Pack Qty</label><input type="number" min="1" class="form-control" id="fPackQty" value="1" placeholder="e.g. 10"></div>
+            <div class="col-md-3 col-6"><label class="form-label">Pack / Strip Size</label><input class="form-control" id="fPack" placeholder="e.g. 15 Tablets"><div class="text-2 small mt-1">Total Pieces in 1 Pack</div></div>
+            <div class="col-md-3 col-6"><label class="form-label">Pack / Strip Qty</label><input type="number" min="1" class="form-control" id="fPackQty" value="1" placeholder="e.g. 10"></div>
             <div class="col-md-3 col-6"><label class="form-label">Sub-unit</label><input class="form-control" id="fSubUnit" placeholder="e.g. Tablet"></div>
             <div class="col-md-3 col-6 d-flex align-items-center">
               <div class="form-check form-switch mt-4 pt-1">
@@ -136,7 +136,7 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
                 <label class="form-check-label" for="fAllowLoose">Allow loose sale</label>
               </div>
             </div>
-            <div class="col-md-3 col-6"><label class="form-label">Box Qty <span class="text-2">(packs/strips per box)</span></label><input type="number" min="1" class="form-control" id="fBoxQty" placeholder="e.g. 10"></div>
+            <div class="col-md-3 col-6"><label class="form-label">Box Qty</label><input type="number" min="1" class="form-control" id="fBoxQty" placeholder="e.g. 10"><div class="text-2">(packs/strips per box)</div></div>
             <div class="col-md-3 col-6"><label class="form-label">Box Unit</label><input class="form-control" id="fBoxUnit" placeholder="Box" value="Box"></div>
           </div>
 
