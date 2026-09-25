@@ -1,0 +1,967 @@
+-- phpMyAdmin SQL Dump
+-- version 5.2.3
+-- https://www.phpmyadmin.net/
+--
+-- Host: localhost:3306
+-- Generation Time: Sep 25, 2026 at 01:07 PM
+-- Server version: 5.7.44-48
+-- PHP Version: 8.4.25
+
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+START TRANSACTION;
+SET time_zone = "+00:00";
+
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+
+--
+-- Database: `edrppymy_sumati`
+--
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `audit_logs`
+--
+
+CREATE TABLE `audit_logs` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `user_id` int(10) UNSIGNED DEFAULT NULL,
+  `user_name` varchar(150) DEFAULT NULL,
+  `action` varchar(50) NOT NULL,
+  `detail` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `batches`
+--
+
+CREATE TABLE `batches` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `medicine_id` int(10) UNSIGNED NOT NULL,
+  `batch_no` varchar(50) NOT NULL,
+  `purchase_date` date DEFAULT NULL,
+  `expiry_date` date NOT NULL,
+  `quantity` int(11) NOT NULL DEFAULT '0',
+  `reserved` int(11) NOT NULL DEFAULT '0',
+  `purchase_rate` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `mrp` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `loose_qty` int(11) NOT NULL DEFAULT '0' COMMENT 'Sub-units currently loose from an opened pack of this batch'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `categories`
+--
+
+CREATE TABLE `categories` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `name` varchar(100) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `counters`
+--
+
+CREATE TABLE `counters` (
+  `id` int(11) NOT NULL,
+  `name` varchar(100) COLLATE utf8_unicode_ci NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `customers`
+--
+
+CREATE TABLE `customers` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `name` varchar(150) NOT NULL,
+  `type` enum('retail','wholesale') NOT NULL DEFAULT 'retail',
+  `phone` varchar(20) DEFAULT NULL,
+  `gstin` varchar(20) DEFAULT NULL,
+  `dl_no` varchar(50) DEFAULT NULL,
+  `address` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `doctors`
+--
+
+CREATE TABLE `doctors` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `name` varchar(150) NOT NULL,
+  `specialty` varchar(100) DEFAULT NULL,
+  `phone` varchar(20) DEFAULT NULL,
+  `reg_no` varchar(50) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `expenses`
+--
+
+CREATE TABLE `expenses` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `category_id` int(10) UNSIGNED NOT NULL,
+  `amount` decimal(12,2) NOT NULL,
+  `expense_date` date NOT NULL,
+  `payment_mode` enum('Cash','Bank','UPI','Cheque') NOT NULL DEFAULT 'Cash',
+  `note` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `expense_categories`
+--
+
+CREATE TABLE `expense_categories` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `name` varchar(100) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `generic_groups`
+--
+
+CREATE TABLE `generic_groups` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `name` varchar(150) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `locations`
+--
+
+CREATE TABLE `locations` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `name` varchar(150) NOT NULL,
+  `address` varchar(255) DEFAULT NULL,
+  `phone` varchar(30) DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `manufacturers`
+--
+
+CREATE TABLE `manufacturers` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `name` varchar(150) NOT NULL,
+  `contact_person` varchar(120) DEFAULT NULL,
+  `email` varchar(160) DEFAULT NULL,
+  `phone` varchar(32) DEFAULT NULL,
+  `gstin` varchar(15) DEFAULT NULL,
+  `address` varchar(500) DEFAULT NULL,
+  `status` varchar(16) NOT NULL DEFAULT 'Active'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `medicines`
+--
+
+CREATE TABLE `medicines` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `name` varchar(200) NOT NULL,
+  `generic_name` varchar(200) DEFAULT NULL,
+  `brand_name` varchar(150) NOT NULL DEFAULT '',
+  `composition` varchar(255) DEFAULT NULL,
+  `category_id` int(10) UNSIGNED DEFAULT NULL,
+  `manufacturer_id` int(10) UNSIGNED DEFAULT NULL,
+  `brand_ref` varchar(150) DEFAULT NULL,
+  `hsn_code` varchar(20) DEFAULT NULL,
+  `gst_rate` decimal(5,2) NOT NULL DEFAULT '0.00',
+  `unit` varchar(30) NOT NULL DEFAULT 'Strip',
+  `pack_size` varchar(50) DEFAULT NULL,
+  `mrp` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `purchase_rate` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `wholesale_rate` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `min_stock` int(11) NOT NULL DEFAULT '0',
+  `reorder_level` int(11) NOT NULL DEFAULT '0',
+  `schedule_class` varchar(10) DEFAULT NULL,
+  `rx_required` tinyint(1) NOT NULL DEFAULT '0',
+  `cold_chain` tinyint(1) NOT NULL DEFAULT '0',
+  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `pack_qty` int(10) UNSIGNED NOT NULL DEFAULT '1' COMMENT 'Sub-units per pack, e.g. 10 tablets per strip',
+  `sub_unit` varchar(30) DEFAULT NULL COMMENT 'Loose-sale unit label, e.g. Tablet, Capsule, Ml',
+  `allow_loose_sale` tinyint(1) NOT NULL DEFAULT '0',
+  `retail_rate` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT 'Actual counter selling price — may differ from mrp',
+  `barcode` varchar(64) DEFAULT NULL,
+  `generic_group_id` int(10) UNSIGNED DEFAULT NULL,
+  `expiry_alert_days` smallint(5) UNSIGNED DEFAULT NULL COMMENT 'Days-before-expiry warning threshold; NULL = use the 90-day default',
+  `box_qty` int(10) UNSIGNED DEFAULT NULL COMMENT 'Packs/strips per purchase box, e.g. 10 strips per box',
+  `box_unit` varchar(30) DEFAULT 'Box'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `payments`
+--
+
+CREATE TABLE `payments` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `party_type` enum('customer','supplier') NOT NULL,
+  `party_id` int(10) UNSIGNED NOT NULL,
+  `amount` decimal(12,2) NOT NULL,
+  `mode` enum('Cash','Bank','UPI','Cheque') NOT NULL DEFAULT 'Cash',
+  `payment_date` date NOT NULL,
+  `note` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `purchases`
+--
+
+CREATE TABLE `purchases` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `supplier_id` int(10) UNSIGNED NOT NULL,
+  `invoice_no` varchar(100) NOT NULL,
+  `invoice_date` date NOT NULL,
+  `subtotal` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `discount` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `taxable` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `cgst` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `sgst` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `igst` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `round_off` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `grand_total` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `payment_mode` enum('Cash','Bank','UPI','Credit') NOT NULL DEFAULT 'Credit',
+  `amount_paid` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `balance_due` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `purchase_items`
+--
+
+CREATE TABLE `purchase_items` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `purchase_id` int(10) UNSIGNED NOT NULL,
+  `medicine_id` int(10) UNSIGNED NOT NULL,
+  `batch_id` int(10) UNSIGNED DEFAULT NULL,
+  `qty` int(11) NOT NULL DEFAULT '0',
+  `free_qty` int(11) NOT NULL DEFAULT '0',
+  `rate` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `disc_pct` decimal(5,2) NOT NULL DEFAULT '0.00',
+  `gst_pct` decimal(5,2) NOT NULL DEFAULT '0.00',
+  `amount` decimal(12,2) NOT NULL DEFAULT '0.00'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `purchase_returns`
+--
+
+CREATE TABLE `purchase_returns` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `purchase_id` int(10) UNSIGNED NOT NULL,
+  `return_no` varchar(30) NOT NULL,
+  `return_date` date NOT NULL,
+  `reason` varchar(100) NOT NULL,
+  `note` varchar(255) DEFAULT NULL,
+  `credit_amount` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `purchase_return_items`
+--
+
+CREATE TABLE `purchase_return_items` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `return_id` int(10) UNSIGNED NOT NULL,
+  `purchase_item_id` int(10) UNSIGNED NOT NULL,
+  `medicine_id` int(10) UNSIGNED NOT NULL,
+  `batch_id` int(10) UNSIGNED NOT NULL,
+  `qty` int(11) NOT NULL DEFAULT '0',
+  `rate` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `amount` decimal(12,2) NOT NULL DEFAULT '0.00'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `role_permissions`
+--
+
+CREATE TABLE `role_permissions` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `role` varchar(50) NOT NULL,
+  `module` varchar(50) NOT NULL,
+  `allowed` tinyint(1) NOT NULL DEFAULT '0'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `sales`
+--
+
+CREATE TABLE `sales` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `customer_id` int(10) UNSIGNED NOT NULL,
+  `doctor_id` int(10) UNSIGNED DEFAULT NULL,
+  `channel` enum('retail','wholesale') NOT NULL DEFAULT 'retail',
+  `invoice_no` varchar(30) NOT NULL,
+  `sale_date` date NOT NULL,
+  `gstin` varchar(20) DEFAULT NULL,
+  `dl_no` varchar(50) DEFAULT NULL,
+  `subtotal` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `discount` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `gst_amount` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `cgst` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `sgst` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `igst` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `round_off` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `grand_total` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `payment_mode` enum('cash','upi','card','bank','credit','split') NOT NULL DEFAULT 'cash',
+  `cash_amount` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `upi_amount` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `amount_paid` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `balance_due` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `sales_returns`
+--
+
+CREATE TABLE `sales_returns` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `sale_id` int(10) UNSIGNED NOT NULL,
+  `return_no` varchar(30) NOT NULL,
+  `return_date` date NOT NULL,
+  `reason` varchar(100) NOT NULL,
+  `note` varchar(255) DEFAULT NULL,
+  `refund_amount` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `sales_return_items`
+--
+
+CREATE TABLE `sales_return_items` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `return_id` int(10) UNSIGNED NOT NULL,
+  `sale_item_id` int(10) UNSIGNED NOT NULL,
+  `medicine_id` int(10) UNSIGNED NOT NULL,
+  `batch_id` int(10) UNSIGNED NOT NULL,
+  `qty` int(11) NOT NULL DEFAULT '0',
+  `rate` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `amount` decimal(12,2) NOT NULL DEFAULT '0.00'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `sale_items`
+--
+
+CREATE TABLE `sale_items` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `sale_id` int(10) UNSIGNED NOT NULL,
+  `medicine_id` int(10) UNSIGNED NOT NULL,
+  `batch_id` int(10) UNSIGNED NOT NULL,
+  `qty` int(11) NOT NULL DEFAULT '0',
+  `free_qty` int(11) NOT NULL DEFAULT '0',
+  `rate` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `disc_pct` decimal(5,2) NOT NULL DEFAULT '0.00',
+  `gst_pct` decimal(5,2) NOT NULL DEFAULT '0.00',
+  `amount` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `unit_sold` enum('pack','loose') NOT NULL DEFAULT 'pack',
+  `pack_qty_at_sale` int(10) UNSIGNED DEFAULT NULL COMMENT 'Snapshot of medicines.pack_qty at sale time — keeps old invoices correct if pack_qty is edited later'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `settings`
+--
+
+CREATE TABLE `settings` (
+  `setting_key` varchar(80) NOT NULL,
+  `setting_value` text
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `stock_adjustments`
+--
+
+CREATE TABLE `stock_adjustments` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `medicine_id` int(10) UNSIGNED NOT NULL,
+  `batch_id` int(10) UNSIGNED NOT NULL,
+  `qty_change` int(11) NOT NULL,
+  `reason` enum('Damage','Expired Write-off','Theft / Loss','Stock Recount','Other') NOT NULL,
+  `notes` varchar(255) DEFAULT NULL,
+  `adjusted_by` varchar(150) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `stock_transfers`
+--
+
+CREATE TABLE `stock_transfers` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `medicine_id` int(10) UNSIGNED NOT NULL,
+  `batch_id` int(10) UNSIGNED NOT NULL,
+  `from_location_id` int(10) UNSIGNED NOT NULL,
+  `to_location_id` int(10) UNSIGNED NOT NULL,
+  `qty` int(11) NOT NULL,
+  `status` enum('completed','cancelled') NOT NULL DEFAULT 'completed',
+  `notes` varchar(255) DEFAULT NULL,
+  `transferred_by` varchar(150) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `suppliers`
+--
+
+CREATE TABLE `suppliers` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `name` varchar(200) NOT NULL,
+  `gstin` varchar(20) DEFAULT NULL,
+  `dl_no` varchar(50) DEFAULT NULL,
+  `phone` varchar(20) DEFAULT NULL,
+  `address` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `users`
+--
+
+CREATE TABLE `users` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `name` varchar(150) NOT NULL,
+  `email` varchar(150) NOT NULL,
+  `mobile` varchar(20) DEFAULT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `role` varchar(50) NOT NULL DEFAULT 'staff',
+  `status` enum('active','disabled') NOT NULL DEFAULT 'active',
+  `last_login` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Indexes for dumped tables
+--
+
+--
+-- Indexes for table `audit_logs`
+--
+ALTER TABLE `audit_logs`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `batches`
+--
+ALTER TABLE `batches`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `medicine_id` (`medicine_id`);
+
+--
+-- Indexes for table `categories`
+--
+ALTER TABLE `categories`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uniq_category_name` (`name`);
+
+--
+-- Indexes for table `counters`
+--
+ALTER TABLE `counters`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `name` (`name`);
+
+--
+-- Indexes for table `customers`
+--
+ALTER TABLE `customers`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `doctors`
+--
+ALTER TABLE `doctors`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `expenses`
+--
+ALTER TABLE `expenses`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `category_id` (`category_id`);
+
+--
+-- Indexes for table `expense_categories`
+--
+ALTER TABLE `expense_categories`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `name` (`name`);
+
+--
+-- Indexes for table `generic_groups`
+--
+ALTER TABLE `generic_groups`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uniq_generic_group_name` (`name`);
+
+--
+-- Indexes for table `locations`
+--
+ALTER TABLE `locations`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uniq_location_name` (`name`);
+
+--
+-- Indexes for table `manufacturers`
+--
+ALTER TABLE `manufacturers`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uniq_manufacturer_name` (`name`);
+
+--
+-- Indexes for table `medicines`
+--
+ALTER TABLE `medicines`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uniq_medicine_barcode` (`barcode`),
+  ADD KEY `category_id` (`category_id`),
+  ADD KEY `manufacturer_id` (`manufacturer_id`),
+  ADD KEY `generic_group_id` (`generic_group_id`);
+
+--
+-- Indexes for table `payments`
+--
+ALTER TABLE `payments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_party` (`party_type`,`party_id`);
+
+--
+-- Indexes for table `purchases`
+--
+ALTER TABLE `purchases`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `supplier_id` (`supplier_id`);
+
+--
+-- Indexes for table `purchase_items`
+--
+ALTER TABLE `purchase_items`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `purchase_id` (`purchase_id`),
+  ADD KEY `medicine_id` (`medicine_id`),
+  ADD KEY `batch_id` (`batch_id`);
+
+--
+-- Indexes for table `purchase_returns`
+--
+ALTER TABLE `purchase_returns`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `purchase_id` (`purchase_id`);
+
+--
+-- Indexes for table `purchase_return_items`
+--
+ALTER TABLE `purchase_return_items`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `return_id` (`return_id`),
+  ADD KEY `purchase_item_id` (`purchase_item_id`),
+  ADD KEY `medicine_id` (`medicine_id`),
+  ADD KEY `batch_id` (`batch_id`);
+
+--
+-- Indexes for table `role_permissions`
+--
+ALTER TABLE `role_permissions`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uniq_role_module` (`role`,`module`);
+
+--
+-- Indexes for table `sales`
+--
+ALTER TABLE `sales`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `customer_id` (`customer_id`),
+  ADD KEY `doctor_id` (`doctor_id`);
+
+--
+-- Indexes for table `sales_returns`
+--
+ALTER TABLE `sales_returns`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `sale_id` (`sale_id`);
+
+--
+-- Indexes for table `sales_return_items`
+--
+ALTER TABLE `sales_return_items`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `return_id` (`return_id`),
+  ADD KEY `sale_item_id` (`sale_item_id`),
+  ADD KEY `medicine_id` (`medicine_id`),
+  ADD KEY `batch_id` (`batch_id`);
+
+--
+-- Indexes for table `sale_items`
+--
+ALTER TABLE `sale_items`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `sale_id` (`sale_id`),
+  ADD KEY `medicine_id` (`medicine_id`),
+  ADD KEY `batch_id` (`batch_id`);
+
+--
+-- Indexes for table `settings`
+--
+ALTER TABLE `settings`
+  ADD PRIMARY KEY (`setting_key`);
+
+--
+-- Indexes for table `stock_adjustments`
+--
+ALTER TABLE `stock_adjustments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `medicine_id` (`medicine_id`),
+  ADD KEY `batch_id` (`batch_id`);
+
+--
+-- Indexes for table `stock_transfers`
+--
+ALTER TABLE `stock_transfers`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `medicine_id` (`medicine_id`),
+  ADD KEY `batch_id` (`batch_id`),
+  ADD KEY `from_location_id` (`from_location_id`),
+  ADD KEY `to_location_id` (`to_location_id`);
+
+--
+-- Indexes for table `suppliers`
+--
+ALTER TABLE `suppliers`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `users`
+--
+ALTER TABLE `users`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `email` (`email`);
+
+--
+-- AUTO_INCREMENT for dumped tables
+--
+
+--
+-- AUTO_INCREMENT for table `audit_logs`
+--
+ALTER TABLE `audit_logs`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `batches`
+--
+ALTER TABLE `batches`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `categories`
+--
+ALTER TABLE `categories`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `counters`
+--
+ALTER TABLE `counters`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `customers`
+--
+ALTER TABLE `customers`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `doctors`
+--
+ALTER TABLE `doctors`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `expenses`
+--
+ALTER TABLE `expenses`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `expense_categories`
+--
+ALTER TABLE `expense_categories`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `generic_groups`
+--
+ALTER TABLE `generic_groups`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `locations`
+--
+ALTER TABLE `locations`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `manufacturers`
+--
+ALTER TABLE `manufacturers`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `medicines`
+--
+ALTER TABLE `medicines`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `payments`
+--
+ALTER TABLE `payments`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `purchases`
+--
+ALTER TABLE `purchases`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `purchase_items`
+--
+ALTER TABLE `purchase_items`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `purchase_returns`
+--
+ALTER TABLE `purchase_returns`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `purchase_return_items`
+--
+ALTER TABLE `purchase_return_items`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `role_permissions`
+--
+ALTER TABLE `role_permissions`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `sales`
+--
+ALTER TABLE `sales`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `sales_returns`
+--
+ALTER TABLE `sales_returns`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `sales_return_items`
+--
+ALTER TABLE `sales_return_items`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `sale_items`
+--
+ALTER TABLE `sale_items`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `stock_adjustments`
+--
+ALTER TABLE `stock_adjustments`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `stock_transfers`
+--
+ALTER TABLE `stock_transfers`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `suppliers`
+--
+ALTER TABLE `suppliers`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `users`
+--
+ALTER TABLE `users`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- Constraints for dumped tables
+--
+
+--
+-- Constraints for table `batches`
+--
+ALTER TABLE `batches`
+  ADD CONSTRAINT `batches_ibfk_1` FOREIGN KEY (`medicine_id`) REFERENCES `medicines` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `expenses`
+--
+ALTER TABLE `expenses`
+  ADD CONSTRAINT `expenses_ibfk_1` FOREIGN KEY (`category_id`) REFERENCES `expense_categories` (`id`);
+
+--
+-- Constraints for table `medicines`
+--
+ALTER TABLE `medicines`
+  ADD CONSTRAINT `medicines_ibfk_1` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `medicines_ibfk_2` FOREIGN KEY (`manufacturer_id`) REFERENCES `manufacturers` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `medicines_ibfk_3` FOREIGN KEY (`generic_group_id`) REFERENCES `generic_groups` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `purchases`
+--
+ALTER TABLE `purchases`
+  ADD CONSTRAINT `purchases_ibfk_1` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`);
+
+--
+-- Constraints for table `purchase_items`
+--
+ALTER TABLE `purchase_items`
+  ADD CONSTRAINT `purchase_items_ibfk_1` FOREIGN KEY (`purchase_id`) REFERENCES `purchases` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `purchase_items_ibfk_2` FOREIGN KEY (`medicine_id`) REFERENCES `medicines` (`id`),
+  ADD CONSTRAINT `purchase_items_ibfk_3` FOREIGN KEY (`batch_id`) REFERENCES `batches` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `purchase_returns`
+--
+ALTER TABLE `purchase_returns`
+  ADD CONSTRAINT `purchase_returns_ibfk_1` FOREIGN KEY (`purchase_id`) REFERENCES `purchases` (`id`);
+
+--
+-- Constraints for table `purchase_return_items`
+--
+ALTER TABLE `purchase_return_items`
+  ADD CONSTRAINT `purchase_return_items_ibfk_1` FOREIGN KEY (`return_id`) REFERENCES `purchase_returns` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `purchase_return_items_ibfk_2` FOREIGN KEY (`purchase_item_id`) REFERENCES `purchase_items` (`id`),
+  ADD CONSTRAINT `purchase_return_items_ibfk_3` FOREIGN KEY (`medicine_id`) REFERENCES `medicines` (`id`),
+  ADD CONSTRAINT `purchase_return_items_ibfk_4` FOREIGN KEY (`batch_id`) REFERENCES `batches` (`id`);
+
+--
+-- Constraints for table `sales`
+--
+ALTER TABLE `sales`
+  ADD CONSTRAINT `sales_ibfk_1` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`),
+  ADD CONSTRAINT `sales_ibfk_2` FOREIGN KEY (`doctor_id`) REFERENCES `doctors` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `sales_returns`
+--
+ALTER TABLE `sales_returns`
+  ADD CONSTRAINT `sales_returns_ibfk_1` FOREIGN KEY (`sale_id`) REFERENCES `sales` (`id`);
+
+--
+-- Constraints for table `sales_return_items`
+--
+ALTER TABLE `sales_return_items`
+  ADD CONSTRAINT `sales_return_items_ibfk_1` FOREIGN KEY (`return_id`) REFERENCES `sales_returns` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `sales_return_items_ibfk_2` FOREIGN KEY (`sale_item_id`) REFERENCES `sale_items` (`id`),
+  ADD CONSTRAINT `sales_return_items_ibfk_3` FOREIGN KEY (`medicine_id`) REFERENCES `medicines` (`id`),
+  ADD CONSTRAINT `sales_return_items_ibfk_4` FOREIGN KEY (`batch_id`) REFERENCES `batches` (`id`);
+
+--
+-- Constraints for table `sale_items`
+--
+ALTER TABLE `sale_items`
+  ADD CONSTRAINT `sale_items_ibfk_1` FOREIGN KEY (`sale_id`) REFERENCES `sales` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `sale_items_ibfk_2` FOREIGN KEY (`medicine_id`) REFERENCES `medicines` (`id`),
+  ADD CONSTRAINT `sale_items_ibfk_3` FOREIGN KEY (`batch_id`) REFERENCES `batches` (`id`);
+
+--
+-- Constraints for table `stock_adjustments`
+--
+ALTER TABLE `stock_adjustments`
+  ADD CONSTRAINT `stock_adjustments_ibfk_1` FOREIGN KEY (`medicine_id`) REFERENCES `medicines` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `stock_adjustments_ibfk_2` FOREIGN KEY (`batch_id`) REFERENCES `batches` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `stock_transfers`
+--
+ALTER TABLE `stock_transfers`
+  ADD CONSTRAINT `stock_transfers_ibfk_1` FOREIGN KEY (`medicine_id`) REFERENCES `medicines` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `stock_transfers_ibfk_2` FOREIGN KEY (`batch_id`) REFERENCES `batches` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `stock_transfers_ibfk_3` FOREIGN KEY (`from_location_id`) REFERENCES `locations` (`id`),
+  ADD CONSTRAINT `stock_transfers_ibfk_4` FOREIGN KEY (`to_location_id`) REFERENCES `locations` (`id`);
+COMMIT;
+
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
