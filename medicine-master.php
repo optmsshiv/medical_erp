@@ -151,7 +151,69 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
     .mm-act-menu .dropdown-divider { margin:.35rem 0; }
     @media (max-width: 575.98px) {
       .mm-switch-row { grid-template-columns:1fr 1fr; }
+      .mm-detail-stats, .mm-stock-kpis { grid-template-columns:1fr 1fr; }
+      .mm-detail-cols { grid-template-columns:1fr; }
     }
+
+    /* Medicine details */
+    .mm-detail-hero { display:flex; align-items:flex-start; gap:14px; margin-bottom:14px; }
+    .mm-detail-icon {
+      width:52px; height:52px; border-radius:14px; flex:0 0 auto;
+      display:grid; place-items:center; background:#e8eef8; color:#16325c; font-size:1.35rem;
+    }
+    .mm-detail-name { font-size:1.12rem; font-weight:750; letter-spacing:-.02em; line-height:1.25; }
+    .mm-detail-name span { color:#6c757d; font-weight:500; }
+    .mm-detail-sub { color:#6c757d; font-size:.82rem; margin-top:3px; }
+    .mm-detail-badges { margin-left:auto; display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end; }
+    .mm-detail-stats, .mm-stock-kpis { display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; }
+    .mm-stat, .mm-kpi {
+      background:#f8fafc; border:1px solid #e7edf4; border-radius:14px; padding:10px 12px;
+    }
+    .mm-stat span, .mm-kpi span {
+      display:block; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#6c757d;
+    }
+    .mm-stat strong, .mm-kpi strong {
+      display:block; margin-top:3px; font-size:1.05rem; font-weight:750; letter-spacing:-.02em;
+      font-variant-numeric:tabular-nums; color:#1b2430;
+    }
+    .mm-kpi strong { font-size:1.2rem; }
+    .mm-stat small, .mm-kpi small { display:block; margin-top:2px; color:#6c757d; font-size:.75rem; }
+    .mm-kpi.accent { background:#e8eef8; border-color:#d7e2f2; }
+    .mm-detail-cols { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px; }
+    .mm-detail-card { border:1px solid #e7edf4; border-radius:14px; padding:12px 14px 4px; background:#fff; }
+    .mm-detail-card .mm-pack-head { margin-bottom:4px; }
+    .mm-dl-item {
+      display:flex; justify-content:space-between; align-items:baseline; gap:16px;
+      padding:8px 0; border-top:1px solid #f1f4f8; font-size:.84rem;
+    }
+    .mm-dl-item span { color:#6c757d; flex:0 0 auto; }
+    .mm-dl-item strong { font-weight:650; text-align:right; color:#1b2430; }
+
+    /* Stock summary */
+    .mm-stock-top { padding:16px 16px 0; }
+    .mm-stock-bar {
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding:12px 16px;
+    }
+    .mm-stock-note {
+      display:flex; align-items:center; gap:8px; margin:0 16px 12px; padding:8px 12px;
+      border-radius:10px; font-size:.82rem; font-weight:600;
+    }
+    .mm-stock-note.low { background:#fff6e4; color:#8a5a00; }
+    .mm-stock-note.out { background:#fdeeee; color:#c62828; }
+    .mm-batch {
+      display:inline-flex; align-items:center; gap:6px; background:#f4f7fb; color:#16325c;
+      border-radius:999px; padding:3px 8px; font-weight:700; font-size:.78rem;
+    }
+    .mm-exp { font-weight:650; }
+    .mm-exp.ok { color:#157347; }
+    .mm-exp.warn { color:#a86400; }
+    .mm-exp.bad { color:#c62828; }
+    .mm-stock-table thead th {
+      font-size:.72rem; letter-spacing:.04em; text-transform:uppercase; color:#6c757d;
+      font-weight:700; background:#f8fafc;
+    }
+    .mm-stock-empty { padding:28px 16px; }
   </style>
 </head>
 <body data-page="medicine-master">
@@ -379,19 +441,23 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
 
   <!-- View modal -->
   <div class="modal fade" id="mmViewModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header"><h5 class="modal-title">Medicine Details</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body" id="mmViewBody"></div>
+        <div class="modal-footer">
+          <button class="btn btn-light-mf" data-bs-dismiss="modal" type="button">Close</button>
+          <button class="btn btn-mf" id="mmViewEdit" type="button"><i class="bi bi-pencil me-1"></i>Edit</button>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- Stock / Batches modal -->
   <div class="modal fade" id="mmStockModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
       <div class="modal-content">
-        <div class="modal-header"><h5 class="modal-title" id="mmStockTitle">Batch Stock</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-header"><h5 class="modal-title" id="mmStockTitle">Stock Summary</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body p-0" id="mmStockBody"></div>
       </div>
     </div>
@@ -485,24 +551,77 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
         }));
       }
 
+      let viewingMed = null;
+      const mmTxt = (v) => (v == null || v === '') ? '—' : MF.esc(v);
+      function mmPairs(rows) {
+        return rows.map(([k, v]) => `<div class="mm-dl-item"><span>${k}</span><strong>${v == null || v === '' ? '—' : v}</strong></div>`).join('');
+      }
       function openView(m) {
+        viewingMed = m;
         const st = MF.stockOf(m.id);
+        const subs = !m.substitutes ? '' : (Array.isArray(m.substitutes) ? m.substitutes.join(', ') : String(m.substitutes));
+        const pack = [m.unit, m.packSize].filter(Boolean).join(' · ');
         $('#mmViewBody').innerHTML = `
-          <div class="d-flex align-items-start gap-3 mb-3">
-            <div class="kpi-icon tone-primary" style="width:48px;height:48px;flex-basis:48px;font-size:1.3rem"><i class="bi bi-capsule"></i></div>
+          <div class="mm-detail-hero">
+            <div class="mm-detail-icon"><i class="bi bi-capsule"></i></div>
             <div>
-              <h6 class="fw-bold mb-0">${MF.esc(m.name)} ${m.brandRef ? `<span class="text-2 fw-normal">· ${MF.esc(m.brandRef)}</span>` : ''}</h6>
-              <div class="text-2 small">${MF.esc(m.composition)} · ${m.category}</div>
+              <div class="mm-detail-name">${MF.esc(m.name)}${m.brandRef ? ` <span>· ${MF.esc(m.brandRef)}</span>` : ''}</div>
+              <div class="mm-detail-sub">${mmTxt(m.composition)} · ${mmTxt(m.category)} · ${mmTxt(m.manufacturer)}</div>
             </div>
-            <div class="ms-auto">${MF.stockBadge(m)} ${m.rxRequired ? MF.badge('Schedule ' + m.schedule, 'purple') : MF.badge(m.schedule, 'secondary')}</div>
+            <div class="mm-detail-badges">${MF.stockBadge(m)} ${m.rxRequired ? MF.badge('Schedule ' + m.schedule, 'purple') : MF.badge(m.schedule, 'secondary')} ${MF.badge(m.status || 'Active', m.status === 'Inactive' ? 'secondary' : 'success')}</div>
           </div>
-          <div class="row g-3">
-            ${[['Manufacturer', m.manufacturer], ['HSN Code', m.hsn], ['GST', m.gst + '%'], ['Unit', `${m.unit} · ${m.packSize}`],
-               ['MRP', MF.fmt(m.mrp, 2)], ['Purchase Rate (PTR)', MF.fmt(m.purchaseRate, 2)], ['Wholesale Rate', MF.fmt(m.wholesaleRate, 2)],
-               ['Current Stock', st + ' ' + m.unit], ['Minimum Stock', m.minStock], ['Reorder Level', m.reorderLevel],
-               ['Rx Required', m.rxRequired ? 'Yes' : 'No'], ['Status', m.status],
-               ['Substitutes', m.substitutes ? MF.esc(Array.isArray(m.substitutes) ? m.substitutes.join(', ') : String(m.substitutes)) : '—']].map(([k, v]) =>
-              `<div class="col-md-4 col-6"><div class="kpi-label">${k}</div><div class="fw-semibold">${v}</div></div>`).join('')}
+          <div class="mm-detail-stats">
+            <div class="mm-stat"><span>Stock</span><strong>${MF.num(st)}</strong><small>${mmTxt(m.unit)}</small></div>
+            <div class="mm-stat"><span>MRP</span><strong>${MF.fmt(m.mrp, 2)}</strong></div>
+            <div class="mm-stat"><span>Retail</span><strong>${MF.fmt(m.retailRate ?? m.mrp, 2)}</strong></div>
+            <div class="mm-stat"><span>GST</span><strong>${mmTxt(m.gst)}%</strong></div>
+          </div>
+          <div class="mm-detail-cols">
+            <section class="mm-detail-card">
+              <div class="mm-pack-head"><i class="bi bi-card-text"></i> Identity</div>
+              ${mmPairs([
+                ['Generic', mmTxt(m.generic)],
+                ['Brand', mmTxt(m.brandRef)],
+                ['Manufacturer', mmTxt(m.manufacturer)],
+                ['Category', mmTxt(m.category)],
+                ['HSN', mmTxt(m.hsn)],
+                ['Barcode', mmTxt(m.barcode)],
+                ['Generic group', mmTxt(m.genericGroup)],
+                ['Substitutes', mmTxt(subs)]
+              ])}
+            </section>
+            <section class="mm-detail-card">
+              <div class="mm-pack-head"><i class="bi bi-box-seam"></i> Packaging</div>
+              ${mmPairs([
+                ['Unit', mmTxt(pack)],
+                ['Pack / strip qty', mmTxt(m.packQty)],
+                ['Sub-unit', mmTxt(m.subUnit)],
+                ['Loose sale', m.allowLoose ? 'Allowed' : 'No'],
+                ['Box', mmTxt([m.boxQty, m.boxUnit || 'Box'].filter((x) => x != null && x !== '').join(' '))],
+                ['Schedule', mmTxt(m.schedule)],
+                ['Rx required', m.rxRequired ? 'Yes' : 'No']
+              ])}
+            </section>
+            <section class="mm-detail-card">
+              <div class="mm-pack-head"><i class="bi bi-currency-rupee"></i> Pricing</div>
+              ${mmPairs([
+                ['MRP', MF.fmt(m.mrp, 2)],
+                ['Purchase rate', MF.fmt(m.purchaseRate, 2)],
+                ['Retail rate', MF.fmt(m.retailRate ?? m.mrp, 2)],
+                ['Wholesale rate', MF.fmt(m.wholesaleRate, 2)],
+                ['GST', mmTxt(m.gst) + '%']
+              ])}
+            </section>
+            <section class="mm-detail-card">
+              <div class="mm-pack-head"><i class="bi bi-boxes"></i> Stock rules</div>
+              ${mmPairs([
+                ['Current stock', MF.num(st) + ' ' + mmTxt(m.unit)],
+                ['Minimum stock', mmTxt(m.minStock)],
+                ['Reorder level', mmTxt(m.reorderLevel)],
+                ['Expiry alert', m.expiryAlertDays ? mmTxt(m.expiryAlertDays) + ' days' : '—'],
+                ['Status', mmTxt(m.status || 'Active')]
+              ])}
+            </section>
           </div>`;
         new bootstrap.Modal($('#mmViewModal')).show();
       }
@@ -620,25 +739,48 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
         const bs = MF.batchesOf(m.id);
         $('#mmStockTitle').textContent = (detailed ? 'Batches — ' : 'Stock Summary — ') + m.name;
         const total = MF.stockOf(m.id);
+        const reserved = bs.reduce((s, b) => s + (Number(b.reserved) || 0), 0);
         const purchValue = bs.reduce((s, b) => s + b.qty * b.purchaseRate, 0);
         const mrpValue = bs.reduce((s, b) => s + b.qty * b.mrp, 0);
+        const margin = mrpValue - purchValue;
+        const note = total === 0
+          ? `<div class="mm-stock-note out"><i class="bi bi-exclamation-circle"></i>Out of stock. Nothing can be billed until a batch is received.</div>`
+          : total <= (m.minStock || 0)
+            ? `<div class="mm-stock-note low"><i class="bi bi-exclamation-triangle"></i>Below minimum stock (${MF.num(m.minStock)} ${MF.esc(m.unit || '')}). Reorder level is ${MF.num(m.reorderLevel)}.</div>`
+            : '';
+        const rows = bs.map((b) => {
+          const days = MF.daysTo(b.expiry);
+          const expTone = days < 0 ? 'bad' : days <= 90 ? 'warn' : 'ok';
+          return `<tr>
+            <td><span class="mm-batch"><i class="bi bi-upc"></i>${MF.esc(b.batchNo)}</span></td>
+            <td class="num">${MF.fmtDate(b.purchaseDate)}</td>
+            <td class="num mm-exp ${expTone}">${MF.fmtMonthYear(b.expiry)}</td>
+            <td class="text-end num">${MF.num(b.qty)}</td>
+            <td class="text-end num text-2">${MF.num(b.reserved)}</td>
+            <td class="text-end num">${MF.fmt(b.purchaseRate, 2)}</td>
+            <td class="text-end num">${MF.fmt(b.mrp, 2)}</td>
+            <td>${MF.statusBadge(MF.batchStatus(b))}</td>
+          </tr>`;
+        }).join('');
         $('#mmStockBody').innerHTML = `
-          <div class="p-3 border-bottom d-flex flex-wrap gap-4">
-            <div><div class="kpi-label">Total Qty</div><div class="fw-bold num">${MF.num(total)} ${m.unit}</div></div>
-            <div><div class="kpi-label">Purchase Value</div><div class="fw-bold num">${MF.fmt(purchValue)}</div></div>
-            <div><div class="kpi-label">MRP Value</div><div class="fw-bold num">${MF.fmt(mrpValue)}</div></div>
-            <div class="ms-auto"><button class="btn btn-mf-soft btn-sm" id="mmStockAdjust"><i class="bi bi-sliders me-1"></i>Stock Adjustment</button></div>
+          <div class="mm-stock-top">
+            <div class="mm-stock-kpis">
+              <div class="mm-kpi accent"><span>Total qty</span><strong>${MF.num(total)}</strong><small>${MF.esc(m.unit || 'units')}${reserved ? ' · ' + MF.num(reserved) + ' reserved' : ''}</small></div>
+              <div class="mm-kpi"><span>Purchase value</span><strong>${MF.fmt(purchValue)}</strong></div>
+              <div class="mm-kpi"><span>MRP value</span><strong>${MF.fmt(mrpValue)}</strong><small>Margin ${MF.fmt(margin)}</small></div>
+              <div class="mm-kpi"><span>Batches</span><strong>${MF.num(bs.length)}</strong><small>${detailed ? 'Full batch list' : 'FEFO order not changed'}</small></div>
+            </div>
           </div>
-          <table class="table table-mf">
+          ${note}
+          <div class="mm-stock-bar">
+            <div class="text-2 small">${detailed ? 'Every batch on this medicine' : 'Sellable and held stock by batch'}</div>
+            <button class="btn btn-mf-soft btn-sm" id="mmStockAdjust" type="button"><i class="bi bi-sliders me-1"></i>Stock Adjustment</button>
+          </div>
+          <table class="table table-mf mm-stock-table mb-0">
             <thead><tr><th>Batch No</th><th>Purchase Date</th><th>Expiry</th><th class="text-end">Qty</th><th class="text-end">Reserved</th><th class="text-end">Purchase Rate</th><th class="text-end">MRP</th><th>Status</th></tr></thead>
-            <tbody>${bs.map((b) => `<tr>
-              <td class="num td-title">${b.batchNo}</td><td class="num">${MF.fmtDate(b.purchaseDate)}</td><td class="num">${MF.fmtMonthYear(b.expiry)}</td>
-              <td class="text-end num">${b.qty}</td><td class="text-end num text-2">${b.reserved}</td>
-              <td class="text-end num">${MF.fmt(b.purchaseRate, 2)}</td><td class="text-end num">${MF.fmt(b.mrp, 2)}</td>
-              <td>${MF.statusBadge(MF.batchStatus(b))}</td></tr>`).join('') || '<tr><td colspan="8"><div class="empty-state"><i class="bi bi-box-seam"></i>No batches recorded.</div></td></tr>'}
-            </tbody></table>`;
-        const modal = new bootstrap.Modal($('#mmStockModal'));
-        modal.show();
+            <tbody>${rows || '<tr><td colspan="8"><div class="empty-state mm-stock-empty"><i class="bi bi-box-seam"></i>No batches recorded.</div></td></tr>'}</tbody>
+          </table>`;
+        new bootstrap.Modal($('#mmStockModal')).show();
         $('#mmStockBody').querySelector('#mmStockAdjust').addEventListener('click', () => {
           MF.toast('Opening adjustment slip for ' + m.name + ' (Stage 2 workflow)', 'info', 'Stock Adjustment');
         });
@@ -669,6 +811,13 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
         render();
       });
       $('#mmAddBtn').addEventListener('click', () => openForm(null));
+      $('#mmViewEdit').addEventListener('click', () => {
+        if (!viewingMed) return;
+        const med = viewingMed;
+        const el = $('#mmViewModal');
+        el.addEventListener('hidden.bs.modal', () => openForm(med), { once: true });
+        bootstrap.Modal.getInstance(el)?.hide();
+      });
       $('#mmExport').addEventListener('click', () => MF.exportCSV('medicines.csv',
         ['Name', 'Generic', 'Brand', 'Category', 'Manufacturer', 'HSN', 'GST%', 'Unit', 'MRP', 'Purchase', 'Wholesale', 'Stock', 'Substitutes'],
         filtered().map((m) => [m.name, m.generic, m.brandRef || '', m.category, m.manufacturer, m.hsn, m.gst, m.unit, m.mrp, m.purchaseRate, m.wholesaleRate, MF.stockOf(m.id), Array.isArray(m.substitutes) ? m.substitutes.join(', ') : (m.substitutes || '')])));
@@ -823,5 +972,5 @@ require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logg
       });
     })();
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a40ae802ac4033c0',t:'MTc5MDM0ODUwOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a40afdd54cfe2698',t:'MTc5MDM0OTQwMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
