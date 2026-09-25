@@ -15,6 +15,72 @@ window.MF = window.MF || {};
   const MF = window.MF;
   const D = window.MF_DATA;
 
+  if (!document.getElementById('mf-sidebar-theme')) {
+    const theme = document.createElement('style');
+    theme.id = 'mf-sidebar-theme';
+    theme.textContent = `
+      #mf-sidebar {
+        background:#f5f8fc !important;
+        border-right:1px solid #e4ecf4 !important;
+        color:#243044;
+      }
+      #mf-sidebar .mf-brand { border-bottom:1px solid #e6edf5; }
+      #mf-sidebar .mf-brand-name { color:#16325c !important; }
+      #mf-sidebar .mf-brand-name span { color:#8b9bb0 !important; }
+      #mf-sidebar .mf-nav-link,
+      #mf-sidebar .mf-nav-parent {
+        color:#516278 !important;
+        border-radius:10px;
+        transition:background-color .15s ease, color .15s ease;
+      }
+      #mf-sidebar .mf-nav-link i,
+      #mf-sidebar .mf-nav-parent i { color:#8b9bb0; transition:color .15s ease; }
+      #mf-sidebar .mf-nav-link:hover,
+      #mf-sidebar .mf-nav-parent:hover {
+        background:#e4edf8 !important;
+        color:#16325c !important;
+      }
+      #mf-sidebar .mf-nav-link:hover i,
+      #mf-sidebar .mf-nav-parent:hover i { color:#16325c !important; }
+      #mf-sidebar .mf-nav-link.active {
+        background:#16325c !important;
+        color:#fff !important;
+      }
+      #mf-sidebar .mf-nav-link.active i { color:#fff !important; }
+      #mf-sidebar .mf-nav-link.active:hover {
+        background:#122848 !important;
+        color:#fff !important;
+      }
+      #mf-sidebar .mf-nav-link.active:hover i { color:#fff !important; }
+      #mf-sidebar .mf-nav-sub .mf-nav-link.active {
+        background:#e4edf8 !important;
+        color:#16325c !important;
+        box-shadow:inset 3px 0 0 #16325c;
+      }
+      #mf-sidebar .mf-nav-sub .mf-nav-link.active i,
+      #mf-sidebar .mf-nav-sub .mf-nav-link.active:hover,
+      #mf-sidebar .mf-nav-sub .mf-nav-link.active:hover i {
+        color:#16325c !important;
+      }
+      #mf-sidebar .mf-nav-sub .mf-nav-link.active:hover { background:#d7e4f6 !important; }
+      #mf-sidebar .mf-nav-parent.has-active {
+        color:#16325c !important;
+        background:transparent !important;
+      }
+      #mf-sidebar .mf-nav-parent.has-active > i:first-child { color:#16325c !important; }
+      #mf-sidebar .mf-nav-link:focus-visible,
+      #mf-sidebar .mf-nav-parent:focus-visible {
+        outline:2px solid #16325c;
+        outline-offset:2px;
+      }
+      #mf-sidebar .mf-sidebar-foot {
+        color:#7d8da3 !important;
+        border-top:1px solid #e4ecf4;
+      }
+    `;
+    document.head.appendChild(theme);
+  }
+
   /* ----------------------------------------------------------------------
      API LAYER — Stage 2 live.
      MF.Api.live = true  → fetch() against PHP REST endpoints (assets/js/config.js)
@@ -568,6 +634,11 @@ window.MF = window.MF || {};
     const invs = D.salesInvoices.filter((i) => i.no.toLowerCase().includes(q) || i.customer.toLowerCase().includes(q)).slice(0, 4);
     const custs = D.customers.filter((c) => c.id !== 'C01' && c.name.toLowerCase().includes(q)).slice(0, 4);
     const sups = D.suppliers.filter((s) => s.name.toLowerCase().includes(q)).slice(0, 4);
+    const labelOf = (x) => typeof x === 'string' ? x : (x && x.name) || '';
+    const mfgs = [...new Set([...(D.manufacturers || []).map(labelOf), ...(D.medicines || []).map((m) => m.manufacturer)])]
+      .filter((n) => n && n.toLowerCase().includes(q)).slice(0, 4);
+    const cats = [...new Set([...(D.categories || []).map(labelOf), ...(D.medicines || []).map((m) => m.category)])]
+      .filter((n) => n && n.toLowerCase().includes(q)).slice(0, 4);
 
     let html = '';
     if (meds.length) {
@@ -623,6 +694,28 @@ window.MF = window.MF || {};
           <div class="flex-grow-1">
             <div class="fw-semibold" style="font-size:.8rem">${MF.esc(s.name)}</div>
             <div class="text-2 small-xs">GSTIN ${s.gstin} · Due ${MF.fmt(s.due)}</div>
+          </div>
+          <i class="bi bi-chevron-right text-2"></i>
+        </div>`).join('');
+    }
+    if (mfgs.length) {
+      html += `<div class="sr-group-label">Manufacturers</div>` + mfgs.map((name) => `
+        <div class="sr-item" data-go="manufacturers.php">
+          ${thumb('buildings', 'info')}
+          <div class="flex-grow-1">
+            <div class="fw-semibold" style="font-size:.8rem">${MF.esc(name)}</div>
+            <div class="text-2 small-xs">${(D.medicines || []).filter((m) => m.manufacturer === name).length} medicine(s)</div>
+          </div>
+          <i class="bi bi-chevron-right text-2"></i>
+        </div>`).join('');
+    }
+    if (cats.length) {
+      html += `<div class="sr-group-label">Categories</div>` + cats.map((name) => `
+        <div class="sr-item" data-go="categories.php">
+          ${thumb('tags', 'primary')}
+          <div class="flex-grow-1">
+            <div class="fw-semibold" style="font-size:.8rem">${MF.esc(name)}</div>
+            <div class="text-2 small-xs">${(D.medicines || []).filter((m) => m.category === name).length} medicine(s)</div>
           </div>
           <i class="bi bi-chevron-right text-2"></i>
         </div>`).join('');
