@@ -68,13 +68,23 @@ function profileFromInput(array $input, ?array $current = null): array
     };
 
     $contact = trim((string) $pick(['contact_person', 'contact'], $current['contact_person'] ?? ''));
+    $email = trim((string) $pick(['email'], $current['email'] ?? ''));
     $phone = trim((string) $pick(['phone'], $current['phone'] ?? ''));
     $gstin = strtoupper(trim((string) $pick(['gstin'], $current['gstin'] ?? '')));
     $address = trim((string) $pick(['address'], $current['address'] ?? ''));
+    $status = trim((string) $pick(['status'], $current['status'] ?? 'Active'));
     $contact = preg_replace('/\s+/', ' ', $contact) ?? $contact;
+    $phone = formatManufacturerPhone($phone);
+    $status = preg_match('/^in/i', $status) ? 'Inactive' : 'Active';
 
     if (textLen($contact) > 120) {
         Json::error('Contact person must be 120 characters or fewer.', 422);
+    }
+    if ($email !== '' && !preg_match('/^[^\s@]+@[^\s@]+\.[^\s@]+$/', $email)) {
+        Json::error('Enter a valid email address.', 422);
+    }
+    if (textLen($email) > 160) {
+        Json::error('Email must be 160 characters or fewer.', 422);
     }
     if (textLen($phone) > 32) {
         Json::error('Phone must be 32 characters or fewer.', 422);
@@ -91,10 +101,30 @@ function profileFromInput(array $input, ?array $current = null): array
 
     return [
         'contact_person' => $contact !== '' ? $contact : null,
+        'email' => $email !== '' ? $email : null,
         'phone' => $phone !== '' ? $phone : null,
         'gstin' => $gstin !== '' ? $gstin : null,
         'address' => $address !== '' ? $address : null,
+        'status' => $status,
     ];
+}
+
+/** Indian mobiles are stored as +91 56985 69565. Other numbers keep their spacing. */
+function formatManufacturerPhone(string $phone): string
+{
+    $phone = trim($phone);
+    if ($phone === '') {
+        return '';
+    }
+    $digits = preg_replace('/\D/', '', $phone) ?? '';
+    if (strlen($digits) === 10) {
+        $digits = '91' . $digits;
+    }
+    if (strlen($digits) === 12 && substr($digits, 0, 2) === '91') {
+        $national = substr($digits, 2);
+        return '+91 ' . substr($national, 0, 5) . ' ' . substr($national, 5);
+    }
+    return preg_replace('/\s+/', ' ', $phone) ?? $phone;
 }
 
 switch ($method) {

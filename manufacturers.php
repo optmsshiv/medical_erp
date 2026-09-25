@@ -28,11 +28,12 @@ require __DIR__ . '/middleware/auth.php';
     .mf-act-menu .dropdown-item.text-danger i { color:inherit; }
     .mf-name { font-weight:700; color:#1b2430; }
     .mf-chip { display:inline-flex; align-items:center; background:#f4f7fb; color:#16325c; border-radius:999px; padding:2px 8px; font-size:.72rem; font-weight:700; margin:0 4px 4px 0; }
-    .mf-phone { white-space:nowrap; font-weight:600; color:#1b2430; text-decoration:none; }
+    .mf-phone { white-space:nowrap; font-weight:600; color:#1b2430; text-decoration:none; letter-spacing:.01em; }
     .mf-phone:hover { color:#16325c; }
+    .mf-email { display:block; margin-top:2px; color:#8b9bb0; font-size:.75rem; font-weight:600; line-height:1.3; }
     .mf-gstin { font-size:.78rem; font-weight:700; letter-spacing:.03em; color:#16325c; white-space:nowrap; }
     .mf-addr { max-width:220px; color:#516278; font-size:.82rem; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-    .mf-wide { min-width:1080px; }
+    .mf-wide { min-width:1180px; }
   </style>
 </head>
 <body data-page="manufacturers">
@@ -57,7 +58,7 @@ require __DIR__ . '/middleware/auth.php';
         <div class="card-mf p-3 mb-3">
           <div class="input-group">
             <span class="input-group-text"><i class="bi bi-search"></i></span>
-            <input class="form-control" id="mfSearch" name="mf-list-filter" placeholder="Search name, contact, phone, GSTIN…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true">
+            <input class="form-control" id="mfSearch" name="mf-list-filter" placeholder="Search name, contact, email, phone, GSTIN…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true">
           </div>
         </div>
 
@@ -71,6 +72,7 @@ require __DIR__ . '/middleware/auth.php';
                   <th>Phone</th>
                   <th>GSTIN</th>
                   <th>Address</th>
+                  <th>Status</th>
                   <th class="text-end">Medicines</th>
                   <th>Categories</th>
                   <th class="text-end">Stock</th>
@@ -108,8 +110,19 @@ require __DIR__ . '/middleware/auth.php';
               <input class="form-control" id="mfContact" name="mf-contact" placeholder="e.g. Rajesh Kumar" autocomplete="section-mfg name" data-lpignore="true" data-1p-ignore="true">
             </div>
             <div class="col-md-6">
+              <label class="form-label" for="mfEmail">Email</label>
+              <input class="form-control" id="mfEmail" name="mf-email" type="email" inputmode="email" placeholder="name@company.com" autocomplete="section-mfg email" data-lpignore="true" data-1p-ignore="true">
+            </div>
+            <div class="col-md-6">
               <label class="form-label" for="mfPhone">Phone</label>
-              <input class="form-control" id="mfPhone" name="mf-phone" inputmode="tel" placeholder="e.g. 98765 43210" autocomplete="section-mfg tel" data-lpignore="true" data-1p-ignore="true">
+              <input class="form-control" id="mfPhone" name="mf-phone" inputmode="tel" placeholder="+91 56985 69565" autocomplete="section-mfg tel" data-lpignore="true" data-1p-ignore="true">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="mfStatus">Status</label>
+              <select class="form-select" id="mfStatus" name="mf-status">
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
             </div>
             <div class="col-md-6">
               <label class="form-label" for="mfGstin">GSTIN</label>
@@ -158,6 +171,25 @@ require __DIR__ . '/middleware/auth.php';
       const nameOf = (x) => typeof x === 'string' ? x : (x && x.name) || '';
       const clean = (s) => (s || '').trim().replace(/\s+/g, ' ');
       const GSTIN_RE = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
+      const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      function formatPhone(raw) {
+        const text = String(raw || '').trim();
+        if (!text) return '';
+        let digits = text.replace(/\D/g, '');
+        if (digits.length === 10) digits = '91' + digits;
+        if (digits.length === 12 && digits.startsWith('91')) {
+          const n = digits.slice(2);
+          return '+91 ' + n.slice(0, 5) + ' ' + n.slice(5);
+        }
+        return text.replace(/\s+/g, ' ');
+      }
+      function statusOf(v) {
+        return /^in/i.test(String(v || '')) ? 'Inactive' : 'Active';
+      }
+      function statusBadge(v) {
+        const s = statusOf(v);
+        return typeof MF.statusBadge === 'function' ? MF.statusBadge(s) : `<span class="badge">${MF.esc(s)}</span>`;
+      }
       function profiles() {
         if (!D.manufacturerProfiles || typeof D.manufacturerProfiles !== 'object' || Array.isArray(D.manufacturerProfiles)) {
           D.manufacturerProfiles = {};
@@ -196,9 +228,11 @@ require __DIR__ . '/middleware/auth.php';
         return {
           id: row ? row.id : (fromObj.id || null),
           contact: clean(saved.contact || fromObj.contact_person || fromObj.contact || fromObj.contactPerson || ''),
-          phone: clean(saved.phone || fromObj.phone || fromObj.mobile || ''),
+          email: String(saved.email || fromObj.email || '').trim(),
+          phone: formatPhone(saved.phone || fromObj.phone || fromObj.mobile || ''),
           gstin: String(saved.gstin || fromObj.gstin || fromObj.GSTIN || '').trim().toUpperCase(),
-          address: String(saved.address || fromObj.address || '').trim()
+          address: String(saved.address || fromObj.address || '').trim(),
+          status: statusOf(saved.status || fromObj.status)
         };
       }
       function writeProfile(name, profile) {
@@ -210,16 +244,24 @@ require __DIR__ . '/middleware/auth.php';
       function readFormProfile() {
         return {
           contact: clean($('#mfContact').value),
-          phone: clean($('#mfPhone').value),
+          email: ($('#mfEmail').value || '').trim(),
+          phone: formatPhone($('#mfPhone').value),
           gstin: ($('#mfGstin').value || '').trim().toUpperCase(),
-          address: ($('#mfAddress').value || '').trim()
+          address: ($('#mfAddress').value || '').trim(),
+          status: statusOf($('#mfStatus').value)
         };
       }
       function dash(v) { return v ? MF.esc(v) : '<span class="text-2">—</span>'; }
       function phoneCell(phone) {
-        if (!phone) return '<span class="text-2">—</span>';
-        const href = phone.replace(/[^\d+]/g, '');
-        return `<a class="mf-phone" href="tel:${href}">${MF.esc(phone)}</a>`;
+        const shown = formatPhone(phone);
+        if (!shown) return '<span class="text-2">—</span>';
+        const href = shown.replace(/[^\d+]/g, '');
+        return `<a class="mf-phone" href="tel:${href}">${MF.esc(shown)}</a>`;
+      }
+      function contactCell(p) {
+        const name = p.contact ? `<div class="fw-semibold">${MF.esc(p.contact)}</div>` : '<span class="text-2">—</span>';
+        const email = p.email ? `<div class="mf-email">${MF.esc(p.email)}</div>` : '';
+        return name + email;
       }
       function allNames() {
         const stored = [...(D.manufacturers || []).map(nameOf), ...state.apiRows.map((r) => r.name)].filter(Boolean);
@@ -245,7 +287,7 @@ require __DIR__ . '/middleware/auth.php';
         const matches = (n) => {
           if (!q) return true;
           const p = profileOf(n);
-          return [n, p.contact, p.phone, p.gstin, p.address].join(' ').toLowerCase().includes(q);
+          return [n, p.contact, p.email, p.phone, p.gstin, p.address, p.status].join(' ').toLowerCase().includes(q);
         };
         const list = allNames().filter(matches);
         const pages = Math.max(1, Math.ceil(list.length / state.per));
@@ -264,10 +306,11 @@ require __DIR__ . '/middleware/auth.php';
           const p = profileOf(name);
           return `<tr>
             <td><div class="mf-name">${MF.esc(name)}</div></td>
-            <td>${dash(p.contact)}</td>
+            <td>${contactCell(p)}</td>
             <td>${phoneCell(p.phone)}</td>
             <td>${p.gstin ? `<span class="mf-gstin">${MF.esc(p.gstin)}</span>` : '<span class="text-2">—</span>'}</td>
             <td>${p.address ? `<div class="mf-addr" title="${MF.esc(p.address)}">${MF.esc(p.address)}</div>` : '<span class="text-2">—</span>'}</td>
+            <td>${statusBadge(p.status)}</td>
             <td class="text-end num fw-semibold">${MF.num(s.meds.length)}</td>
             <td>${chips || '<span class="text-2">—</span>'}</td>
             <td class="text-end num">${MF.num(s.stock)}</td>
@@ -285,7 +328,7 @@ require __DIR__ . '/middleware/auth.php';
               </div>
             </td>
           </tr>`;
-        }).join('') || `<tr><td colspan="10"><div class="empty-state"><i class="bi bi-buildings"></i>No manufacturers match.</div></td></tr>`;
+        }).join('') || `<tr><td colspan="11"><div class="empty-state"><i class="bi bi-buildings"></i>No manufacturers match.</div></td></tr>`;
         $('#mfPageInfo').textContent = `Showing ${slice.length ? (state.page - 1) * state.per + 1 : 0}–${(state.page - 1) * state.per + slice.length} of ${list.length}`;
         $('#mfPager').innerHTML = Array.from({ length: pages }, (_, i) =>
           `<li class="page-item ${i + 1 === state.page ? 'active' : ''}"><button class="page-link" type="button" data-pg="${i + 1}">${i + 1}</button></li>`).join('');
@@ -301,14 +344,16 @@ require __DIR__ . '/middleware/auth.php';
 
       function openForm(name, id) {
         editing = name || null;
-        const p = editing ? profileOf(editing) : { id: null, contact: '', phone: '', gstin: '', address: '' };
+        const p = editing ? profileOf(editing) : { id: null, contact: '', email: '', phone: '', gstin: '', address: '', status: 'Active' };
         editingId = id || p.id || null;
         $('#mfFormTitle').textContent = editing ? 'Edit manufacturer' : 'Add Manufacturer';
         $('#mfName').value = editing || '';
         $('#mfContact').value = p.contact;
-        $('#mfPhone').value = p.phone;
+        $('#mfEmail').value = p.email || '';
+        $('#mfPhone').value = p.phone ? formatPhone(p.phone) : '';
         $('#mfGstin').value = p.gstin;
         $('#mfAddress').value = p.address;
+        $('#mfStatus').value = statusOf(p.status);
         holdSearch();
         new bootstrap.Modal($('#mfFormModal')).show();
         setTimeout(() => $('#mfName').focus(), 200);
@@ -320,10 +365,11 @@ require __DIR__ . '/middleware/auth.php';
         $('#mfViewBody').innerHTML = `
           <div class="p-3 border-bottom">
             <div class="row g-3">
-              <div class="col-md-3"><div class="kpi-label">Contact person</div><div class="fw-semibold">${dash(p.contact)}</div></div>
+              <div class="col-md-3"><div class="kpi-label">Contact person</div><div class="fw-semibold">${contactCell(p)}</div></div>
               <div class="col-md-3"><div class="kpi-label">Phone</div><div class="fw-semibold">${phoneCell(p.phone)}</div></div>
               <div class="col-md-3"><div class="kpi-label">GSTIN</div><div class="fw-semibold">${p.gstin ? `<span class="mf-gstin">${MF.esc(p.gstin)}</span>` : '<span class="text-2">—</span>'}</div></div>
-              <div class="col-md-3"><div class="kpi-label">Address</div><div class="fw-semibold">${dash(p.address)}</div></div>
+              <div class="col-md-3"><div class="kpi-label">Status</div><div class="fw-semibold">${statusBadge(p.status)}</div></div>
+              <div class="col-12"><div class="kpi-label">Address</div><div class="fw-semibold">${dash(p.address)}</div></div>
             </div>
           </div>
           <div class="p-3 border-bottom d-flex flex-wrap gap-4">
@@ -351,10 +397,15 @@ require __DIR__ . '/middleware/auth.php';
           MF.toast('GSTIN must be 15 characters, like 27AABCU9603R1ZM.', 'err', 'Validation');
           return;
         }
+        if (profile.email && !EMAIL_RE.test(profile.email)) {
+          MF.toast('Enter a valid email address.', 'err', 'Validation');
+          return;
+        }
         if (profile.phone && profile.phone.replace(/\D/g, '').length < 6) {
           MF.toast('Enter a valid phone number.', 'err', 'Validation');
           return;
         }
+        $('#mfPhone').value = profile.phone;
         const dup = allNames().some((n) => n.toLowerCase() === next.toLowerCase() && n !== editing);
         if (dup) { MF.toast('A manufacturer with that name already exists.', 'warn', 'Duplicate'); return; }
         const renamed = editing && editing !== next;
@@ -365,9 +416,11 @@ require __DIR__ . '/middleware/auth.php';
             const body = {
               name: next,
               contact_person: profile.contact,
+              email: profile.email,
               phone: profile.phone,
               gstin: profile.gstin,
-              address: profile.address
+              address: profile.address,
+              status: profile.status
             };
             if (editing) await MF.Api.put('manufacturers.php', { id: id || 0, from: editing, ...body });
             else await MF.Api.post('manufacturers.php', body);
@@ -430,18 +483,19 @@ require __DIR__ . '/middleware/auth.php';
       $('#mfAdd').addEventListener('click', () => openForm(null));
       $('#mfSave').addEventListener('click', save);
       $('#mfName').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
+      $('#mfPhone').addEventListener('blur', () => { $('#mfPhone').value = formatPhone($('#mfPhone').value); });
       $('#mfExport').addEventListener('click', () => {
         const q = state.q.toLowerCase();
         MF.exportCSV('manufacturers.csv',
-          ['Manufacturer', 'Contact person', 'Phone', 'GSTIN', 'Address', 'Medicines', 'Categories', 'Stock', 'MRP value'],
+          ['Manufacturer', 'Contact person', 'Email', 'Phone', 'GSTIN', 'Address', 'Status', 'Medicines', 'Categories', 'Stock', 'MRP value'],
           allNames().filter((n) => {
             if (!q) return true;
             const p = profileOf(n);
-            return [n, p.contact, p.phone, p.gstin, p.address].join(' ').toLowerCase().includes(q);
+            return [n, p.contact, p.email, p.phone, p.gstin, p.address, p.status].join(' ').toLowerCase().includes(q);
           }).map((n) => {
             const s = rowStats(n);
             const p = profileOf(n);
-            return [n, p.contact, p.phone, p.gstin, p.address, s.meds.length, s.cats.join(', '), s.stock, s.mrp];
+            return [n, p.contact, p.email, p.phone, p.gstin, p.address, p.status, s.meds.length, s.cats.join(', '), s.stock, s.mrp];
           }));
       });
 
