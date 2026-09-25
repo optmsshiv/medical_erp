@@ -3,7 +3,7 @@ session_start();
 require dirname(__DIR__, 2) . '/middleware/tenant.php';
 require dirname(__DIR__, 2) . '/core/Auth.php';
 require dirname(__DIR__, 2) . '/core/Json.php';
-require dirname(__DIR__, 2) . '/models/Manufacturer.php';
+require dirname(__DIR__, 2) . '/models/Category.php';
 
 if (!Auth::check()) {
     Json::error('Not authenticated.', 401);
@@ -11,14 +11,14 @@ if (!Auth::check()) {
 
 $method = $_SERVER['REQUEST_METHOD'];
 
-/** Find another manufacturer with the same name, if any (excludes $excludeId on edit). */
+/** Find another category with the same name, if any (excludes $excludeId on edit). */
 function findConflict(string $name, ?int $excludeId = null): ?array
 {
     $name = trim($name);
     if ($name === '') {
         return null;
     }
-    $row = Manufacturer::first('name', '=', $name);
+    $row = Category::first('name', '=', $name);
     if ($row && ($excludeId === null || (int) $row['id'] !== $excludeId)) {
         return $row;
     }
@@ -28,13 +28,13 @@ function findConflict(string $name, ?int $excludeId = null): ?array
 switch ($method) {
     case 'GET':
         // medicine_count lets the frontend show usage and warn before a delete
-        // that's about to hit the FK guard on medicines.manufacturer_id.
-        Json::ok(['data' => Manufacturer::query(
-            'SELECT mf.*, COUNT(m.id) AS medicine_count
-             FROM manufacturers mf
-             LEFT JOIN medicines m ON m.manufacturer_id = mf.id
-             GROUP BY mf.id
-             ORDER BY mf.name'
+        // that's about to hit the FK guard on medicines.category_id.
+        Json::ok(['data' => Category::query(
+            'SELECT c.*, COUNT(m.id) AS medicine_count
+             FROM categories c
+             LEFT JOIN medicines m ON m.category_id = c.id
+             GROUP BY c.id
+             ORDER BY c.name'
         )]);
         break;
 
@@ -43,13 +43,13 @@ switch ($method) {
         $name = trim($input['name'] ?? '');
 
         if ($name === '') {
-            Json::error('Manufacturer name is required.', 422);
+            Json::error('Category name is required.', 422);
         }
         if (findConflict($name)) {
-            Json::error("A manufacturer named \"{$name}\" already exists.", 422);
+            Json::error("A category named \"{$name}\" already exists.", 422);
         }
 
-        $id = Manufacturer::create(['name' => $name]);
+        $id = Category::create(['name' => $name]);
         Json::ok(['id' => $id]);
         break;
 
@@ -58,33 +58,33 @@ switch ($method) {
         $id = (int) ($input['id'] ?? 0);
         $name = trim($input['name'] ?? '');
 
-        if (!$id || !Manufacturer::find($id)) {
-            Json::error('Manufacturer not found.', 404);
+        if (!$id || !Category::find($id)) {
+            Json::error('Category not found.', 404);
         }
         if ($name === '') {
-            Json::error('Manufacturer name is required.', 422);
+            Json::error('Category name is required.', 422);
         }
         if ($conflict = findConflict($name, $id)) {
-            Json::error("A manufacturer named \"{$name}\" already exists.", 422);
+            Json::error("A category named \"{$name}\" already exists.", 422);
         }
 
-        Manufacturer::update($id, ['name' => $name]);
+        Category::update($id, ['name' => $name]);
         Json::ok();
         break;
 
     case 'DELETE':
         $id = (int) ($_GET['id'] ?? 0);
 
-        if (!$id || !Manufacturer::find($id)) {
-            Json::error('Manufacturer not found.', 404);
+        if (!$id || !Category::find($id)) {
+            Json::error('Category not found.', 404);
         }
 
         try {
-            Manufacturer::delete($id);
+            Category::delete($id);
             Json::ok();
         } catch (\PDOException $e) {
             if ($e->getCode() === '23000') {
-                Json::error('This manufacturer is assigned to one or more medicines and can\'t be deleted. Reassign them first.', 409);
+                Json::error('This category is assigned to one or more medicines and can\'t be deleted. Reassign them first.', 409);
             }
             throw $e;
         }

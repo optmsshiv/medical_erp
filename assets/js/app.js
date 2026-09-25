@@ -274,61 +274,73 @@ window.MF = window.MF || {};
      The group containing the active page auto-expands. */
   const NAV = [
     { label: 'Dashboard', icon: 'grid-1x2-fill', page: 'dashboard', href: 'dashboard.php' },
-    { label: 'Sales', icon: 'cart-check', items: [
-      { label: 'Retail POS', icon: 'cart3', page: 'retail-pos', href: 'retail-pos.php' },
-      { label: 'Wholesale Billing', icon: 'receipt', page: 'wholesale-billing', href: 'wholesale-billing.php' },
-      { label: 'Sales Invoices', icon: 'file-earmark-text', href: 'reports.php?tab=sales&view=invoices' },
-      { label: 'Sales Returns', icon: 'arrow-counterclockwise', page: 'sales-return', href: 'sales-return.php' },
-      { label: 'Customers', icon: 'people', page: 'customers', href: 'customers.php' },
-      { label: 'Customer Dues', icon: 'cash-stack', href: 'reports.php?tab=dues&party=customer' }
-    ]},
-    { label: 'Purchase', icon: 'bag-plus', items: [
-      { label: 'New Purchase', icon: 'bag-plus-fill', page: 'purchase', href: 'purchase.php' },
-      { label: 'Purchase Invoices', icon: 'file-earmark-ruled', href: 'reports.php?tab=purchase&view=invoices' },
-      { label: 'Purchase Returns', icon: 'box-arrow-in-left', page: 'purchase-return', href: 'purchase-return.php' },
-      { label: 'Suppliers', icon: 'truck', page: 'suppliers', href: 'suppliers.php' },
-      { label: 'Supplier Dues', icon: 'wallet2', href: 'reports.php?tab=dues&party=supplier' }
-    ]},
-    { label: 'Inventory', icon: 'boxes', items: [
-      { label: 'Products / Medicines', icon: 'capsule', page: 'medicine-master', href: 'medicine-master.php' },
-      { label: 'Stock Overview', icon: 'box-seam', href: 'reports.php?tab=stock&view=overview' },
-      { label: 'Batch Management', icon: 'collection', page: 'batch-management', href: 'batch-management.php' },
-      { label: 'Expiry Management', icon: 'calendar2-x', page: 'expiry-management', href: 'expiry-management.php' },
-      { label: 'Low Stock', icon: 'exclamation-triangle', href: 'medicine-master.php?stock=low' },
-      { label: 'Stock Adjustment', icon: 'sliders', page: 'stock-adjustment', href: 'stock-adjustment.php' },
-      { label: 'Stock Transfer', icon: 'arrow-left-right', page: 'stock-transfer', href: 'stock-transfer.php' }
-    ]},
+    {
+      label: 'Sales', icon: 'cart-check', items: [
+        { label: 'Retail POS', icon: 'cart3', page: 'retail-pos', href: 'retail-pos.php' },
+        { label: 'Wholesale Billing', icon: 'receipt', page: 'wholesale-billing', href: 'wholesale-billing.php' },
+        { label: 'Sales Invoices', icon: 'file-earmark-text', href: 'reports.php?tab=sales&view=invoices' },
+        { label: 'Sales Returns', icon: 'arrow-counterclockwise', page: 'sales-return', href: 'sales-return.php' },
+        { label: 'Customers', icon: 'people', page: 'customers', href: 'customers.php' },
+        { label: 'Customer Dues', icon: 'cash-stack', href: 'reports.php?tab=dues&party=customer' }
+      ]
+    },
+    {
+      label: 'Purchase', icon: 'bag-plus', items: [
+        { label: 'New Purchase', icon: 'bag-plus-fill', page: 'purchase', href: 'purchase.php' },
+        { label: 'Purchase Invoices', icon: 'file-earmark-ruled', href: 'reports.php?tab=purchase&view=invoices' },
+        { label: 'Purchase Returns', icon: 'box-arrow-in-left', page: 'purchase-return', href: 'purchase-return.php' },
+        { label: 'Suppliers', icon: 'truck', page: 'suppliers', href: 'suppliers.php' },
+        { label: 'Supplier Dues', icon: 'wallet2', href: 'reports.php?tab=dues&party=supplier' }
+      ]
+    },
+    {
+      label: 'Inventory', icon: 'boxes', items: [
+        { label: 'Products / Medicines', icon: 'capsule', page: 'medicine-master', href: 'medicine-master.php' },
+        { label: 'Stock Overview', icon: 'box-seam', href: 'reports.php?tab=stock&view=overview' },
+        { label: 'Batch Management', icon: 'collection', page: 'batch-management', href: 'batch-management.php' },
+        { label: 'Expiry Management', icon: 'calendar2-x', page: 'expiry-management', href: 'expiry-management.php' },
+        { label: 'Low Stock', icon: 'exclamation-triangle', href: 'medicine-master.php?stock=low' },
+        { label: 'Stock Adjustment', icon: 'sliders', page: 'stock-adjustment', href: 'stock-adjustment.php' },
+        { label: 'Stock Transfer', icon: 'arrow-left-right', page: 'stock-transfer', href: 'stock-transfer.php' }
+      ]
+    },
     {
       label: 'Pharmacy', icon: 'heart-pulse', items: [
         { label: 'Prescriptions', icon: 'file-medical', page: 'prescriptions', href: 'prescriptions.php' },
         { label: 'Doctors', icon: 'heart-pulse', page: 'doctors', href: 'doctors.php' },
-        { label: 'Manufacturers', icon: 'buildings', stub: true },
-        { label: 'Medicine Categories', icon: 'tags', stub: true }
-      ]},
+        { label: 'Manufacturers', icon: 'buildings', page: 'manufacturers', href: 'manufacturers.php' },
+        { label: 'Medicine Categories', icon: 'tags', page: 'categories', href: 'categories.php' }
+      ]
+    },
     {
       label: 'Accounts', icon: 'wallet2', items: [
         { label: 'Payments', icon: 'credit-card-2-front', stub: true },
         { label: 'Expenses', icon: 'cash-coin', page: 'expenses', href: 'expenses.php' },
         { label: 'Cash Book', icon: 'journal-text', stub: true },
         { label: 'GST', icon: 'percent', href: 'reports.php?tab=gst&view=summary' }
-      ]},
-    { label: 'Reports', icon: 'graph-up', items: [
-      { label: 'Sales Reports', icon: 'graph-up', href: 'reports.php?tab=sales' },
-      { label: 'Purchase Reports', icon: 'receipt-cutoff', href: 'reports.php?tab=purchase' },
-      { label: 'Stock Reports', icon: 'box-seam', href: 'reports.php?tab=stock' },
-      { label: 'Expiry Reports', icon: 'calendar-x', href: 'reports.php?tab=expiry' },
-      { label: 'Profit Reports', icon: 'currency-rupee', href: 'reports.php?tab=profit' },
-      { label: 'GST Reports', icon: 'percent', href: 'reports.php?tab=gst' },
-      { label: 'Due Reports', icon: 'clock-history', href: 'reports.php?tab=dues' }
-    ]},
-    { label: 'Administration', icon: 'gear', items: [
-      { label: 'Users', icon: 'person-badge', href: 'settings.php?tab=users' },
-      { label: 'Roles & Permissions', icon: 'shield-lock', href: 'settings.php?tab=roles' },
-      { label: 'Store Settings', icon: 'shop', href: 'settings.php?tab=store' },
-      { label: 'Invoice Settings', icon: 'file-earmark-sliders', href: 'settings.php?tab=invoice' },
-      { label: 'Tax Settings', icon: 'calculator', href: 'settings.php?tab=tax' },
-      { label: 'Audit Logs', icon: 'journal-check', href: 'settings.php?tab=audit' }
-    ]}
+      ]
+    },
+    {
+      label: 'Reports', icon: 'graph-up', items: [
+        { label: 'Sales Reports', icon: 'graph-up', href: 'reports.php?tab=sales' },
+        { label: 'Purchase Reports', icon: 'receipt-cutoff', href: 'reports.php?tab=purchase' },
+        { label: 'Stock Reports', icon: 'box-seam', href: 'reports.php?tab=stock' },
+        { label: 'Expiry Reports', icon: 'calendar-x', href: 'reports.php?tab=expiry' },
+        { label: 'Profit Reports', icon: 'currency-rupee', href: 'reports.php?tab=profit' },
+        { label: 'GST Reports', icon: 'percent', href: 'reports.php?tab=gst' },
+        { label: 'Due Reports', icon: 'clock-history', href: 'reports.php?tab=dues' }
+      ]
+    },
+    {
+      label: 'Administration', icon: 'gear', items: [
+        { label: 'Users', icon: 'person-badge', href: 'settings.php?tab=users' },
+        { label: 'Roles & Permissions', icon: 'shield-lock', href: 'settings.php?tab=roles' },
+        { label: 'Store Settings', icon: 'shop', href: 'settings.php?tab=store' },
+        { label: 'Invoice Settings', icon: 'file-earmark-sliders', href: 'settings.php?tab=invoice' },
+        { label: 'Tax Settings', icon: 'calculator', href: 'settings.php?tab=tax' },
+        { label: 'Audit Logs', icon: 'journal-check', href: 'settings.php?tab=audit' }
+      ]
+    }
   ];
   const allNavItems = NAV.flatMap((s) => s.items || [s]);
 
@@ -541,7 +553,7 @@ window.MF = window.MF || {};
         <div class="sr-group-label">Try searching</div>
         <div class="d-flex flex-wrap gap-2">
           ${['Paracetamol', 'AZI25', 'INV-26-0124', 'MediMart', 'Cipla'].map((s) =>
-            `<button class="btn btn-light-mf btn-sm mf-srch-suggest">${s}</button>`).join('')}
+        `<button class="btn btn-light-mf btn-sm mf-srch-suggest">${s}</button>`).join('')}
         </div>
         <div class="empty-state pb-0 pt-4"><i class="bi bi-search"></i>Search across medicines, batches, invoices, customers and suppliers.</div>`;
       box.querySelectorAll('.mf-srch-suggest').forEach((b) => b.addEventListener('click', () => {
