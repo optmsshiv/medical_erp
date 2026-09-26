@@ -20,7 +20,7 @@ window.MF = window.MF || {};
      MF.Api.live = true  → fetch() against PHP REST endpoints (assets/js/config.js)
      MF.Api.live = false → offline demo mode (all data from assets/js/data.js)
      Endpoints: auth/login · bootstrap · medicines · batches · customers ·
-     suppliers · payments · pos/checkout · wholesale/invoice · purchases ·
+     suppliers · payments · pos/checkout · wholesale/invoice · sales-invoices · purchases ·
      returns/sales · returns/purchase · users · settings
      ---------------------------------------------------------------------- */
   MF.Config = window.MF_CONFIG || { backend: false, apiBase: 'api/v1' };
@@ -127,7 +127,7 @@ window.MF = window.MF || {};
 
   MF.badge = (label, tone) => `<span class="badge badge-soft-${tone}">${label}</span>`;
   MF.statusBadge = (s) =>
-    MF.badge(s, { Paid: 'success', Active: 'success', Due: 'danger', Expired: 'danger', Partial: 'warning', 'Low Stock': 'warning', 'Near Expiry': 'warning', Credit: 'warning', Inactive: 'secondary' }[s] || 'secondary');
+    MF.badge(s, { Paid: 'success', Active: 'success', Due: 'danger', Expired: 'danger', Partial: 'warning', 'Low Stock': 'warning', 'Near Expiry': 'warning', Credit: 'warning', Inactive: 'secondary', Returned: 'danger', 'Part returned': 'warning' }[s] || 'secondary');
 
   MF.stockBadge = (med) => {
     const st = MF.stockOf(med.id);
@@ -278,7 +278,7 @@ window.MF = window.MF || {};
       label: 'Sales', icon: 'cart-check', items: [
         { label: 'Retail POS', icon: 'cart3', page: 'retail-pos', href: 'retail-pos.php' },
         { label: 'Wholesale Billing', icon: 'receipt', page: 'wholesale-billing', href: 'wholesale-billing.php' },
-        { label: 'Sales Invoices', icon: 'file-earmark-text', href: 'reports.php?tab=sales&view=invoices' },
+        { label: 'Sales Invoices', icon: 'file-earmark-text', page: 'sales-invoices', href: 'sales-invoices.php' },
         { label: 'Sales Returns', icon: 'arrow-counterclockwise', page: 'sales-return', href: 'sales-return.php' },
         { label: 'Customers', icon: 'people', page: 'customers', href: 'customers.php' },
         { label: 'Customer Dues', icon: 'cash-stack', href: 'reports.php?tab=dues&party=customer' }
@@ -601,7 +601,7 @@ window.MF = window.MF || {};
     }
     if (invs.length) {
       html += `<div class="sr-group-label">Invoices</div>` + invs.map((i) => `
-        <div class="sr-item" data-go="reports.php?tab=sales">
+        <div class="sr-item" data-go="sales-invoices.php?invoice=${encodeURIComponent(i.no)}">
           ${thumb('file-earmark-text', 'success')}
           <div class="flex-grow-1">
             <div class="fw-semibold" style="font-size:.8rem">${i.no} <span class="text-2 small-xs">· ${MF.esc(i.customer)}</span></div>
