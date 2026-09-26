@@ -20,7 +20,7 @@ window.MF = window.MF || {};
      MF.Api.live = true  → fetch() against PHP REST endpoints (assets/js/config.js)
      MF.Api.live = false → offline demo mode (all data from assets/js/data.js)
      Endpoints: auth/login · bootstrap · medicines · batches · customers ·
-     suppliers · payments · pos/checkout · wholesale/invoice · sales-invoices · supplier-dues · purchases ·
+     suppliers · payments · pos/checkout · wholesale/invoice · sales-invoices · purchases ·
      returns/sales · returns/purchase · users · settings
      ---------------------------------------------------------------------- */
   MF.Config = window.MF_CONFIG || { backend: false, apiBase: 'api/v1' };
@@ -290,7 +290,7 @@ window.MF = window.MF || {};
         { label: 'Purchase Invoices', icon: 'file-earmark-ruled', href: 'reports.php?tab=purchase&view=invoices' },
         { label: 'Purchase Returns', icon: 'box-arrow-in-left', page: 'purchase-return', href: 'purchase-return.php' },
         { label: 'Suppliers', icon: 'truck', page: 'suppliers', href: 'suppliers.php' },
-        { label: 'Supplier Dues', icon: 'wallet2', page: 'supplier-dues', href: 'supplier-dues.php' },
+        { label: 'Supplier Dues', icon: 'wallet2', href: 'reports.php?tab=dues&party=supplier' }
       ]
     },
     {
