@@ -238,6 +238,7 @@ require __DIR__ . '/middleware/auth.php';
   document.addEventListener('DOMContentLoaded', () => {
     (function () {
       'use strict';
+      const D = window.MF_DATA || {};   /* other pages pull the same handle (see pos.js) */
       const $ = (s, r) => (r || document).querySelector(s);
       const $$ = (s, r) => [...(r || document).querySelectorAll(s)];
       const todayStr = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
