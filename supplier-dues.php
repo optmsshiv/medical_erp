@@ -325,7 +325,7 @@ require __DIR__ . '/middleware/auth.php';
             <td class="text-end num">${MF.fmt(r.amount_paid)}</td>
             <td class="text-end ${dueCls}">${MF.fmt(r.outstanding)}</td>
             <td>${oldestCell(r)}</td>
-            <td>${statusBadge(r.position)}${r.position === 'Advance' && advOf(r) > 0 ? `<div class="${cls}-muted num" style="font-size:.68rem">+₹${MF.fmt(advOf(r))}</div>` : ''}</td>
+            <td>${statusBadge(r.position)}${r.position === 'Advance' && advOf(r) > 0 ? `<div class="sd-muted num" style="font-size:.68rem">+₹${MF.fmt(advOf(r))}</div>` : ''}</td>
             <td class="text-end">
               <div class="dropdown">
                 <button type="button" class="btn btn-icon btn-light-mf sd-kebab" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-label="Actions"><i class="bi bi-three-dots-vertical"></i></button>

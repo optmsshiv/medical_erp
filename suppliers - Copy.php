@@ -179,7 +179,7 @@ require __DIR__ . '/middleware/auth.php';
             <td class="num text-2">${MF.esc(s.dlNo || '—')}</td>
             <td class="text-end num">${MF.fmt(s.totalPurchases)}</td>
             <td class="text-end num text-success">${MF.fmt(s.paid)}</td>
-            <td class="text-end num fw-semibold ${s.due ? 'text-danger' : ''}">${MF.fmt(s.due)}</td>
+            <td class="text-end num fw-semibold ${s.due ? 'text-danger' : ''}">${MF.fmt(s.due)}${!s.due && s.advance > 0 ? `<div class="text-2" style="font-size:.68rem;font-weight:600">ADV +₹${MF.fmt(s.advance)}</div>` : ''}</td>
             <td class="text-end row-actions"><button class="btn btn-sm btn-mf-soft" data-view="${s.id}">Profile</button></td>
           </tr>`).join('') || `<tr><td colspan="8"><div class="empty-state"><i class="bi bi-truck"></i>No suppliers match the filters.</div></td></tr>`;
         $('#suBody').querySelectorAll('[data-view]').forEach((b) => b.addEventListener('click', () => openProfile(b.dataset.view)));
@@ -238,11 +238,31 @@ require __DIR__ . '/middleware/auth.php';
           bootstrap.Modal.getInstance($('#suProfileModal')).hide();
           MF.toast(`${MF.fmt(amt)} paid to ${current.name}.`, 'success', 'Payment recorded');
           await MF.rehydrate();
-          renderKpis(); render();
+          await syncDues();
         } catch (err) {
           MF.toast(err.message || 'Could not record payment.', 'danger');
         }
       });
+
+      /* Ledger truth: due/paid/advance recomputed by the dues endpoint from
+         the very payments table the Supplier Dues ledger reads — keeps this
+         master page and the Dues page in lock-step instead of drifting. */
+      async function syncDues() {
+        try {
+          const res = await MF.Api.get('supplier-dues.php');
+          const rows = (res && res.data && res.data.suppliers) || [];
+          const byId = new Map(rows.map((r) => [String(r.supplier_id), r]));
+          D.suppliers.forEach((s) => {
+            const r = byId.get(String(s.id));
+            if (!r) return;
+            s.due = Math.round((+r.outstanding || 0) * 100) / 100;
+            s.advance = Math.round((+r.advance || 0) * 100) / 100;
+            if (r.billed != null) s.totalPurchases = Math.round((+r.billed || 0) * 100) / 100;
+            s.paid = Math.round(Math.max(+r.amount_paid || 0, +r.payments || 0) * 100) / 100;
+          });
+          renderKpis(); render();
+        } catch (e) { /* dues endpoint unreachable — local numbers remain */ }
+      }
 
       $('#suAddBtn').addEventListener('click', () => {
         ['suName', 'suGstin', 'suDl', 'suPhone', 'suAddr'].forEach((id) => $('#' + id).value = '');
@@ -267,6 +287,7 @@ require __DIR__ . '/middleware/auth.php';
 
       ['suSearch', 'suDue'].forEach((id) => $('#' + id).addEventListener('input', render));
       renderKpis(); render();
+      syncDues();
     })();
     });
   </script>

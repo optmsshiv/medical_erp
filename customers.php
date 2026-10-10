@@ -70,6 +70,26 @@ require __DIR__ . '/middleware/auth.php';
     .cu-busy::after { content:""; position:absolute; left:0; bottom:0; height:3px; width:38%; background:var(--mf-primary); animation:cu-slide .8s ease-in-out infinite; }
     .btn-mf.cu-busy::after { background:#fff; }
     @keyframes cu-slide { from { transform:translateX(-120%); } to { transform:translateX(320%); } }
+    /* ------- Customer ledger premium pass ------- */
+    .cu-table { table-layout: fixed; width: 100%; }
+    .cu-minw0 { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .cu-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+    .cu-person { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .cu-av { width: 34px; height: 34px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; font-size: .76rem; font-weight: 800; letter-spacing: .02em; flex: 0 0 34px; }
+    .cu-av.retail { background: #E6F1EE; color: #0F4D42; }
+    .cu-av.wholesale, .cu-av.business { background: #E0F2FE; color: #0369A1; }
+    .cu-av.hospital { background: #F1EBFC; color: #6D28D9; }
+    .cu-av.clinic { background: #FEF3E2; color: #B45309; }
+    .cu-av.others, .cu-av.other { background: #F3F4F6; color: #4B5563; }
+    .cu-nm { font-weight: 650; color: #1B2430; font-size: .88rem; }
+    .cu-sub { font-size: .72rem; color: #8B9BB0; font-weight: 550; display: block; }
+    .cu-num { font-variant-numeric: tabular-nums; }
+    .cu-mono { font-size: .8rem; font-weight: 650; letter-spacing: .02em; color: #41546E; white-space: nowrap; }
+    .cu-time { font-size: .7rem; color: #8B9BB0; font-weight: 600; white-space: nowrap; margin-left: 4px; }
+    .cu-adv { font-size: .68rem; font-weight: 700; color: #0369A1; white-space: nowrap; }
+    .cu-bar { height: 4px; width: 84px; max-width: 100%; border-radius: 4px; background: #EDF1F4; margin: 5px 0 0 auto; overflow: hidden; }
+    .cu-bar i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #34B399, #176B5B); }
+    @media (max-width: 1199.98px) { .cu-h-lg { display: none; } }
   </style>
 </head>
 <body data-page="customers">
@@ -119,12 +139,12 @@ require __DIR__ . '/middleware/auth.php';
 
         <div class="card-mf">
           <div class="table-scroll" style="max-height:none">
-            <table class="table table-mf">
+            <table class="table table-mf cu-table">
               <thead>
                 <tr>
-                  <th>Customer Name</th><th>Phone</th><th>GSTIN</th><th>Address</th>
-                  <th class="text-end">Total Sales</th><th class="text-end">Paid</th><th class="text-end">Due</th>
-                  <th>Last Purchase</th><th class="text-end">Actions</th>
+                  <th style="width:20%">Customer Name</th><th style="width:12%">Phone</th><th class="cu-h-lg" style="width:11%">GSTIN</th><th class="cu-h-lg" style="width:16%">Address</th>
+                  <th class="text-end" style="width:9%">Total Sales</th><th class="text-end" style="width:9%">Paid</th><th class="text-end" style="width:8%">Due</th>
+                  <th style="width:9%">Last Purchase</th><th class="text-end" style="width:6%">Actions</th>
                 </tr>
               </thead>
               <tbody id="cuBody"></tbody>
@@ -368,9 +388,9 @@ require __DIR__ . '/middleware/auth.php';
           ['Total Customers', l.length, 'primary', 'people'],
           ['Lifetime Sales', MF.fmt(l.reduce((s, c) => s + c.totalSales, 0)), 'success', 'graph-up-arrow'],
           ['Outstanding Dues', MF.fmt(bizDue + retDue), 'danger', 'cash-stack'],
+          ['Advance parked', MF.fmt(l.reduce((s, c) => s + (c.advance || 0), 0)), 'info', 'safe'],
           ['Business receivable', MF.fmt(bizDue), 'primary', 'briefcase'],
-          ['Retail receivable', MF.fmt(retDue), 'warning', 'person-check'],
-          ['Customers with Due', l.filter((c) => c.due > 0).length, 'warning', 'exclamation-triangle']
+          ['Retail receivable', MF.fmt(retDue), 'warning', 'person-check']
         ].map(([lbl, v, tone, icon]) => `
           <div class="col-6 col-md-4 col-xl-2"><div class="card-mf kpi-card h-100">
             <div class="kpi-icon tone-${tone}"><i class="bi bi-${icon}"></i></div>
@@ -389,16 +409,24 @@ require __DIR__ . '/middleware/auth.php';
           const kind = typeLabel(c.type);
           const tone = typeKey(c.type);
           const gstin = c.gstin || '';
+          const city = typeof cityName === 'function' ? cityName(addr) : '';
+          const initials = String(c.name || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+          const paidBase = Math.max(0, (c.totalSales || 0) - (c.due || 0));
+          const settlePct = c.totalSales > 0 ? Math.min(100, Math.round((Math.min(c.totalSales, Math.max(c.paid || 0, paidBase)) / c.totalSales) * 100)) : null;
+          const lpAt = c.lastPurchaseAt || c.lastPurchase || '';
+          const lpDate = lpAt ? MF.fmtDate(lpAt) : '';
+          const lpHm = String(lpAt).slice(11, 16);
+          const lpTime = (String(lpAt).length > 10 && lpHm !== '00:00') ? lpHm : '';
           return `
           <tr>
-            <td><div class="td-title">${MF.esc(c.name)}</div>${biz ? `<div class="td-sub">${MF.esc(biz)}</div>` : ''}</td>
+            <td><div class="cu-person"><span class="cu-av ${tone}">${MF.esc(initials)}</span><span class="cu-minw0"><span class="cu-nm cu-ellipsis" title="${MF.esc(c.name)}">${MF.esc(c.name)}</span>${biz ? `<span class="cu-sub cu-ellipsis" title="${MF.esc(biz)}">${MF.esc(biz)}</span>` : ''}</span></div></td>
             <td><div class="num">${MF.esc(c.phone || '—')}</div>${kind && kind !== '—' ? `<span class="cu-type ${tone}">${MF.esc(kind)}</span>` : ''}</td>
-            <td class="num">${gstin ? MF.esc(gstin) : '<span class="text-2">—</span>'}</td>
-            <td>${addr ? `<span class="cu-addr" title="${MF.esc(addr)}">${MF.esc(addr)}</span>` : '<span class="text-2">—</span>'}</td>
-            <td class="text-end num">${MF.fmt(c.totalSales)}</td>
-            <td class="text-end num text-success">${MF.fmt(c.paid)}</td>
-            <td class="text-end num fw-semibold ${c.due ? 'text-danger' : ''}">${MF.fmt(c.due)}</td>
-            <td class="num text-2">${c.lastPurchase ? MF.fmtDate(c.lastPurchase) : '—'}</td>
+            <td class="cu-h-lg">${gstin ? `<span class="cu-mono">${MF.esc(gstin)}</span>` : '<span class="text-2">—</span>'}</td>
+            <td class="cu-h-lg">${addr ? `<span class="cu-addr" title="${MF.esc(addr)}">${MF.esc(addr)}</span>` : '<span class="text-2">—</span>'}${city ? `<div class="cu-sub">${MF.esc(city)}</div>` : ''}</td>
+            <td class="text-end cu-num">${MF.fmt(c.totalSales)}</td>
+            <td class="text-end cu-num text-success">${MF.fmt(c.paid)}${settlePct != null ? `<div class="cu-bar"><i style="width:${settlePct}%"></i></div>` : ''}</td>
+            <td class="text-end cu-num fw-semibold ${c.due > 0 ? 'text-danger' : ''}">${MF.fmt(c.due)}${!(c.due > 0) && (c.advance || 0) > 0 ? `<div class="cu-adv">ADV +₹${MF.fmt(c.advance)}</div>` : ''}</td>
+            <td class="num">${lpDate ? `${lpDate}${lpTime ? `<span class="cu-time">${lpTime}</span>` : ''}` : '<span class="text-2">—</span>'}</td>
             <td class="text-end row-actions">
               <button class="btn btn-sm btn-mf-soft" data-view="${c.id}">Profile</button>
             </td>
@@ -514,7 +542,7 @@ require __DIR__ . '/middleware/auth.php';
           MF.toast(`${MF.fmt(amt)} received from ${current.name}.`, 'success', 'Payment recorded');
           await MF.rehydrate();
           applySaved();
-          renderKpis(); render();
+          await syncDues();
         } catch (err) {
           MF.toast(err.message || 'Could not record payment.', 'danger');
         } finally {
@@ -730,6 +758,26 @@ require __DIR__ . '/middleware/auth.php';
         }
       });
 
+      /* Ledger truth — same principle as the suppliers page: due/advance
+         recomputed by customer-dues.php from the shared payments table. */
+      async function syncDues() {
+        if (!MF.Api.live) return;
+        try {
+          const res = await MF.Api.get('customer-dues.php');
+          const rows = (res && res.data && res.data.customers) || [];
+          const byId = new Map(rows.map((r) => [String(r.customer_id), r]));
+          (D.customers || []).forEach((c) => {
+            const r = byId.get(String(c.id));
+            if (!r) { c.due = 0; c.advance = 0; return; }
+            c.due = Math.round((+r.outstanding || 0) * 100) / 100;
+            c.advance = Math.round((+r.advance || 0) * 100) / 100;
+            if (r.billed != null) c.totalSales = Math.round((+r.billed || 0) * 100) / 100;
+            c.paid = Math.round(Math.max(+r.amount_paid || 0, +r.payments || 0) * 100) / 100;
+          });
+          renderKpis(); render();
+        } catch (e) { /* local figures remain */ }
+      }
+
       ['cuSearch', 'cuDue'].forEach((id) => $('#' + id).addEventListener('input', render));
 
       async function loadProfiles() {
@@ -740,7 +788,7 @@ require __DIR__ . '/middleware/auth.php';
           rows.forEach((row) => {
             const hit = (D.customers || []).find((c) => String(c.id) === String(row.id));
             if (!hit) return;
-            ['name', 'phone', 'address', 'type', 'gstin', 'business_name', 'dl_no', 'credit_limit', 'credit_days'].forEach((key) => {
+            ['name', 'phone', 'address', 'type', 'gstin', 'business_name', 'dl_no', 'credit_limit', 'credit_days', 'lastPurchase', 'lastPurchaseAt'].forEach((key) => {
               if (Object.prototype.hasOwnProperty.call(row, key) && row[key] != null && row[key] !== '') hit[key] = row[key];
             });
             if (row.businessName && !hit.business_name) hit.business_name = row.businessName;
@@ -750,6 +798,7 @@ require __DIR__ . '/middleware/auth.php';
         } catch (e) { /* ledger still uses the bootstrapped customers */ }
       }
       loadProfiles().then(() => { applySaved(); renderKpis(); render(); });
+      syncDues();
       renderKpis(); render();
     })();
     });

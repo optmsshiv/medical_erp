@@ -72,6 +72,8 @@ function shapeCustomer(array $row): array
         'credit_limit' => isset($row['credit_limit']) ? (float) $row['credit_limit'] : null,
         'credit_days' => isset($row['credit_days']) ? (int) $row['credit_days'] : null,
         'created_at' => (string) ($row['created_at'] ?? ''),
+        'lastPurchase' => isset($row['last_purchase']) && $row['last_purchase'] !== null ? (string) $row['last_purchase'] : null,
+        'lastPurchaseAt' => isset($row['last_purchase_at']) && $row['last_purchase_at'] !== null ? (string) $row['last_purchase_at'] : null,
     ];
 }
 
@@ -97,8 +99,10 @@ function ensureCreditColumns(): void
 
 function listRows(): array
 {
-    $extended = 'SELECT id, name, business_name, type, phone, gstin, dl_no, address, credit_limit, credit_days, created_at
-        FROM customers ORDER BY name ASC, id ASC';
+    $extended = "SELECT c.id, c.name, c.business_name, c.type, c.phone, c.gstin, c.dl_no, c.address, c.credit_limit, c.credit_days, c.created_at,
+            (SELECT MAX(s.sale_date) FROM sales s WHERE s.customer_id = c.id) AS last_purchase,
+            (SELECT MAX(s.created_at) FROM sales s WHERE s.customer_id = c.id) AS last_purchase_at
+        FROM customers c ORDER BY c.name ASC, c.id ASC";
     try {
         ensureCreditColumns();
         return queryRows($extended);

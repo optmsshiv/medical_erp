@@ -176,7 +176,12 @@ function shapeSupplier(array $row): array
         'age_days' => ageDays($oldest),
     ];
     $shaped['outstanding'] = outstanding($shaped);
+    $extraPaid = max(0, money($shaped, 'payments') - money($shaped, 'amount_paid'));
+    $shaped['advance'] = round(max(0, $extraPaid - money($shaped, 'balance_due')), 2);
     $shaped['position'] = positionOf($shaped);
+    if ($shaped['advance'] > 0.009 && $shaped['outstanding'] <= 0.009) {
+        $shaped['position'] = 'Advance';
+    }
     return $shaped;
 }
 
@@ -261,16 +266,18 @@ $summary = [
     'overdue' => 0,
     'settled' => 0,
     'outstanding' => 0.0,
+    'advance' => 0.0,
     'open_bills' => 0,
     'billed' => 0.0,
     'payments' => 0.0,
 ];
 foreach ($suppliers as $row) {
     $summary['outstanding'] += $row['outstanding'];
+    $summary['advance'] += (float) ($row['advance'] ?? 0);
     $summary['open_bills'] += $row['open_bills'];
     $summary['billed'] += $row['billed'];
     $summary['payments'] += $row['payments'];
-    if ($row['position'] === 'Settled') {
+    if ($row['position'] === 'Settled' || $row['position'] === 'Advance') {
         $summary['settled']++;
     } else {
         $summary['with_due']++;

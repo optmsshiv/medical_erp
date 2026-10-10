@@ -161,9 +161,17 @@ require __DIR__ . '/middleware/auth.php';
         return Math.max(0, Math.round((balance - Math.max(0, payments - paidOnBills)) * 100) / 100);
       }
 
+      /* Advance = money already in the ledger beyond what bills owe.
+         Future bills auto-absorb it (outstanding math already counts it). */
+      function advOf(r) {
+        if (r.advance != null) return Number(r.advance) || 0;
+        const extra = Math.max(0, (Number(r.payments) || 0) - (Number(r.amount_paid) || 0));
+        return Math.max(0, Math.round((extra - (Number(r.balance_due) || 0)) * 100) / 100);
+      }
+
       function positionOf(row) {
         const due = Number(row.outstanding) || 0;
-        if (due <= 0.009) return 'Settled';
+        if (due <= 0.009) return advOf(row) > 0.009 ? 'Advance' : 'Settled';
         const days = row.age_days == null ? ageDays(row.oldest_open) : Number(row.age_days);
         if (days != null && days > 30) return 'Overdue';
         if ((Number(row.amount_paid) || 0) > 0.009) return 'Partial';
@@ -171,7 +179,7 @@ require __DIR__ . '/middleware/auth.php';
       }
 
       function statusBadge(s) {
-        const tone = { Settled: 'success', Due: 'danger', Partial: 'warning', Overdue: 'danger' }[s] || 'secondary';
+        const tone = { Settled: 'success', Advance: 'info', Due: 'danger', Partial: 'warning', Overdue: 'danger' }[s] || 'secondary';
         return MF.badge(s || '—', tone);
       }
 
@@ -196,6 +204,7 @@ require __DIR__ . '/middleware/auth.php';
         row.age_days = oldest ? ageDays(oldest) : null;
         row.outstanding = raw.outstanding != null ? Number(raw.outstanding) : outstanding(row);
         row.position = raw.position || positionOf(row);
+        row.advance = raw.advance != null ? Number(raw.advance) : advOf(row);
         return row;
       }
 
@@ -252,7 +261,7 @@ require __DIR__ . '/middleware/auth.php';
         return state.suppliers.filter((r) => {
           if (state.filter === 'due' && !(r.outstanding > 0.009)) return false;
           if (state.filter === 'overdue' && r.position !== 'Overdue') return false;
-          if (state.filter === 'settled' && r.position !== 'Settled') return false;
+          if (state.filter === 'settled' && !['Settled', 'Advance'].includes(r.position)) return false;
           if (!q) return true;
           return [r.supplier_name, r.phone, r.gstin, r.dl_no, r.position].join(' ').toLowerCase().includes(q);
         });
@@ -300,7 +309,8 @@ require __DIR__ . '/middleware/auth.php';
           <div class="col-6 col-md"><div class="sd-stat accent"><span>Suppliers</span><strong>${MF.num(list.length)}</strong></div></div>
           <div class="col-6 col-md"><div class="sd-stat"><span>Open bills</span><strong>${MF.num(sum('open_bills'))}</strong></div></div>
           <div class="col-6 col-md"><div class="sd-stat"><span>Due</span><strong>${MF.fmt(sum('outstanding'))}</strong></div></div>
-          <div class="col-6 col-md"><div class="sd-stat"><span>Overdue</span><strong>${MF.num(overdue)}</strong></div></div>`;
+          <div class="col-6 col-md"><div class="sd-stat"><span>Overdue</span><strong>${MF.num(overdue)}</strong></div></div>
+          <div class="col-6 col-md"><div class="sd-stat"><span>Advance parked</span><strong>${MF.fmt(sum('advance'))}</strong></div></div>`;
         $('#sdBody').innerHTML = slice.map((r) => {
           const phone = formatPhone(r.phone);
           const dueCls = Number(r.outstanding) > 0.009 ? 'sd-due' : 'num';
@@ -315,7 +325,7 @@ require __DIR__ . '/middleware/auth.php';
             <td class="text-end num">${MF.fmt(r.amount_paid)}</td>
             <td class="text-end ${dueCls}">${MF.fmt(r.outstanding)}</td>
             <td>${oldestCell(r)}</td>
-            <td>${statusBadge(r.position)}</td>
+            <td>${statusBadge(r.position)}${r.position === 'Advance' && advOf(r) > 0 ? `<div class="${cls}-muted num" style="font-size:.68rem">+₹${MF.fmt(advOf(r))}</div>` : ''}</td>
             <td class="text-end">
               <div class="dropdown">
                 <button type="button" class="btn btn-icon btn-light-mf sd-kebab" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-label="Actions"><i class="bi bi-three-dots-vertical"></i></button>
