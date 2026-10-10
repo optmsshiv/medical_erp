@@ -125,23 +125,6 @@ function partyName(PDO $pdo, string $type, int $id): string
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
-    /* Temporary diagnostics — ?diag=1 (remove once the dues-visibility case closes). */
-    if (isset($_GET['diag'])) {
-        $out = ['php' => PHP_VERSION];
-        $out['view_supplier_dues'] = pTableExists($pdo, 'v_supplier_dues') ? 'present' : 'MISSING → fallback SQL in use';
-        $out['has_direction'] = $hasDir ? 'yes' : 'no';
-        $out['suppliers_table'] = pTableExists($pdo, 'suppliers') ? 'present' : 'MISSING';
-        try {
-            $out['payments_by_party'] = $pdo->query("SELECT party_type, party_id, COUNT(*) AS rows_n, SUM(amount) AS total, MAX(payment_date) AS last_date
-                FROM payments GROUP BY party_type, party_id ORDER BY party_type, party_id LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
-        } catch (Throwable $e) { $out['payments_by_party'] = 'ERR: ' . $e->getMessage(); }
-        try {
-            $out['recent_supplier_rows'] = $pdo->query("SELECT p.id, p.party_id, s.name AS supplier_join_name, p.amount, p.mode, p.payment_date, p.party_type
-                FROM payments p LEFT JOIN suppliers s ON s.id = p.party_id
-                WHERE p.party_type = 'supplier' ORDER BY p.id DESC LIMIT 5")->fetchAll(PDO::FETCH_ASSOC);
-        } catch (Throwable $e) { $out['recent_supplier_rows'] = 'ERR: ' . $e->getMessage(); }
-        Json::ok(['diag' => $out]);
-    }
     $to = pDayOk($_GET['to'] ?? '') ?: date('Y-m-d');
     $from = pDayOk($_GET['from'] ?? '') ?: $to;
     try {

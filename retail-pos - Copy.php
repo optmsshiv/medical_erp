@@ -675,7 +675,7 @@ if ($cashier === '') $cashier = 'Cashier';
   </aside>
 
   <!-- BUMP this version on EVERY pos.js change — long-cache browsers must not serve stale billing logic. -->
-  <script src="assets/js/pos.js?v=2026-10-10.01"></script>
+  <script src="assets/js/pos.js?v=2026-10-06.21"></script>
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
       await MF.boot();

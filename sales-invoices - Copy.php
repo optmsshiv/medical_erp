@@ -29,7 +29,7 @@ require __DIR__ . '/middleware/auth.php';
     .si-muted { display:block; margin-top:2px; color:#8b9bb0; font-size:.75rem; font-weight:600; line-height:1.3; }
     .si-batch { display:inline-flex; align-items:center; gap:4px; margin-top:4px; background:#f4f7fb; color:#16325c; border:1px solid #e4ebf4; border-radius:4px; padding:2px 6px; font-size:11px; font-weight:700; }
     .si-batch i { font-size:12px; }
-    .si-wide { table-layout:fixed; width:100%; }
+    .si-wide { min-width:1180px; }
     .si-ledger { border:1px solid #e3ebf4; border-radius:16px; background:#fff; overflow:hidden; box-shadow:0 1px 2px rgba(22,50,92,.04), 0 10px 28px rgba(22,50,92,.04); }
     .si-ledger-search { display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid #e7eef6; background:#fff; flex-wrap:wrap; }
     .si-ledger-search > i { color:#8b9bb0; font-size:15px; }
@@ -52,22 +52,6 @@ require __DIR__ . '/middleware/auth.php';
     .si-ledger-foot .page-link:hover { background:#f4f7fb; color:#16325c; }
     .si-ledger-note { color:#8b9bb0; font-size:.78rem; line-height:1.45; padding:10px 16px 12px; margin:0; border-top:1px solid #eef3f8; background:#fbfcfe; }
     .si-due { color:#B02A37; font-weight:700; }
-    /* ------- Premium invoice ledger pass ------- */
-    .si-ellipsis { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .si-time { display:block; font-size:.68rem; font-weight:650; color:#8B9BB0; white-space:nowrap; }
-    .si-doc { display:inline-block; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; font-weight:650; color:#1B2430; }
-    .si-doc-add { border:1px dashed #C7D3E0; background:#F8FAFC; color:#516278; border-radius:7px; font-size:.7rem; font-weight:700; padding:2px 8px; display:inline-flex; align-items:center; gap:4px; cursor:pointer; transition:all .15s ease; }
-    .si-doc-add i { font-size:.72rem; color:#8B9BB0; }
-    .si-doc-add:hover { border-color:var(--mf-primary); color:var(--mf-primary-dark); background:var(--mf-primary-soft); }
-    .si-num { font-variant-numeric:tabular-nums; }
-    .si-bar { height:4px; width:78px; max-width:100%; border-radius:4px; background:#EDF1F4; margin:5px 0 0 auto; overflow:hidden; }
-    .si-bar i { display:block; height:100%; border-radius:4px; background:linear-gradient(90deg,#34B399,#176B5B); }
-    .si-row-due > td:first-child { box-shadow:inset 3px 0 0 #E5484D; }
-    .si-ledger .table-mf tbody tr.si-row-due:hover td { background:#FEF6F6; }
-    @media (max-width:1199.98px) { .si-h-lg { display:none; } }
-    @media (max-width:767.98px) { .si-h-md { display:none; } }
-    #siDocDialog { position:fixed; inset:0; margin:auto; width:min(430px,94vw); max-height:86dvh; border:0; border-radius:16px; padding:16px; box-shadow:0 30px 90px rgba(16,32,64,.35); background:#fff; z-index:1085; font-family:system-ui,-apple-system,'Segoe UI',sans-serif; }
-    #siDocDialog::backdrop { background:rgba(15,23,42,.38); backdrop-filter:blur(6px) saturate(1.03); }
   </style>
 </head>
 <body data-page="sales-invoices">
@@ -103,17 +87,17 @@ require __DIR__ . '/middleware/auth.php';
             <table class="table table-mf si-wide">
               <thead>
                 <tr>
-                  <th style="width:11%">Invoice</th>
-                  <th style="width:9%">Date</th>
-                  <th style="width:15%">Customer</th>
-                  <th style="width:11%">Doctor</th>
-                  <th class="text-end si-h-md" style="width:6%">Items</th>
-                  <th class="si-h-lg" style="width:9%">Payment</th>
-                  <th class="text-end" style="width:8%">Total</th>
-                  <th class="text-end" style="width:8%">Paid</th>
-                  <th class="text-end" style="width:8%">Due</th>
-                  <th style="width:7%">Status</th>
-                  <th class="text-end" style="width:8%">Actions</th>
+                  <th>Invoice</th>
+                  <th>Date</th>
+                  <th>Customer</th>
+                  <th>Doctor</th>
+                  <th class="text-end">Items</th>
+                  <th>Payment</th>
+                  <th class="text-end">Total</th>
+                  <th class="text-end">Paid</th>
+                  <th class="text-end">Due</th>
+                  <th>Status</th>
+                  <th class="text-end">Actions</th>
                 </tr>
               </thead>
               <tbody id="siBody"></tbody>
@@ -198,9 +182,6 @@ require __DIR__ . '/middleware/auth.php';
           id: raw.id || idx + 1,
           invoice_no: raw.invoice_no || raw.no || '',
           sale_date: String(raw.sale_date || raw.date || '').slice(0, 10),
-          sale_at: String(raw.created_at || raw.sale_at || ''),
-          sale_time: (() => { const t = String(raw.created_at || raw.sale_at || '').slice(11, 16); return t && t !== '00:00' ? t : ''; })(),
-          doctor_id: raw.doctor_id != null && raw.doctor_id !== '' ? Number(raw.doctor_id) : null,
           channel,
           customer_name: raw.customer_name || raw.customer || 'Walk-in',
           customer_phone: raw.customer_phone || raw.phone || raw.mobile || '',
@@ -321,23 +302,21 @@ require __DIR__ . '/middleware/auth.php';
           const phone = formatPhone(r.customer_phone);
           const dueCls = Number(r.balance_due) > 0.009 ? 'si-due' : 'num';
           const split = r.payment_mode === 'split' ? `<span class="si-muted">Cash ${MF.fmt(r.cash_amount)} · UPI ${MF.fmt(r.upi_amount)}</span>` : '';
-          const rowCls = Number(r.balance_due) > 0.009 ? 'si-row-due' : '';
-          const payPct = Number(r.grand_total) > 0 ? Math.min(100, Math.round(Math.min(Number(r.grand_total), Number(r.amount_paid) || 0) / Number(r.grand_total) * 100)) : null;
-          return `<tr${rowCls ? ` class="${rowCls}"` : ''}>
+          return `<tr>
             <td>
               <div class="si-name num">${MF.esc(r.invoice_no || '—')}</div>
               <div class="mt-1">${channelBadge(r.channel)}</div>
             </td>
-            <td class="num"><div>${r.sale_date ? MF.fmtDate(r.sale_date) : '—'}</div>${r.sale_time ? `<span class="si-time">${r.sale_time}</span>` : ''}</td>
+            <td class="num">${r.sale_date ? MF.fmtDate(r.sale_date) : '—'}</td>
             <td>
-              <div class="fw-semibold si-ellipsis" title="${MF.esc(r.customer_name || 'Walk-in')}">${MF.esc(r.customer_name || 'Walk-in')}</div>
+              <div class="fw-semibold">${MF.esc(r.customer_name || 'Walk-in')}</div>
               ${phone ? `<span class="si-muted">${MF.esc(phone)}</span>` : ''}
             </td>
-            <td class="si-doccell">${r.doctor_name ? `<span class="si-doc" title="${MF.esc(r.doctor_name)}">${MF.esc(r.doctor_name)}</span>` : `<button type="button" class="si-doc-add" data-a="doctor" data-id="${MF.esc(r.id)}" data-inv="${MF.esc(r.invoice_no)}"><i class="bi bi-person-plus"></i>Attach</button>`}</td>
-            <td class="text-end si-h-md"><div class="num fw-semibold">${MF.num(r.item_count)}</div><div class="text-2 small-xs">${MF.num(r.qty)} qty</div></td>
-            <td class="si-h-lg"><div class="fw-semibold">${MF.esc(payLabel(r.payment_mode))}</div>${split}</td>
+            <td>${r.doctor_name ? MF.esc(r.doctor_name) : '<span class="text-2">—</span>'}</td>
+            <td class="text-end"><div class="num fw-semibold">${MF.num(r.item_count)}</div><div class="text-2 small-xs">${MF.num(r.qty)} qty</div></td>
+            <td><div class="fw-semibold">${MF.esc(payLabel(r.payment_mode))}</div>${split}</td>
             <td class="text-end num fw-semibold">${MF.fmt(r.grand_total)}</td>
-            <td class="text-end num si-num">${MF.fmt(r.amount_paid)}${payPct != null ? `<div class="si-bar"><i style="width:${payPct}%"></i></div>` : ''}</td>
+            <td class="text-end num">${MF.fmt(r.amount_paid)}</td>
             <td class="text-end ${dueCls}">${MF.fmt(r.balance_due)}</td>
             <td>${statusBadge(r.status)}</td>
             <td class="text-end">
@@ -346,7 +325,6 @@ require __DIR__ . '/middleware/auth.php';
                 <ul class="dropdown-menu dropdown-menu-end si-act-menu">
                   <li><button type="button" class="dropdown-item" data-a="view" data-id="${MF.esc(r.id)}"><i class="bi bi-eye"></i><span>View</span></button></li>
                   <li><button type="button" class="dropdown-item" data-a="print" data-id="${MF.esc(r.id)}"><i class="bi bi-printer"></i><span>Print</span></button></li>
-                  <li><button type="button" class="dropdown-item" data-a="doctor" data-id="${MF.esc(r.id)}" data-inv="${MF.esc(r.invoice_no)}"><i class="bi bi-person-badge"></i><span>${r.doctor_name ? 'Change doctor' : 'Attach doctor'}</span></button></li>
                   <li><a class="dropdown-item" href="sales-return.php"><i class="bi bi-arrow-counterclockwise"></i><span>Sales return</span></a></li>
                 </ul>
               </div>
@@ -360,8 +338,7 @@ require __DIR__ . '/middleware/auth.php';
         $('#siBody').querySelectorAll('[data-a]').forEach((b) => b.addEventListener('click', () => {
           const row = state.rows.find((r) => String(r.id) === String(b.dataset.id));
           if (!row) return;
-          if (b.dataset.a === 'doctor') attachDoctor(row, b.dataset.inv || row.invoice_no);
-          else if (b.dataset.a === 'print') printInvoice(row);
+          if (b.dataset.a === 'print') printInvoice(row);
           else openView(row);
         }));
         renderFilters();
@@ -419,7 +396,7 @@ require __DIR__ . '/middleware/auth.php';
           <div class="d-flex justify-content-between small mb-2">
             <span>Invoice: <strong>${MF.esc(r.invoice_no)}</strong></span><span>${r.sale_date ? MF.fmtDate(r.sale_date) : ''}</span>
           </div>
-          <div class="small mb-2">Customer: <strong>${MF.esc(r.customer_name || 'Walk-in')}</strong>${phone ? ' · ' + MF.esc(phone) : ''}${r.doctor_name ? ' · Doctor: <strong>' + MF.esc(r.doctor_name) + '</strong>' : ''} · Payment: <strong>${MF.esc(payLabel(r.payment_mode))}</strong></div>
+          <div class="small mb-2">Customer: <strong>${MF.esc(r.customer_name || 'Walk-in')}</strong>${phone ? ' · ' + MF.esc(phone) : ''} · Payment: <strong>${MF.esc(payLabel(r.payment_mode))}</strong></div>
           ${itemsTable(r.items || [])}
           ${totalsHtml(r)}
           <p class="text-center text-2 small-xs mt-3 mb-0">Medicines once sold will not be taken back without valid reason.</p>`;
@@ -472,78 +449,8 @@ require __DIR__ . '/middleware/auth.php';
         const list = filtered();
         MF.exportCSV('sales-invoices.csv',
           ['Invoice', 'Date', 'Channel', 'Customer', 'Phone', 'Doctor', 'Items', 'Payment', 'Total', 'Paid', 'Due', 'Status'],
-          list.map((r) => [r.invoice_no, r.sale_time ? r.sale_date + ' ' + r.sale_time : r.sale_date, r.channel, r.customer_name, formatPhone(r.customer_phone), r.doctor_name, r.item_count, payLabel(r.payment_mode), r.grand_total, r.amount_paid, r.balance_due, r.status]));
+          list.map((r) => [r.invoice_no, r.sale_date, r.channel, r.customer_name, formatPhone(r.customer_phone), r.doctor_name, r.item_count, payLabel(r.payment_mode), r.grand_total, r.amount_paid, r.balance_due, r.status]));
       }
-
-      /* ------- Prescribing doctor — attach / change on posted invoices -------
-         New bills carry the doctor from checkout (pos.js → sale-doctor.php);
-         this dialog fixes the past ones by invoice number. */
-      const siDocDlg = document.createElement('dialog');
-      siDocDlg.id = 'siDocDialog';
-      siDocDlg.setAttribute('aria-label', 'Change prescribing doctor');
-      siDocDlg.innerHTML = `
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-          <span style="width:30px;height:30px;border-radius:50%;background:#176B5B;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem">Rx</span>
-          <div style="min-width:0"><div style="font-weight:700;color:#1B2430">Prescribing doctor</div><div id="siDocSub" style="font-size:.74rem;color:#8B9BB0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:290px"></div></div>
-          <button type="button" data-x aria-label="Close" style="margin-left:auto;border:0;background:transparent;color:#8B9BB0;cursor:pointer;font-size:1.05rem;padding:4px;line-height:1">✕</button>
-        </div>
-        <div id="siDocList"></div>`;
-      document.body.appendChild(siDocDlg);
-      let siDocInv = '';
-
-      function docRowHtml(d, curId) {
-        const on = String(d.id) === String(curId || '');
-        return `<label style="display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:9px;cursor:pointer;${on ? 'background:#E6F1EE;' : ''}">
-          <input type="radio" name="si-doc" value="${MF.esc(d.id)}" ${on ? 'checked' : ''} style="accent-color:#176B5B">
-          <span style="min-width:0"><span style="display:block;font-weight:650;font-size:.86rem;color:#1B2430;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${MF.esc(d.name)}</span>${d.specialty || d.clinic ? `<span style="display:block;font-size:.7rem;color:#8B9BB0">${MF.esc([d.specialty, d.clinic].filter(Boolean).join(' · '))}</span>` : ''}</span>
-          ${on ? '<span style="margin-left:auto;font-size:.64rem;font-weight:800;letter-spacing:.05em;color:#176B5B;white-space:nowrap">CURRENT</span>' : ''}
-        </label>`;
-      }
-
-      async function attachDoctor(row, inv) {
-        siDocInv = String(inv || row.invoice_no || '');
-        $('#siDocSub').textContent = siDocInv + (row.customer_name ? ' · ' + row.customer_name : '');
-        const list = $('#siDocList');
-        list.innerHTML = '<div style="padding:14px;text-align:center;color:#8B9BB0;font-size:.85rem">Loading doctors…</div>';
-        siDocDlg.showModal ? siDocDlg.showModal() : siDocDlg.setAttribute('open', '');
-        try {
-          let rows = Array.isArray(D.doctors) && D.doctors.length ? D.doctors : [];
-          if (!rows.length && MF.Api.live) {
-            const res = await MF.Api.get('doctors.php');
-            rows = Array.isArray(res.data) ? res.data : ((res.data && res.data.doctors) || []);
-            D.doctors = rows;
-          }
-          rows = rows.filter((d) => d && d.name && String(d.status || 'Active') !== 'Inactive').sort((a, b) => String(a.name).localeCompare(String(b.name)));
-          list.innerHTML = rows.length ? rows.map((d) => docRowHtml(d, row.doctor_id)).join('') : '<div style="padding:14px;text-align:center;color:#8B9BB0;font-size:.85rem">No doctors yet — add them on the Doctors page.</div>';
-        } catch (err) {
-          list.innerHTML = '<div style="padding:14px;text-align:center;color:#B02A37;font-size:.85rem">Could not load doctors.</div>';
-        }
-      }
-
-      siDocDlg.addEventListener('click', (e) => { if (e.target.closest('[data-x]')) siDocDlg.close(); });
-      siDocDlg.addEventListener('change', async (e) => {
-        const inp = e.target.closest('input[name="si-doc"]');
-        if (!inp) return;
-        const docId = inp.value;
-        const row = (state.rows || []).find((r) => String(r.invoice_no) === siDocInv);
-        try {
-          if (MF.Api.live) {
-            await MF.Api.post('sale-doctor.php', { invoiceNo: siDocInv, doctorId: docId });
-            const res = await MF.Api.get('sales-invoices.php');
-            const fresh = (res.data && (res.data.ledger || res.data.invoices)) || (Array.isArray(res.data) ? res.data : []);
-            if (fresh.length) { state.rows = fresh.map((raw, i) => shape(raw, i)); }
-          } else if (row) {
-            const d = (D.doctors || []).find((x) => String(x.id) === String(docId));
-            row.doctor_id = Number(docId);
-            row.doctor_name = d ? d.name : '';
-          }
-          render();
-          siDocDlg.close();
-          MF.toast('Doctor saved on ' + siDocInv + '.', 'success', 'Invoice updated');
-        } catch (err) {
-          MF.toast(err.message || 'Could not save the doctor.', 'danger');
-        }
-      });
 
       document.addEventListener('DOMContentLoaded', async () => {
         await MF.boot();

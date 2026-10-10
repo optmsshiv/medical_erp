@@ -1746,7 +1746,9 @@
 
   function printInvoice() {
     if (!state.cart.length) { MF.toast('Cart is empty — nothing to print', 'warn'); return; }
-    MF.printHtml(receiptHtml('DRAFT', calcTotals(), state.printFmt));
+    MF.printHtml(state.printFmt === 'thermal'
+      ? thermalReceiptHtml('DRAFT', calcTotals())
+      : a4ReceiptHtml('DRAFT', calcTotals()));
   }
 
   function paintPrintBtn() {
@@ -2132,49 +2134,514 @@
     });
   }
 
-  function receiptHtml(invNo, t, fmt, snap) {
-    // snap = frozen bill context for reprints (cart/payment/tender/customer as-was);
-    // omitted on the live path, where current state is the context.
+
+  /* ===== Thermal receipt engine (80mm / 58mm) — reference-grade =====
+   Mono, columnar, audit-honest: batch+exp on every drug line, schedule chips,
+   GST section ONLY when the data says so, amount in words (Indian), a REAL
+   scannable Code39 of the invoice number, and an H1 pharmacy-copy stub only
+   when controlled items were actually sold. Width (80/58) is a saved pref. */
+  const thermalMm = () => (localStorage.getItem('mf-pos-thermal-mm') === '58' ? '58' : '80');
+  function paintThermalMmLabels() {
+    const mm = thermalMm();
+    document.querySelectorAll('[data-thermal-mm]').forEach((el) => { el.textContent = mm + 'mm'; });
+    document.querySelectorAll('[data-thermal-other]').forEach((el) => { el.textContent = (mm === '80' ? '58' : '80') + 'mm'; });
+  }
+  function setThermalMm(mm) {
+    localStorage.setItem('mf-pos-thermal-mm', mm === '58' ? '58' : '80');
+    paintThermalMmLabels();
+  }
+  function thermalCashier() {
+    const item = [...document.querySelectorAll('#posMetaBar .pos-meta-item')].find((el) => /Cashier/i.test(el.textContent || ''));
+    return item ? (item.querySelector('strong')?.textContent || '').trim().toUpperCase() : '';
+  }
+  function numWords(n) {
+    n = Math.round(Math.abs(+n || 0));
+    if (!n) return 'ZERO';
+    const ONES = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'TEN', 'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN'];
+    const TENS = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY'];
+    const two = (x) => (x < 20 ? ONES[x] : TENS[Math.floor(x / 10)] + (x % 10 ? ' ' + ONES[x % 10] : ''));
+    const three = (x) => {
+      const h = Math.floor(x / 100), r = x % 100;
+      return (h ? ONES[h] + ' HUNDRED' + (r ? ' ' : '') : '') + (r ? two(r) : '');
+    };
+    const parts = [];
+    const cr = Math.floor(n / 1e7); n %= 1e7;
+    const lk = Math.floor(n / 1e5); n %= 1e5;
+    const th = Math.floor(n / 1e3); n %= 1e3;
+    if (cr) parts.push(three(cr) + ' CRORE');
+    if (lk) parts.push(two(lk) + ' LAKH');
+    if (th) parts.push(two(th) + ' THOUSAND');
+    if (n) parts.push(three(n));
+    return parts.join(' ');
+  }
+  // Real Code39 encoder (digits, A-Z, dash) — scans on any laser/CCD scanner.
+  function code39Svg(text, height) {
+    const T = {
+      '0': 'nnnwwnwnn', '1': 'wnnwnnnnw', '2': 'nnwwnnnnw', '3': 'wnwwnnnnn', '4': 'nnnwwnnnw',
+      '5': 'wnnwwnnnn', '6': 'nnwwwnnnn', '7': 'nnnwnnwnw', '8': 'wnnwnnwnn', '9': 'nnwwnnwnn',
+      A: 'wnnnnnwnw', B: 'nnwnnnwnw', C: 'wnwnnnwnn', D: 'nnnnwnwnw', E: 'wnnnwnwnn', F: 'nnwnwnwnn',
+      G: 'nnnnnnwwn', H: 'wnnnnnwnn', I: 'nnwnnnwnn', J: 'wnwnnnwnn', K: 'wnnnnnnww', L: 'nnwnnnnww',
+      M: 'wnwnnnnwn', N: 'nnnnwnnww', O: 'wnnnwnnwn', P: 'nnwnwnnwn', Q: 'nnnnnnwww', R: 'wnnnnnwwn',
+      S: 'nnwnnnwwn', T: 'wnwnnnwwn', '-': 'nwnnnnwnw', '*': 'nwnnwnwnw',
+    };
+    const clean = ('*' + String(text).toUpperCase().replace(/[^0-9A-Z-]+/g, '-') + '*').split('') .filter((c) => T[c]);
+    const N = 1, W = 2.6, GAP = 1;
+    let x = 0, bars = '';
+    clean.forEach((ch, ci) => {
+      const pat = T[ch];
+      for (let i = 0; i < 9; i++) {
+        const wk = pat[i] === 'w' ? W : N;
+        if (i % 2 === 0) bars += `<rect x="${x.toFixed(1)}" y="0" width="${wk}" height="${height}" fill="#111"/>`;
+        x += wk;
+      }
+      if (ci < clean.length - 1) x += GAP;
+    });
+    return `<svg viewBox="0 0 ${Math.ceil(x)} ${height}" preserveAspectRatio="none" style="width:100%;height:${height}px;display:block">${bars}</svg>`;
+  }
+  function thermalReceiptHtml(invNo, t, snap) {
+    const mm = thermalMm();
     const liveCust = MF.cust($('#posCustomer').value);
-    const cust = snap && snap.cust ? snap.cust : (liveCust || { name: 'Customer' });
-    const cart = snap && snap.cart ? snap.cart : state.cart;
-    const pay = snap && snap.payment ? snap.payment : state.payment;
-    const split = snap && snap.split ? snap.split : state.split;
-    const tender = snap && 'tender' in snap ? snap.tender : state.tender;
-    const payLabel = { cash: 'Cash', upi: 'UPI', card: 'Card', credit: 'Credit', split: `Split (Cash ${MF.fmt(split.cash)} + UPI ${MF.fmt(split.upi)})` }[pay] || pay;
-    const tenderRows = pay === 'cash' && tender
-      ? `<div class="sum-row"><span class="text-2">Cash paid</span><span class="num">${MF.fmt(tender.cashReceived)}</span></div>
-         <div class="sum-row"><span class="text-2">Change</span><span class="num">${MF.fmt(tender.changeReturned)}</span></div>`
+    const cust = (snap && snap.cust) ? snap.cust : (liveCust || { name: 'Customer' });
+    const cart = (snap && snap.cart) ? snap.cart : state.cart;
+    const pay = (snap && snap.payment) ? snap.payment : state.payment;
+    const split = (snap && snap.split) ? snap.split : state.split;
+    const tender = (snap && 'tender' in snap) ? snap.tender : state.tender;
+    const when = new Date((snap && snap.at) || Date.now());
+    const dmy = when.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
+    const hm = when.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }).toUpperCase();
+    // Doctor: live → current picker; reprint → frozen on the snapshot.
+    let doc = snap && snap.doctor !== undefined ? snap.doctor : null;
+    if (!snap) {
+      const dv = $('#posDoctor')?.value;
+      if (dv) {
+        const dd = (D.doctors || []).find((x) => String(x.id) === String(dv));
+        doc = { id: dv, name: dd ? dd.name : ($('#posDoctor').selectedOptions[0]?.text || 'Doctor'), reg: (dd && (dd.reg_no || dd.regNo)) || '' };
+      }
+    }
+    const payLabel = { cash: 'CASH', upi: 'UPI', card: 'CARD', credit: 'CREDIT', split: `SPLIT (CASH + UPI)` }[pay] || String(pay || '').toUpperCase();
+    const counter = $('#posMetaCounter')?.textContent?.trim() || '1';
+    const cashier = thermalCashier();
+    const store = D.store || {};
+    const gstin = store.gstin || store.gstNo || '';
+    const dl = store.dl || store.dl_no || store.dlNo || '';
+    const isLooseLine = (l) => l.unit === 'loose';
+    const lineUnit = (l, m) => (isLooseLine(l) ? (m.pieceLabel || 'TAB') : (m.unitLabel || 'STRIP')).toUpperCase();
+    const schCode = (m) => String((m && m.schedule) || '').trim().toUpperCase().replace(/^SCHEDULE\s+/, '');
+    const itemsHtml = cart.map((l) => {
+      const m = MF.med(l.medId) || {};
+      const b = D.batches.find((x) => String(x.id) === String(l.batchId)) || {};
+      const c = calcLine(l);
+      const sch = schCode(m);
+      const expTxt = b.expiry ? MF.fmtMonthYear(b.expiry).replace(/[\s-]+/g, '/') : '';
+      const discNote = (Number(l.discPct) || 0) > 0 ? ` (-${Number(l.discPct)}%)` : '';
+      return `<div class="th-it">
+        <div class="th-nm">${MF.esc(String(m.name || 'Medicine').toUpperCase())}${sch ? `<span class="th-sch">SCH-${MF.esc(sch)}</span>` : ''}</div>
+        <div class="th-meta"><span>${MF.esc(b.batchNo || '—')}${expTxt ? '&nbsp;&nbsp;EXP:' + MF.esc(expTxt) : ''}</span><span>${MF.esc(lineUnit(l, m))}</span></div>
+        <div class="th-amt"><span>${l.qty} X ${MF.fmt(l.rate, 2)}${discNote}</span><span class="th-b">${MF.fmt(c.net, 2)}</span></div>
+      </div>`;
+    }).join('');
+    const packCount = cart.reduce((s, l) => s + (isLooseLine(l) ? 0 : l.qty), 0);
+    const looseCount = cart.reduce((s, l) => s + (isLooseLine(l) ? l.qty : 0), 0);
+    const gstRows = t.gst > 0
+      ? `<div class="th-dash"></div>
+         <div class="th-r th-sm"><span>TAXABLE VALUE</span><span>${MF.fmt(Math.max(0, t.grand - t.gst), 2)}</span></div>
+         <div class="th-r th-sm"><span>CGST (INCLUDED IN MRP)</span><span>${MF.fmt(t.gst / 2, 2)}</span></div>
+         <div class="th-r th-sm"><span>SGST (INCLUDED IN MRP)</span><span>${MF.fmt(t.gst / 2, 2)}</span></div>`
       : '';
-    const html = `
-      <div class="text-center mb-3">
-        <img src="assets/images/logo.svg" width="42" alt="">
-        <h6 class="fw-bold mt-2 mb-0">${MF.esc(D.store.name)}</h6>
-        ${D.store.address ? `<div class="text-2 small-xs">${MF.esc(D.store.address)}${D.store.gstin ? ' · GSTIN ' + D.store.gstin : ''}</div>` : ''}
+    const tenderRows = pay === 'cash' && tender
+      ? `<div class="th-dash"></div>
+         <div class="th-r"><span class="th-k">CASH</span><span class="th-fill"></span><span>${MF.fmt(tender.cashReceived, 2)}</span></div>
+         <div class="th-r"><span class="th-k">RETURN</span><span class="th-fill"></span><span>${MF.fmt(tender.changeReturned, 2)}</span></div>`
+      : (pay === 'split'
+        ? `<div class="th-dash"></div>
+           <div class="th-r"><span class="th-k">CASH PART</span><span class="th-fill"></span><span>${MF.fmt(split.cash, 2)}</span></div>
+           <div class="th-r"><span class="th-k">UPI PART</span><span class="th-fill"></span><span>${MF.fmt(split.upi, 2)}</span></div>`
+        : (pay === 'credit'
+          ? `<div class="th-dash"></div><div class="th-r"><span class="th-k">ADDED TO DUES</span><span class="th-fill"></span><span>${MF.fmt(t.grand, 2)}</span></div>`
+          : ''));
+    const h1Lines = cart.filter((l) => /^(H1|X|NDPS)$/.test(schCode(MF.med(l.medId))));
+    const stubHtml = h1Lines.length ? h1Lines.map((l) => {
+      const m = MF.med(l.medId) || {};
+      const b = D.batches.find((x) => String(x.id) === String(l.batchId)) || {};
+      return `<div class="th-stub">
+        <div class="c th-b th-sm">SCHEDULE ${schCode(m)} REGISTER · PHARMACY COPY</div>
+        <div class="th-kv th-sm"><span class="th-kk">DRUG</span><span class="th-b">${MF.esc(String(m.name || '').toUpperCase())}</span></div>
+        <div class="th-kv th-sm"><span class="th-kk">BATCH / EXP</span><span>${MF.esc(b.batchNo || '—')} / ${b.expiry ? MF.esc(MF.fmtMonthYear(b.expiry)) : '—'}</span></div>
+        <div class="th-kv th-sm"><span class="th-kk">QTY DISPENSED</span><span>${l.qty} ${MF.esc(lineUnit(l, m))}</span></div>
+        <div class="th-kv th-sm"><span class="th-kk">DATE &amp; TIME</span><span>${dmy} ${hm}</span></div>
+        <div class="th-kv th-sm"><span class="th-kk">PURCHASER</span><span>${MF.esc(String(cust.name || 'CASH CUSTOMER').toUpperCase())}</span></div>
+        ${doc ? `<div class="th-kv th-sm"><span class="th-kk">PRESCRIBER</span><span>${MF.esc(String(doc.name || '').toUpperCase())}</span></div>` : ''}
+        ${doc && doc.reg ? `<div class="th-kv th-sm"><span class="th-kk">REG. NO.</span><span>${MF.esc(doc.reg)}</span></div>` : ''}
+        <div class="th-kv th-sm"><span class="th-kk">SIGN OF BUYER</span><span>_______________</span></div>
+        <div class="c th-tiny" style="margin-top:5px">RETAIN AS PER DRUGS &amp; COSMETICS ACT</div>
+      </div>`;
+    }).join('') : '';
+    const controlled = cart.some((l) => schCode(MF.med(l.medId)));
+    const wCss = mm === '58' ? '52mm' : '72mm';
+    const fs = mm === '58' ? '10px' : '11px';
+    return `<style>
+      @page { size: ${mm}mm auto; margin: 1.5mm 1mm; }
+      .th-rc { width:${wCss}; margin:0 auto; font-family:"Courier New", Courier, ui-monospace, Menlo, Consolas, monospace;
+        font-size:${fs}; line-height:1.38; letter-spacing:.01em; color:#111; background:#fff; padding:2mm 1mm; }
+      .th-rc .c { text-align:center; } .th-rc .th-b { font-weight:700; }
+      .th-dbl { font-size:calc(${fs} * 1.3); font-weight:700; letter-spacing:.02em; }
+      .th-sm { font-size:calc(${fs} - 1.2px); } .th-tiny { font-size:calc(${fs} - 2px); }
+      .th-dash { border-top:1px dashed #333; margin:4px 0; } .th-dash.th-solid { border-top-style:solid; border-color:#111; }
+      .th-r { display:flex; justify-content:space-between; gap:8px; margin:2px 0; }
+      .th-k { white-space:nowrap; } .th-fill { flex:1; border-bottom:1px dotted #bbb; margin:0 2px; transform:translateY(-3px); }
+      .th-net { font-size:calc(${fs} + 1px); font-weight:700; }
+      .th-it { margin:4px 0; } .th-nm { font-weight:700; text-transform:uppercase; }
+      .th-meta, .th-amt { display:flex; justify-content:space-between; font-size:calc(${fs} - 1px); }
+      .th-sch { border:1px solid #111; padding:0 3px; font-size:calc(${fs} - 1.5px); font-weight:700; margin-left:4px; }
+      .th-kv { display:flex; gap:6px; } .th-kk { width:44%; flex-shrink:0; }
+      .th-stub { border:1px dashed #333; padding:5px; margin-top:3px; }
+    </style>
+    <div class="th-rc">
+      <div class="c th-dbl">${MF.esc(String(store.name || 'PHARMACY').toUpperCase())}</div>
+      ${store.address ? `<div class="c th-sm">${MF.esc(String(store.address).toUpperCase())}</div>` : ''}
+      ${store.phone ? `<div class="c th-sm">PH: ${MF.esc(store.phone)}</div>` : ''}
+      ${gstin ? `<div class="c th-sm">GSTIN: ${MF.esc(gstin)}</div>` : ''}
+      ${dl ? `<div class="c th-sm">DL: ${MF.esc(dl)}</div>` : ''}
+      <div class="th-dash"></div>
+      <div class="c th-b">TAX INVOICE (${MF.esc(payLabel)})</div>
+      <div class="th-dash"></div>
+      <div class="th-r th-sm"><span>INV: ${MF.esc(invNo)}</span><span>${dmy}</span></div>
+      <div class="th-r th-sm"><span>TIME: ${hm}</span><span>CASHIER: ${MF.esc(cashier || '—')}</span></div>
+      <div class="th-r th-sm"><span>COUNTER: ${MF.esc(counter)}</span><span>MODE: ${MF.esc(payLabel)}</span></div>
+      <div class="th-sm">PT: ${MF.esc(String(cust.name || 'CASH CUSTOMER').toUpperCase())}${doc ? '&nbsp;&nbsp;DR: ' + MF.esc(String(doc.name || '').toUpperCase()) : ''}</div>
+      <div class="th-dash th-solid"></div>
+      <div class="th-r th-b th-sm"><span>ITEM / BATCH-EXP</span><span>AMOUNT</span></div>
+      <div class="th-dash"></div>
+      ${itemsHtml}
+      <div class="th-dash th-solid"></div>
+      <div class="th-r th-sm"><span class="th-k">ITEMS: ${cart.length}&nbsp;&nbsp;(${packCount || 0} PACK${packCount === 1 ? '' : 'S'}${looseCount ? ' + ' + looseCount + ' LOOSE' : ''})</span></div>
+      <div class="th-r"><span class="th-k">GROSS</span><span class="th-fill"></span><span>${MF.fmt(t.subtotal, 2)}</span></div>
+      <div class="th-r"><span class="th-k">DISCOUNT</span><span class="th-fill"></span><span>-${MF.fmt(t.discount, 2)}</span></div>
+      <div class="th-r th-sm"><span class="th-k">ROUND ${t.roundOff >= 0 ? 'ADDED' : 'LESS'}</span><span class="th-fill"></span><span>${t.roundOff >= 0 ? '+' : '-'}${MF.fmt(Math.abs(t.roundOff), 2)}</span></div>
+      <div class="th-dash"></div>
+      <div class="th-r th-net"><span class="th-k">NET PAYABLE</span><span class="th-fill"></span><span>${MF.fmt(t.grand, 2)}</span></div>
+      ${gstRows}
+      ${tenderRows}
+      <div class="th-dash"></div>
+      <div class="c th-sm th-b">RUPEES ${numWords(t.grand)} ONLY</div>
+      <div class="th-dash"></div>
+      <div class="c">${code39Svg(invNo, mm === '58' ? 30 : 34)}</div>
+      <div class="c th-sm th-b" style="letter-spacing:.14em">${MF.esc(invNo)}</div>
+      <div class="th-dash"></div>
+      ${controlled ? `<div class="th-sm">* PRESCRIPTION DRUG(S) SOLD AS PER</div>
+      <div class="th-sm">&nbsp;&nbsp;RECORDED PRESCRIPTION / REGISTER</div>` : ''}
+      <div class="th-sm">* MEDICINES NOT RETURNABLE ONCE SOLD</div>
+      <div class="th-sm">&nbsp;&nbsp;(EXCEPT QUALITY DEFECT, 7 DAYS,</div>
+      <div class="th-sm">&nbsp;&nbsp;WITH THIS RECEIPT)</div>
+      <div class="th-sm">* STORE BELOW 30 C. KEEP AWAY FROM</div>
+      <div class="th-sm">&nbsp;&nbsp;CHILDREN. FINISH FULL COURSE.</div>
+      <div class="c th-b" style="margin-top:6px">GET WELL SOON! / धन्यवाद</div>
+      <div class="c th-tiny" style="margin-top:4px">THIS IS A COMPUTER-GENERATED INVOICE</div>
+      ${stubHtml ? `<div class="th-dash" style="margin-top:8px"></div>
+      <div class="c th-tiny th-b" style="margin:4px 0">- - - CUT HERE · PHARMACY COPY - - -</div>
+      ${stubHtml}` : ''}
+      <div class="c th-tiny" style="margin-top:8px">**** THANK YOU ****</div>
+    </div>`;
+  }
+
+  /* ===== A4 tax invoice engine — letterhead-grade, data-honest =====
+   Same data contract as the thermal engine. Anything the data doesn't prove
+   is simply left out: no blank boxes, no invented tax rows, no decorative QR.
+   The UPI QR (when the store set a UPI ID) is a REAL scannable request with
+   the exact net amount — generated through the on-page QRCode library. */
+  function payQrDataUrl(grand) {
+    const upi = String((D.store && D.store.upi) || '').trim();
+    if (!upi || typeof QRCode === 'undefined') return null;
+    const host = document.createElement('div');
+    host.style.display = 'none';
+    document.body.appendChild(host);
+    try {
+      new QRCode(host, {
+        text: `upi://pay?pa=${encodeURIComponent(upi)}&pn=${encodeURIComponent(D.store.name || 'Pharmacy')}&am=${(+grand || 0).toFixed(2)}&cu=INR`,
+        width: 120, height: 120, correctLevel: QRCode.CorrectLevel.M,
+      });
+      const cv = host.querySelector('canvas');
+      return cv ? cv.toDataURL('image/png') : null;
+    } catch (e) {
+      return null;
+    } finally {
+      host.remove();
+    }
+  }
+  function a4ReceiptHtml(invNo, t, snap) {
+    const liveCust = MF.cust($('#posCustomer').value);
+    const custRaw = (snap && snap.cust) ? snap.cust : (liveCust || { name: 'Customer' });
+    const custCard = (custRaw && custRaw.id && MF.cust) ? (MF.cust(custRaw.id) || custRaw) : custRaw;
+    const cart = (snap && snap.cart) ? snap.cart : state.cart;
+    const pay = (snap && snap.payment) ? snap.payment : state.payment;
+    const split = (snap && snap.split) ? snap.split : state.split;
+    const tender = (snap && 'tender' in snap) ? snap.tender : state.tender;
+    const when = new Date((snap && snap.at) || Date.now());
+    const dmy = when.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
+    const hm = when.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }).toUpperCase();
+    let doc = snap && snap.doctor !== undefined ? snap.doctor : null;
+    if (!snap) {
+      const dv = $('#posDoctor')?.value;
+      if (dv) {
+        const dd = (D.doctors || []).find((x) => String(x.id) === String(dv));
+        doc = { id: dv, name: dd ? dd.name : ($('#posDoctor').selectedOptions[0]?.text || 'Doctor'), reg: (dd && (dd.reg_no || dd.regNo)) || '', specialty: dd ? (dd.specialty || dd.speciality || '') : '' };
+      }
+    }
+    const rxSnap = snap && snap.rx !== undefined ? snap.rx : null;
+    const store = D.store || {};
+    const gstin = store.gstin || store.gstNo || '';
+    const dl = store.dl || store.dl_no || store.dlNo || '';
+    const counter = $('#posMetaCounter')?.textContent?.trim() || '1';
+    const cashier = thermalCashier();
+    const payLabel = { cash: 'Cash', upi: 'UPI', card: 'Card', credit: 'Credit', split: 'Split (Cash + UPI)' }[pay] || (pay || '—');
+    const isDraft = String(invNo).toUpperCase() === 'DRAFT';
+    const schCode = (m) => String((m && m.schedule) || '').trim().toUpperCase().replace(/^SCHEDULE\s+/, '');
+    const isLooseLine = (l) => l.unit === 'loose';
+    const uL = (m) => m.unitLabel || 'Strip';
+    const pL = (m) => m.pieceLabel || 'Tab';
+    // ----- item rows + HSN/GST aggregation -----
+    const hsnAgg = {}; // "hsn|rate" → {taxable, tax}
+    const rows = cart.map((l, i) => {
+      const m = MF.med(l.medId) || {};
+      const b = D.batches.find((x) => String(x.id) === String(l.batchId)) || {};
+      const c = calcLine(l);
+      const sch = schCode(m);
+      const packSize = +m.packSize || 1;
+      const qtyTxt = isLooseLine(l)
+        ? `${l.qty} ${pL(m)}`
+        : `${l.qty} ${uL(m)}`;
+      const subBits = [
+        `Batch: <b>${MF.esc(b.batchNo || '—')}</b>`,
+        b.expiry ? `Exp: <b>${MF.esc(MF.fmtMonthYear(b.expiry))}</b>` : null,
+        isLooseLine(l) ? `Unit: ${MF.esc(pL(m))} (loose, from ${MF.esc(uL(m))} of ${packSize})` : (packSize > 1 ? `Unit: ${MF.esc(uL(m))} (${packSize} ${MF.esc(pL(m))}s)` : `Unit: ${MF.esc(uL(m))}`),
+        packSize > 1 && !isLooseLine(l) ? `${MF.fmt(l.rate / packSize, 2)} per ${MF.esc(pL(m))}` : null,
+        (Number(l.discPct) || 0) > 0 ? `Line discount −${Number(l.discPct)}%` : null,
+      ].filter(Boolean).join(' &nbsp;·&nbsp; ');
+      const gstPct = +m.gst || 0;
+      const key = (m.hsn || '—') + '|' + gstPct;
+      (hsnAgg[key] = hsnAgg[key] || { hsn: m.hsn || '—', rate: gstPct, taxable: 0, tax: 0 });
+      hsnAgg[key].taxable += Math.max(0, c.net - (c.gstAmt || 0));
+      hsnAgg[key].tax += c.gstAmt || 0;
+      return `<tr>
+        <td class="a4-sno">${i + 1}</td>
+        <td class="a4-desc"><b>${MF.esc(m.name || 'Medicine')}${sch ? `<span class="a4-sch">SCHEDULE ${MF.esc(sch)}</span>` : ''}</b>
+          <div class="a4-sub">${subBits}</div></td>
+        <td class="a4-c">${MF.esc(m.hsn || '—')}</td>
+        <td class="a4-c">${gstPct ? gstPct + '%' : '—'}</td>
+        <td class="a4-c">${MF.esc(qtyTxt)}</td>
+        <td class="a4-r">${MF.fmt(l.rate, 2)}</td>
+        <td class="a4-r"><b>${MF.fmt(c.net, 2)}</b></td>
+      </tr>`;
+    }).join('');
+    // ----- summary / payments -----
+    const gstRows = t.gst > 0
+      ? `<div class="a4-sr"><span class="a4-k">Taxable Value</span><span class="num">${MF.fmt(Math.max(0, t.grand - t.gst), 2)}</span></div>
+         <div class="a4-sr"><span class="a4-k">CGST (share)</span><span class="num">${MF.fmt(t.gst / 2, 2)}</span></div>
+         <div class="a4-sr"><span class="a4-k">SGST (share)</span><span class="num">${MF.fmt(t.gst / 2, 2)}</span></div>`
+      : '';
+    const tenderRows = pay === 'cash' && tender
+      ? `<div class="a4-sr"><span class="a4-k">Cash Paid</span><span class="num">${MF.fmt(tender.cashReceived, 2)}</span></div>
+         <div class="a4-sr"><span class="a4-k">Change Returned</span><span class="num">${MF.fmt(tender.changeReturned, 2)}</span></div>`
+      : (pay === 'split'
+        ? `<div class="a4-sr"><span class="a4-k">Cash Part</span><span class="num">${MF.fmt(split.cash, 2)}</span></div>
+           <div class="a4-sr"><span class="a4-k">UPI Part</span><span class="num">${MF.fmt(split.upi, 2)}</span></div>`
+        : (pay === 'credit'
+          ? `<div class="a4-sr"><span class="a4-k">Added to Customer Dues</span><span class="num">${MF.fmt(t.grand, 2)}</span></div>`
+          : ''));
+    const payQr = !isDraft ? payQrDataUrl(t.grand) : null;
+    const upiPanel = (D.store && D.store.upi)
+      ? `<div class="a4-payflex" style="margin-top:8px">
+          ${payQr ? `<img src="${payQr}" alt="UPI QR" style="width:58px;height:58px;flex-shrink:0">` : ''}
+          <div class="a4-upitxt"><b>Scan to pay · UPI</b><br>${MF.esc(D.store.upi)}<br>Amount: <b>${MF.fmt(t.grand, 2)}</b></div>
+        </div>`
+      : '';
+    const hsnRowsHtml = Object.values(hsnAgg).filter((g) => g.tax > 0).map((g) =>
+      `<div class="a4-kv"><span class="k">HSN ${MF.esc(g.hsn)} · ${g.rate}%</span><span class="v num">${MF.fmt(g.taxable, 2)} + tax ${MF.fmt(g.tax, 2)}</span></div>`).join('');
+    const h1Lines = cart.filter((l) => /^(H1|X|NDPS)$/.test(schCode(MF.med(l.medId))));
+    const h1Html = h1Lines.length
+      ? `<h4 style="margin-top:8px">Schedule ${schCode(MF.med(h1Lines[0].medId))} Register Entry</h4>` +
+        h1Lines.map((l) => {
+          const m = MF.med(l.medId) || {};
+          const b = D.batches.find((x) => String(x.id) === String(l.batchId)) || {};
+          return `<div class="a4-kv"><span class="k">${MF.esc(m.name || 'Drug')} (${l.qty} ${isLooseLine(l) ? MF.esc(pL(m)) : MF.esc(uL(m))})</span><span class="v num">${MF.esc(b.batchNo || '—')} / ${b.expiry ? MF.esc(MF.fmtMonthYear(b.expiry)) : '—'}</span></div>`;
+        }).join('') +
+        `${doc ? `<div class="a4-kv"><span class="k">Prescriber</span><span class="v">${MF.esc(doc.name || '')}${doc.reg ? ' · Reg. ' + MF.esc(doc.reg) : ''}</span></div>` : ''}
+         ${rxSnap && rxSnap.rx_no ? `<div class="a4-kv"><span class="k">Prescription retained</span><span class="v">Yes (${MF.esc(rxSnap.rx_no)})</span></div>` : ''}
+         <div class="a4-kv"><span class="k">Signature of purchaser</span><span class="v">____________________</span></div>`
+      : '';
+    const docBox = doc
+      ? `<div class="a4-ibox">
+          <h4>Prescriber</h4>
+          <div class="a4-nm">${MF.esc(doc.name || '')}</div>
+          ${doc.specialty ? `<div>${MF.esc(doc.specialty)}</div>` : ''}
+          ${doc.reg ? `<div>Reg. No.: ${MF.esc(doc.reg)}</div>` : ''}
+          ${rxSnap && rxSnap.rx_no ? `<div>Rx: ${MF.esc(rxSnap.rx_no)}${rxSnap.rx_date ? ' · ' + MF.esc(String(rxSnap.rx_date).slice(0, 10)) : ''}</div>` : ''}
+        </div>`
+      : '';
+    return `<style>
+      @page { size: A4; margin: 12mm 12mm 10mm; }
+      .a4-rc { width:180mm; margin:0 auto; background:#fff; color:#111827; font-family:Arial, Helvetica, "Segoe UI", sans-serif;
+        font-size:11.5px; line-height:1.45; }
+      .a4-rc .num { font-variant-numeric:tabular-nums; }
+      .a4-lh { display:flex; gap:12px; align-items:flex-start; padding-bottom:9px; border-bottom:2.5px solid #176B5B; }
+      .a4-logo { width:48px; height:48px; border-radius:11px; background:#176B5B; color:#fff; display:flex; align-items:center; justify-content:center;
+        font-size:20px; font-weight:800; flex-shrink:0; }
+      .a4-shop { font-size:20px; font-weight:800; letter-spacing:.02em; }
+      .a4-tag { font-size:9.5px; color:#4b5563; letter-spacing:.16em; text-transform:uppercase; margin-top:1px; }
+      .a4-addr { font-size:10.5px; color:#4b5563; margin-top:4px; line-height:1.5; }
+      .a4-lhr { text-align:right; font-size:10px; color:#4b5563; line-height:1.6; min-width:60mm; margin-left:auto; }
+      .a4-copytag { display:inline-block; border:1px solid #176B5B; color:#176B5B; font-size:8.5px; font-weight:800;
+        letter-spacing:.12em; padding:2.5px 8px; border-radius:4px; text-transform:uppercase; margin-bottom:5px; }
+      .a4-title { display:flex; justify-content:space-between; align-items:center; margin:10px 0 8px; }
+      .a4-title h2 { font-size:15px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; margin:0; }
+      .a4-title .a4-meta { font-size:10.5px; color:#4b5563; text-align:right; line-height:1.55; }
+      .a4-grid { display:grid; grid-template-columns:1.2fr 1fr 0.9fr; border:1px solid #111827; margin-bottom:10px; }
+      .a4-ibox { padding:7px 9px; border-right:1px solid #d1d5db; font-size:10.5px; }
+      .a4-ibox:last-child { border-right:0; }
+      .a4-ibox h4, .a4-panel h4, .a4-words h4 { font-size:8.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#4b5563; margin:0 0 4px; }
+      .a4-nm { font-weight:800; font-size:12px; }
+      .a4-ibox .a4-kv, .a4-panel .a4-kv { display:flex; justify-content:space-between; gap:8px; }
+      .a4-ibox .a4-kv span:first-child, .a4-panel .a4-kv .k { color:#4b5563; }
+      .a4-items { width:100%; border-collapse:collapse; margin-bottom:4px; }
+      .a4-items th { background:#f3f4f6; font-size:8.8px; font-weight:800; letter-spacing:.07em; text-transform:uppercase;
+        padding:6px 7px; border:1px solid #111827; text-align:left; }
+      .a4-items td { padding:6px 7px; border:1px solid #d1d5db; font-size:11px; vertical-align:top; }
+      .a4-items .a4-r { text-align:right; } .a4-items .a4-c { text-align:center; }
+      .a4-sno { width:8mm; text-align:center; font-weight:700; }
+      .a4-sub { color:#4b5563; font-size:9.5px; margin-top:2px; line-height:1.5; }
+      .a4-sch { display:inline-block; border:1px solid #111827; font-size:8.5px; font-weight:800; padding:0 4px; margin-left:5px; vertical-align:1px; }
+      .a4-sumrow { display:flex; gap:10px; margin-top:6px; align-items:flex-start; }
+      .a4-words { flex:1; border:1px solid #d1d5db; padding:7px 9px; font-size:10.5px; }
+      .a4-words b { font-size:11.5px; }
+      .a4-summary { width:70mm; border:1px solid #111827; }
+      .a4-sr { display:flex; justify-content:space-between; padding:5px 9px; font-size:11px; border-bottom:1px solid #d1d5db; }
+      .a4-sr:last-child { border-bottom:0; }
+      .a4-sr .a4-k { color:#4b5563; }
+      .a4-sr.a4-net { background:#e6f4ef; font-weight:800; font-size:13px; border-top:1.5px solid #111827; }
+      .a4-sr.a4-net .a4-k { color:#111827; }
+      .a4-payflex { display:flex; gap:9px; align-items:center; }
+      .a4-upitxt { font-size:9.5px; color:#4b5563; }
+      .a4-lower { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+      .a4-panel { border:1px solid #d1d5db; padding:8px 10px; font-size:9.5px; line-height:1.6; }
+      .a4-panel ol { margin-left:13px; } .a4-panel li { margin:2px 0; }
+      .a4-panel .a4-kv .v { font-weight:700; }
+      .a4-signrow { display:flex; justify-content:space-between; gap:18px; margin-top:20px; padding-top:6px; }
+      .a4-sign { width:58mm; text-align:center; font-size:10px; color:#4b5563; }
+      .a4-sign .a4-line { border-top:1px solid #111827; margin:30px 0 4px; }
+      .a4-sign b { color:#111827; }
+      .a4-decl { margin-top:10px; font-size:9px; color:#4b5563; text-align:center; border-top:1px dashed #d1d5db; padding-top:6px; }
+      .a4-foot { margin-top:6px; padding-top:6px; text-align:center; font-size:9px; letter-spacing:.08em; color:#9ca3af;
+        text-transform:uppercase; border-top:1px solid #d1d5db; }
+      @media print { .a4-rc { width:auto; margin:0; } }
+    </style>
+    <div class="a4-rc">
+      <div class="a4-lh">
+        <div class="a4-logo">+</div>
+        <div>
+          <div class="a4-shop">${MF.esc(String(store.name || 'Pharmacy').toUpperCase())}</div>
+          <div class="a4-tag">Retail Chemist &amp; Druggist</div>
+          <div class="a4-addr">
+            ${store.address ? `${MF.esc(store.address)}<br>` : ''}
+            ${store.phone ? `Ph: ${MF.esc(store.phone)}` : ''}
+          </div>
+        </div>
+        <div class="a4-lhr">
+          <div class="a4-copytag">${isDraft ? 'Draft · Not an Invoice' : 'Original · Customer Copy'}</div>
+          ${gstin ? `<div style="font-weight:700;color:#111827">GSTIN: ${MF.esc(gstin)}</div>` : ''}
+          ${dl ? `<div>Drug Lic. No.: ${MF.esc(dl)}</div>` : ''}
+        </div>
       </div>
-      <div class="d-flex justify-content-between small mb-2">
-        <span>Invoice: <strong>${invNo}</strong></span><span>${MF.fmtDate(MF.today())}</span>
+      <div class="a4-title">
+        <h2>${isDraft ? 'Draft Bill' : 'Tax Invoice'}</h2>
+        <div class="a4-meta num">
+          Invoice No: <b>${MF.esc(invNo)}</b><br>
+          Date &amp; Time: <b>${dmy} · ${hm}</b>
+        </div>
       </div>
-      <div class="small mb-2">Customer: <strong>${MF.esc(cust.name || 'Customer')}</strong> · Payment: <strong>${payLabel}</strong></div>
-      <table class="table table-sm table-bordered small">
-        <thead><tr><th>Item</th><th class="text-center">Qty</th><th class="text-end">Rate</th><th class="text-end">Amt</th></tr></thead>
-        <tbody>${cart.map((l) => {
-          const m = MF.med(l.medId), c = calcLine(l);
-          return `<tr><td>${MF.esc(m.name)}</td><td class="text-center">${l.qty}</td><td class="text-end num">${MF.fmt(l.rate, 2)}</td><td class="text-end num">${MF.fmt(c.net, 2)}</td></tr>`;
-        }).join('')}</tbody>
+      <div class="a4-grid">
+        <div class="a4-ibox">
+          <h4>Patient / Bill To</h4>
+          <div class="a4-nm">${MF.esc(custCard.name || 'Customer')}</div>
+          ${custCard.phone ? `<div>Ph: ${MF.esc(custCard.phone)}</div>` : ''}
+          ${custCard.address ? `<div>${MF.esc(custCard.address)}</div>` : ''}
+        </div>
+        ${docBox || `<div class="a4-ibox">
+          <h4>Prescriber</h4>
+          <div class="a4-nm">—</div>
+          <div>Over-the-counter sale</div>
+        </div>`}
+        <div class="a4-ibox">
+          <h4>Invoice Details</h4>
+          <div class="a4-kv"><span>Invoice No.</span><span class="num">${MF.esc(invNo)}</span></div>
+          <div class="a4-kv"><span>Date</span><span class="num">${dmy}</span></div>
+          <div class="a4-kv"><span>Cashier</span><span>${MF.esc(cashier || '—')}</span></div>
+          <div class="a4-kv"><span>Counter</span><span class="num">${MF.esc(counter)}</span></div>
+          <div class="a4-kv"><span>Payment</span><span>${MF.esc(payLabel)}</span></div>
+        </div>
+      </div>
+      <table class="a4-items num">
+        <thead><tr>
+          <th class="a4-sno">#</th>
+          <th>Description of Goods (Batch · Expiry · Unit)</th>
+          <th style="width:14mm" class="a4-c">HSN</th>
+          <th style="width:11mm" class="a4-c">GST</th>
+          <th style="width:17mm" class="a4-c">Qty</th>
+          <th style="width:19mm" class="a4-r">Rate</th>
+          <th style="width:22mm" class="a4-r">Amount</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
       </table>
-      <div class="ms-auto" style="max-width:260px">
-        <div class="sum-row"><span class="text-2">Subtotal</span><span class="num">${MF.fmt(t.subtotal, 2)}</span></div>
-        <div class="sum-row"><span class="text-2">Discount</span><span class="num">− ${MF.fmt(t.discount, 2)}</span></div>
-        <div class="sum-row"><span class="text-2">Round off</span><span class="num">${t.roundOff >= 0 ? '+' : '−'} ${MF.fmt(Math.abs(t.roundOff), 2)}</span></div>
-        <div class="sum-row total"><span>Total</span><span class="num">${MF.fmt(t.grand)}</span></div>
-        ${tenderRows}
+      <div class="a4-sumrow">
+        <div class="a4-words">
+          <h4>Amount in Words</h4>
+          <b>RUPEES ${numWords(t.grand)} ONLY</b>
+          <div style="margin-top:5px;color:#4b5563">
+            All prices are MRP inclusive of applicable taxes.${t.gst > 0 ? ' Tax amounts derive from the medicines\' own GST rates (dynamic per item).' : ''}
+          </div>
+          ${upiPanel}
+        </div>
+        <div class="a4-summary num">
+          <div class="a4-sr"><span class="a4-k">Gross Amount</span><span>${MF.fmt(t.subtotal, 2)}</span></div>
+          <div class="a4-sr"><span class="a4-k">Less: Discount</span><span>− ${MF.fmt(t.discount, 2)}</span></div>
+          ${gstRows}
+          <div class="a4-sr"><span class="a4-k">Round Off</span><span>${t.roundOff >= 0 ? '+' : '−'} ${MF.fmt(Math.abs(t.roundOff), 2)}</span></div>
+          <div class="a4-sr a4-net"><span class="a4-k">NET PAYABLE</span><span>₹ ${MF.fmt(t.grand)}</span></div>
+          ${tenderRows}
+        </div>
       </div>
-      <p class="text-center text-2 small-xs mt-3 mb-0">Medicines once sold will not be taken back without valid reason · Get well soon!</p>`;
-    // Thermal 80mm roll → narrow, compact column; A4 → the normal width.
-    return fmt === 'thermal'
-      ? `<div style="width:72mm; margin:0 auto; font-size:11px; line-height:1.42;">${html}</div>`
-      : html;
+      <div class="a4-lower">
+        <div class="a4-panel">
+          <h4>Terms &amp; Conditions</h4>
+          <ol>
+            <li>Goods once sold will not be taken back or exchanged except for quality/manufacturing defect, within 7 days of purchase with this invoice.</li>
+            <li>Medicines to be stored below 30°C, away from direct sunlight &amp; out of reach of children. Finish the full course as directed.</li>
+            <li>Schedule H / H1 drugs are dispensed only against a valid prescription, retained at the store for inspection.</li>
+            <li>Subject to local jurisdiction. E. &amp; O.E.</li>
+          </ol>
+          ${h1Html}
+        </div>
+        <div class="a4-panel">
+          <h4>Declaration</h4>
+          <div>We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.</div>
+          ${hsnRowsHtml ? `<h4 style="margin-top:7px">Tax Summary (HSN-wise)</h4>${hsnRowsHtml}
+          <div class="a4-kv"><span class="k">Total Tax</span><span class="v num">₹ ${MF.fmt(t.gst, 2)}</span></div>` : ''}
+          <h4 style="margin-top:7px">Returns / Help</h4>
+          <div>Keep this invoice for any exchange or insurance claim.${store.phone ? `<br>Helpline: ${MF.esc(store.phone)}` : ''}</div>
+        </div>
+      </div>
+      <div class="a4-signrow">
+        <div class="a4-sign">
+          <div class="a4-line"></div>
+          <b>Customer Signature</b><br>(${MF.esc(custCard.name || 'Customer')})
+        </div>
+        <div class="a4-sign">
+          <div class="a4-line"></div>
+          <b>For ${MF.esc(String(store.name || 'Pharmacy').toUpperCase())}</b><br>Authorised Signatory
+        </div>
+      </div>
+      <div class="a4-decl">This is a computer-generated invoice${isDraft ? ' — DRAFT, not valid for tax purposes' : ''}</div>
+      <div class="a4-foot">Thank you · Get well soon · धन्यवाद</div>
+    </div>`;
   }
 
   /* ===== Last-bill reprint chip =====
@@ -2193,8 +2660,21 @@
         split: { cash: state.split.cash, upi: state.split.upi },
         tender: state.tender ? { cashReceived: state.tender.cashReceived, changeReturned: state.tender.changeReturned } : null,
         cust: cust ? { id: cust.id, name: cust.name, phone: cust.phone || '' } : null,
+        at: Date.now(), // the receipt shows the SALE's moment, not the reprint's
+        doctor: (() => {
+          const dv = $('#posDoctor')?.value;
+          if (!dv) return null;
+          const dd = (D.doctors || []).find((x) => String(x.id) === String(dv));
+          return { id: dv, name: dd ? dd.name : ($('#posDoctor').selectedOptions[0]?.text || 'Doctor'), reg: (dd && (dd.reg_no || dd.regNo)) || '' };
+        })(),
+        rx: (() => {
+          const rid = $('#posRx')?.value;
+          if (!rid) return null;
+          const row = (state.rxRows || []).find((r) => String(r.id) === String(rid));
+          return row ? { id: rid, rx_no: row.rx_no || '', rx_date: row.rx_date || '' } : { id: rid };
+        })(),
       },
-      t: { subtotal: t.subtotal, discount: t.discount, roundOff: t.roundOff, grand: t.grand },
+      t: { subtotal: t.subtotal, discount: t.discount, roundOff: t.roundOff, grand: t.grand, gst: t.gst || 0 },
     };
     try {
       localStorage.setItem('mf-pos-lastbill', JSON.stringify({ v: 1, bill: state.lastBill }));
@@ -2215,7 +2695,7 @@
   function reprintLastBill(fmt) {
     const b = state.lastBill;
     if (!b) { MF.toast('No completed bill to reprint yet on this counter.', 'warn', 'Reprint'); return; }
-    MF.printHtml(receiptHtml(b.invNo, b.t, fmt, b.snap));
+    MF.printHtml(fmt === 'thermal' ? thermalReceiptHtml(b.invNo, b.t, b.snap) : a4ReceiptHtml(b.invNo, b.t, b.snap));
   }
   function initLastBillChip() {
     const chip = $('#posLastBill'), menu = $('#posReprintMenu');
@@ -2225,6 +2705,8 @@
     document.addEventListener('click', (e) => { if (!e.target.closest('#posReprintMenu')) menu.hidden = true; });
     $('#posReprintThermal')?.addEventListener('click', () => { menu.hidden = true; reprintLastBill('thermal'); });
     $('#posReprintA4')?.addEventListener('click', () => { menu.hidden = true; reprintLastBill('a4'); });
+    $('#posReprintMm')?.addEventListener('click', () => { setThermalMm(thermalMm() === '80' ? '58' : '80'); menu.hidden = true; MF.toast('Thermal width set to ' + thermalMm() + 'mm.', 'info', 'Receipt'); });
+    paintThermalMmLabels();
   }
 
   /* ===== Business credit gate =====
@@ -2441,7 +2923,9 @@
         changeReturned: tender.changeReturned,
         items: state.cart.map((l) => ({ medId: l.medId, batchId: l.batchId, qty: l.qty, rate: l.rate, discPct: l.discPct, unit: l.unit || 'pack' })),
       });
-      MF.printHtml(receiptHtml(res.invoiceNo, t, state.printFmt));
+      MF.printHtml(state.printFmt === 'thermal'
+        ? thermalReceiptHtml(res.invoiceNo, t)
+        : a4ReceiptHtml(res.invoiceNo, t));
       saveLastBill(res.invoiceNo, t);
       paintLastBill();
       MF.toast(`${res.invoiceNo} · ${MF.fmt(res.grandTotal)} · ${state.payment.toUpperCase()}`, 'success', 'Sale completed');
@@ -2917,9 +3401,9 @@
     pickerClose(st, false);
     pickerSyncLabel(st.selId);
     rxNudgeSync(); // a field just got settled — the glow may clear
-    // Inside the Scan & Send modal, stay put — yanking focus to the bill search
-    // would kick the user out of the attach form mid-flow.
-    if (!$('#posScanRxModal')?.classList.contains('show')) $('#posSearch').focus();
+    // Inside any capture modal, stay put — yanking focus to the bill search
+    // would kick the user out of the form mid-flow.
+    if (!['#posScanRxModal', '#posRxPendModal'].some((m) => $(m)?.classList.contains('show'))) $('#posSearch').focus();
   }
   function initPicker(selId, addBtnId, kind) {
     const sel = $(selId); if (!sel || pickerState[selId]) return;
@@ -2958,7 +3442,7 @@
         else pickerClose(st);
         return;
       }
-      if (e.key === 'Escape') { e.stopPropagation(); pickerClose(st); if (!$('#posScanRxModal')?.classList.contains('show')) $('#posSearch').focus(); }
+      if (e.key === 'Escape') { e.stopPropagation(); pickerClose(st); if (!['#posScanRxModal', '#posRxPendModal'].some((m) => $(m)?.classList.contains('show'))) $('#posSearch').focus(); }
     });
     st.menu.addEventListener('mousedown', (e) => e.preventDefault()); // keep input focus while clicking
     st.menu.addEventListener('click', (e) => {
@@ -3035,10 +3519,9 @@
     rpActive = state.rxPending[i] || null;
     if (!rpActive) return;
     $('#rpFormTitle').textContent = 'Capture — ' + rpActive.invoice_no;
-    const docSel = $('#rpDoctor');
-    docSel.innerHTML = '<option value="">— select doctor —</option>' +
-      ((D.doctors || []).slice().sort((a, b) => String(a.name).localeCompare(String(b.name)))
-        .map((d) => `<option value="${MF.esc(d.id)}">${MF.esc(d.name)}</option>`).join(''));
+    // Fresh form per capture: live doctor source (same engine as the QR modal's).
+    $('#rpDoctor').value = '';
+    MF.refillRxDoctor('#rpDoctor');
     $('#rpDate').value = MF.today();
     $('#rpFormWrap').hidden = false;
     setTimeout(() => $('#rpPatient').focus(), 150);
@@ -3109,7 +3592,7 @@
    polling ships "without refresh" honestly). Attach writes a REAL prescription
    (photo kept on the register entry), claims the inbox row, and auto-selects the
    script in the bill's dropdown through the same onRxPick path. */
-  console.debug('[pos] build 2026-10-06.17 — chips in global top bar + deep links'); // cache diagnosis aid
+  console.debug('[pos] build 2026-10-06.21 — a4 invoice engine'); // cache diagnosis aid
   state.rxInbox = [];
   let sxActive = null;
   let sxPhoneEditingId = 0; // inbox row id whose inline phone editor is open (poll freeze)
@@ -3221,13 +3704,10 @@
       if (e.key === 'Escape') { e.preventDefault(); done(); paintScanRxList(); }
     });
   }
-  // Central doctor-option refill for the Scan & Send modal — also called by the
-  // inline quick-add flow after a doctor is created mid-attach.
-  // Mirrors fillDoctors(): bootstrap D.doctors is unreliable on this page, so the
-  // live doctors.php list is the real source (same shape, same specialty suffix).
-  MF.refillSxDoctor = async function (preferId) {
-    const sel = $('#sxDoctor'); if (!sel) return;
-    const keep = preferId || sel.value;
+  // The ONE live doctor source for every picker on this page (bootstrap D.doctors is
+  // unreliable here). Mirrors fillDoctors(): live doctors.php first, bootstrap fallback,
+  // Active only, alphabetical, name + specialty label.
+  async function doctorRowsLive() {
     let rows = Array.isArray(D.doctors) ? D.doctors.slice() : [];
     if (MF.Api && MF.Api.live) {
       try {
@@ -3237,15 +3717,24 @@
         if (list.length) rows = list;
       } catch (e) { /* keep bootstrap doctors */ }
     }
-    rows = rows.filter((d) => d && d.name && d.status !== 'Inactive');
-    rows.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    return rows
+      .filter((d) => d && d.name && d.status !== 'Inactive')
+      .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  }
+  // Repaints ANY doctor select (repaints its picker input + open menu too).
+  MF.refillRxDoctor = async function (selId, preferId) {
+    const sel = $(selId); if (!sel) return;
+    const keep = preferId || sel.value;
+    const rows = await doctorRowsLive();
     sel.innerHTML = '<option value="">— select doctor —</option>' +
       rows.map((d) => `<option value="${MF.esc(d.id)}">${MF.esc(d.name)}${d.specialty ? ' — ' + MF.esc(d.specialty) : ''}</option>`).join('');
     if (keep) sel.value = keep;
-    sel.dispatchEvent(new Event('change', { bubbles: true })); // repaints the picker input
-    const st = pickerState['#sxDoctor'];
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    const st = pickerState[selId];
     if (st && st.open) pickerPaintMenu(st); // list up-to-date if the menu is open
   };
+  // Legacy name kept for the inline quick-add flow (#sxDoctor is the Scan & Send one).
+  MF.refillSxDoctor = function (preferId) { return MF.refillRxDoctor('#sxDoctor', preferId); };
   // Bill-as-customer choices for the active inbox photo (patient ≠ account):
   //   ''        → keep the bill's current customer        (explicit default)
   //   '__new__' → create a customer from patient name      (default for unknown senders;
@@ -3446,6 +3935,7 @@
     initPicker('#posCustomer', '#posAddCustomer', 'customer');
     initPicker('#posDoctor', '#posAddDoctor', 'doctor');
     initPicker('#sxDoctor', '#sxAddDoctor', 'doctor'); // same searchable picker inside the Scan & Send modal
+    initPicker('#rpDoctor', '#rpAddDoctor', 'doctor'); // and inside the Rx-capture modal
     initLastBillChip();
 
     // Rx capture-later queue wiring

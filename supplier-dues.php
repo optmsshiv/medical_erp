@@ -28,9 +28,9 @@ require __DIR__ . '/middleware/auth.php';
     .sd-act-menu .dropdown-item:hover { background:var(--mf-primary-soft); color:var(--mf-primary-dark); }
     .sd-name { font-weight:700; color:#1b2430; }
     .sd-muted { display:block; margin-top:2px; color:#8b9bb0; font-size:.75rem; font-weight:600; line-height:1.3; }
-    .sd-gstin { font-size:.78rem; font-weight:700; letter-spacing:.03em; color:var(--mf-primary-dark); white-space:nowrap; }
+    .sd-gstin { font-size:.78rem; font-weight:700; letter-spacing:.03em; color:var(--mf-primary-dark); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:132px; display:inline-block; vertical-align:bottom; }
     .sd-due { color:#B02A37; font-weight:700; }
-    .sd-wide { min-width:1080px; }
+    .sd-wide { table-layout:fixed; width:100%; }
     .sd-ledger { border:1px solid #e3ebf4; border-radius:16px; background:#fff; overflow:hidden; box-shadow:0 1px 2px rgba(22,50,92,.04), 0 10px 28px rgba(22,50,92,.04); }
     .sd-ledger-search { display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid #e7eef6; background:#fff; }
     .sd-ledger-search > i { color:#8b9bb0; font-size:15px; }
@@ -52,6 +52,17 @@ require __DIR__ . '/middleware/auth.php';
     .sd-ledger-foot .page-item.active .page-link { background:var(--mf-primary); border-color:var(--mf-primary); color:#fff; }
     .sd-ledger-foot .page-link:hover { background:var(--mf-primary-soft); color:var(--mf-primary-dark); }
     .sd-ledger-note { color:#8b9bb0; font-size:.78rem; line-height:1.45; padding:10px 16px 12px; margin:0; border-top:1px solid #eef3f8; background:#fbfcfe; }
+    /* ------- Premium ledger column fit pass ------- */
+    .sd-num { font-variant-numeric:tabular-nums; }
+    .sd-bar { height:4px; width:86px; max-width:100%; border-radius:4px; background:#EDF1F4; margin:5px 0 0 auto; overflow:hidden; }
+    .sd-bar i { display:block; height:100%; border-radius:4px; background:linear-gradient(90deg,#34B399,#176B5B); }
+    .sd-row-overdue > td:first-child { box-shadow:inset 3px 0 0 #E5484D; }
+    .sd-row-advance > td:first-child { box-shadow:inset 3px 0 0 #0EA5E9; }
+    .sd-ledger .table-mf tbody tr.sd-row-overdue:hover td { background:#FEF6F6; }
+    .sd-ledger .table-mf tbody tr.sd-row-advance:hover td { background:#F2F9FE; }
+    .sd-adv-sub { display:block; margin-top:2px; font-size:.68rem; font-weight:700; color:#0369A1; white-space:nowrap; }
+    @media (max-width:1199.98px) { .sd-h-lg { display:none; } }
+    @media (max-width:767.98px) { .sd-h-md { display:none; } }
   </style>
 </head>
 <body data-page="supplier-dues">
@@ -84,15 +95,15 @@ require __DIR__ . '/middleware/auth.php';
             <table class="table table-mf sd-wide">
               <thead>
                 <tr>
-                  <th>Supplier</th>
-                  <th>GSTIN</th>
-                  <th class="text-end">Open bills</th>
-                  <th class="text-end">Billed</th>
-                  <th class="text-end">Paid</th>
-                  <th class="text-end">Due</th>
-                  <th>Oldest open</th>
-                  <th>Position</th>
-                  <th class="text-end">Actions</th>
+                  <th style="width:23%">Supplier</th>
+                  <th class="sd-h-lg" style="width:11%">GSTIN</th>
+                  <th class="text-end sd-h-md" style="width:8%">Open bills</th>
+                  <th class="text-end" style="width:11%">Billed</th>
+                  <th class="text-end" style="width:11%">Paid</th>
+                  <th class="text-end" style="width:11%">Due</th>
+                  <th style="width:10%">Oldest open</th>
+                  <th style="width:9%">Position</th>
+                  <th class="text-end" style="width:6%">Actions</th>
                 </tr>
               </thead>
               <tbody id="sdBody"></tbody>
@@ -314,18 +325,20 @@ require __DIR__ . '/middleware/auth.php';
         $('#sdBody').innerHTML = slice.map((r) => {
           const phone = formatPhone(r.phone);
           const dueCls = Number(r.outstanding) > 0.009 ? 'sd-due' : 'num';
-          return `<tr>
+          const rowCls = Number(r.outstanding) > 0.009 ? 'sd-row-overdue' : (r.position === 'Advance' ? 'sd-row-advance' : '');
+          const payPct = Number(r.billed) > 0 ? Math.min(100, Math.round(Math.min(Number(r.billed), Number(r.amount_paid) || 0) / Number(r.billed) * 100)) : null;
+          return `<tr${rowCls ? ` class="${rowCls}"` : ''}>
             <td>
               <div class="sd-name">${MF.esc(r.supplier_name || '—')}</div>
               ${phone ? `<span class="sd-muted">${MF.esc(phone)}</span>` : ''}
             </td>
-            <td>${r.gstin ? `<span class="sd-gstin">${MF.esc(r.gstin)}</span>` : '<span class="text-2">—</span>'}</td>
-            <td class="text-end num">${MF.num(r.open_bills)}</td>
-            <td class="text-end num">${MF.fmt(r.billed)}</td>
-            <td class="text-end num">${MF.fmt(r.amount_paid)}</td>
+            <td class="sd-h-lg">${r.gstin ? `<span class="sd-gstin" title="${MF.esc(r.gstin)}">${MF.esc(r.gstin)}</span>` : '<span class="text-2">—</span>'}</td>
+            <td class="text-end num sd-h-md">${MF.num(r.open_bills)}</td>
+            <td class="text-end sd-num">${MF.fmt(r.billed)}</td>
+            <td class="text-end sd-num">${MF.fmt(r.amount_paid)}${payPct != null ? `<div class="sd-bar"><i style="width:${payPct}%"></i></div>` : ''}</td>
             <td class="text-end ${dueCls}">${MF.fmt(r.outstanding)}</td>
             <td>${oldestCell(r)}</td>
-            <td>${statusBadge(r.position)}${r.position === 'Advance' && advOf(r) > 0 ? `<div class="sd-muted num" style="font-size:.68rem">+₹${MF.fmt(advOf(r))}</div>` : ''}</td>
+            <td>${statusBadge(r.position)}${r.position === 'Advance' && advOf(r) > 0 ? `<span class="sd-adv-sub">ADV +₹${MF.fmt(advOf(r))}</span>` : ''}</td>
             <td class="text-end">
               <div class="dropdown">
                 <button type="button" class="btn btn-icon btn-light-mf sd-kebab" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-label="Actions"><i class="bi bi-three-dots-vertical"></i></button>
