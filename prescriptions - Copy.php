@@ -154,32 +154,6 @@ require __DIR__ . '/middleware/auth.php';
       .rx-grid-head { display:none; }
       .rx-grid-head, .rx-line { grid-template-columns:1fr 1fr; }
     }
-    /* ------- Scanned prescription: thumbs + pro photo viewer ------- */
-    .rxcell { display:flex; align-items:center; gap:10px; min-width:0; }
-    .rx-thumb { width:38px; height:42px; border-radius:8px; object-fit:cover; border:1px solid #e3ebf4; box-shadow:0 1px 3px rgba(22,50,92,.12); cursor:zoom-in; flex:0 0 38px; background:#F1F5F9; }
-    .rx-thumb:hover { border-color:#176B5B; }
-    .rx-photocard { margin:12px 0 4px; border:1px solid #e3ebf4; border-radius:14px; overflow:hidden; background:#f8fafc; }
-    .rx-photocard img { display:block; width:100%; max-height:230px; object-fit:cover; cursor:zoom-in; }
-    .rx-photocard .cap { display:flex; align-items:center; gap:8px; padding:8px 12px; font-size:.74rem; font-weight:650; color:#516278; background:#fff; border-top:1px solid #eef3f8; flex-wrap:wrap; }
-    .rx-photocard .cap i { color:#176B5B; }
-    .rx-photocard .cap .rx-plink { margin-left:auto; border:0; background:none; color:#176B5B; font-weight:700; font-size:.74rem; cursor:pointer; padding:0; }
-    .rx-photocard .cap a.rx-dl { color:#176B5B; text-decoration:none; font-weight:700; }
-    .rxx { position:fixed; inset:0; z-index:2000; background:rgba(8,14,28,.93); backdrop-filter:blur(8px); display:none; }
-    .rxx.open { display:block; }
-    .rxx-top { position:absolute; top:0; left:0; right:0; display:flex; align-items:center; gap:12px; padding:14px 18px; color:#DBE4F3; z-index:2; background:linear-gradient(rgba(8,14,28,.7), transparent); }
-    .rxx-meta { min-width:0; }
-    .rxx-title { font-weight:750; font-size:.95rem; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .rxx-sub { font-size:.72rem; color:#9FB0C9; }
-    .rxx-tools { margin-left:auto; display:flex; align-items:center; gap:6px; flex-wrap:nowrap; }
-    .rxx-btn { width:38px; height:38px; border-radius:10px; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.06); color:#E8EEF9; display:inline-flex; align-items:center; justify-content:center; font-size:1rem; cursor:pointer; transition:background .15s ease, border-color .15s ease; text-decoration:none; }
-    .rxx-btn:hover { background:rgba(255,255,255,.14); border-color:rgba(255,255,255,.3); }
-    .rxx-zoom { min-width:52px; text-align:center; font-size:.8rem; font-weight:700; color:#DBE4F3; font-variant-numeric:tabular-nums; }
-    .rxx-stage { position:absolute; inset:58px 0 0; overflow:hidden; cursor:grab; display:flex; align-items:center; justify-content:center; }
-    .rxx-stage.pan { cursor:grabbing; }
-    .rxx-stage img { max-width:92vw; max-height:86vh; user-select:none; -webkit-user-drag:none; box-shadow:0 24px 80px rgba(0,0,0,.5); border-radius:6px; transition:transform .12s ease-out; transform-origin:center center; }
-    .rxx-nav { position:absolute; top:50%; transform:translateY(-50%); width:44px; height:64px; border-radius:12px; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.07); color:#fff; font-size:1.25rem; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:2; }
-    .rxx-nav:hover { background:rgba(255,255,255,.16); }
-    .rxx-prev { left:14px; } .rxx-next { right:14px; }
   </style>
 </head>
 <body data-page="prescriptions">
@@ -497,7 +471,7 @@ require __DIR__ . '/middleware/auth.php';
               ? `<button type="button" class="rx-flow-btn" data-a="dispense" data-id="${MF.esc(r.id)}"><i class="bi bi-check2 me-1"></i>Dispense</button>`
               : '';
           return `<tr>
-          <td><div class="rxcell">${r.has_photo ? `<img class="rx-thumb" src="${MF.esc(r.image_path)}" alt="Rx photo" loading="lazy" data-a="photo" data-id="${MF.esc(r.id)}">` : ''}<span style="min-width:0"><span class="rx-name num">${MF.esc(r.rx_no || '—')}</span><span class="rx-when">${MF.esc(clock(r))}</span></span></div></td>
+          <td><span class="rx-name num">${MF.esc(r.rx_no || '—')}</span><span class="rx-when">${MF.esc(clock(r))}</span></td>
           <td><span class="rx-name">${MF.esc(r.patient_name || '—')}</span>${age}${phone}</td>
           <td>${r.doctor_name ? MF.esc(r.doctor_name) : '<span class="text-2">—</span>'}${r.specialty ? `<span class="rx-when">${MF.esc(r.specialty)}</span>` : ''}</td>
           <td>${r.diagnosis ? MF.esc(r.diagnosis) : '<span class="text-2">—</span>'}${names.length ? `<div>${names.map((n) => `<span class="rx-sq">${MF.esc(n)}</span>`).join('')}</div>` : ''}</td>
@@ -862,7 +836,6 @@ require __DIR__ . '/middleware/auth.php';
       async function onAction(action, id) {
         const row = state.rows.find((r) => String(r.id) === String(id));
         if (!row) return;
-        if (action === 'photo') return rxPhotoOpen(row.id);
         if (action === 'view') return openView(row);
         if (action === 'edit') return openEdit(row);
         if (action === 'dispense') return openDispense(row);
@@ -1053,114 +1026,13 @@ require __DIR__ . '/middleware/auth.php';
             ${fact('Status', statusPill(row.status))}
             <div class="alone"><div class="k">Diagnosis / Notes</div><div class="v">${MF.esc(row.diagnosis || '—')}</div></div>
           </div>
-          ${photoCard(row)}
           ${medicineTable(items)}`;
-        $('#rxViewBody').querySelectorAll('[data-photo]').forEach((el) => el.addEventListener('click', () => rxPhotoOpen(el.dataset.photo)));
         $('#rxEditView').hidden = !pending;
         $('#rxMarkReady').hidden = !pending;
         $('#rxComplete').hidden = true;
         $('#rxCancelRx').hidden = row.status === 'Cancelled';
         bootstrap.Modal.getOrCreateInstance($('#rxViewModal')).show();
       }
-
-      /* =============== Scanned prescription — pro photo viewer ===============
-         Zoom (buttons / wheel / dblclick), drag-pan when zoomed, rotate,
-         download, and prev/next across every prescription that has a photo.
-         Keyboard: arrows to step, +/- zoom, Esc to close. */
-      function photoCard(row) {
-        if (!row.has_photo || !row.image_path) return '';
-        return `
-          <div class="rx-photocard">
-            <img src="${MF.esc(row.image_path)}" alt="Scanned prescription" data-photo="${MF.esc(row.id)}">
-            <div class="cap"><i class="bi bi-camera-fill"></i><span>Scanned prescription attached to this record</span><button type="button" class="rx-plink" data-photo="${MF.esc(row.id)}">Enlarge</button><a class="rx-dl" href="${MF.esc(row.image_path)}" target="_blank" rel="noopener" download>Download</a></div>
-          </div>`;
-      }
-
-      const rxx = document.createElement('div');
-      rxx.className = 'rxx'; rxx.id = 'rxx';
-      rxx.setAttribute('aria-hidden', 'true');
-      rxx.innerHTML = `
-        <div class="rxx-top">
-          <div class="rxx-meta"><div class="rxx-title" id="rxxTitle">Prescription</div><div class="rxx-sub" id="rxxSub"></div></div>
-          <div class="rxx-tools">
-            <button type="button" class="rxx-btn" id="rxxZoomOut" title="Zoom out (−)"><i class="bi bi-zoom-out"></i></button>
-            <span class="rxx-zoom" id="rxxPct">100%</span>
-            <button type="button" class="rxx-btn" id="rxxZoomIn" title="Zoom in (+)"><i class="bi bi-zoom-in"></i></button>
-            <button type="button" class="rxx-btn" id="rxxFit" title="Fit to screen"><i class="bi bi-aspect-ratio"></i></button>
-            <button type="button" class="rxx-btn" id="rxxRot" title="Rotate"><i class="bi bi-arrow-clockwise"></i></button>
-            <a class="rxx-btn" id="rxxDl" href="#" download title="Download"><i class="bi bi-download"></i></a>
-            <button type="button" class="rxx-btn" id="rxxClose" title="Close (Esc)"><i class="bi bi-x-lg"></i></button>
-          </div>
-        </div>
-        <div class="rxx-stage" id="rxxStage"><img id="rxxImg" alt="Prescription photo"></div>
-        <button type="button" class="rxx-nav rxx-prev" id="rxxPrev" aria-label="Previous photo"><i class="bi bi-chevron-left"></i></button>
-        <button type="button" class="rxx-nav rxx-next" id="rxxNext" aria-label="Next photo"><i class="bi bi-chevron-right"></i></button>`;
-      document.body.appendChild(rxx);
-      const rxxV = { s: 1, x: 0, y: 0, rot: 0, rows: [], i: 0, drag: null, open: false };
-
-      function rxxPhotos() { return filtered().filter((r) => r.has_photo && r.image_path); }
-      function rxxApply() {
-        $('#rxxImg').style.transform = `translate(${rxxV.x}px, ${rxxV.y}px) scale(${rxxV.s}) rotate(${rxxV.rot}deg)`;
-        $('#rxxPct').textContent = Math.round(rxxV.s * 100) + '%';
-        $('#rxxStage').classList.toggle('pan', rxxV.s > 1.01);
-      }
-      function rxPhotoClose() {
-        rxxV.open = false; rxxV.drag = null;
-        rxx.classList.remove('open');
-        rxx.setAttribute('aria-hidden', 'true');
-        document.body.style.overflow = '';
-      }
-      function rxxShow(i) {
-        rxxV.rows = rxxPhotos();
-        if (!rxxV.rows.length) { rxPhotoClose(); return; }
-        rxxV.i = ((i % rxxV.rows.length) + rxxV.rows.length) % rxxV.rows.length;
-        const r = rxxV.rows[rxxV.i];
-        rxxV.s = 1; rxxV.x = 0; rxxV.y = 0; rxxV.rot = 0;
-        $('#rxxImg').src = r.image_path;
-        $('#rxxTitle').textContent = (r.rx_no || 'Prescription') + (r.patient_name ? ' — ' + r.patient_name : '');
-        $('#rxxSub').textContent = [r.doctor_name || '', r.rx_date ? MF.fmtDate(r.rx_date) : '', (rxxV.i + 1) + ' of ' + rxxV.rows.length].filter(Boolean).join(' · ');
-        $('#rxxDl').href = r.image_path;
-        const many = rxxV.rows.length > 1;
-        $('#rxxPrev').style.display = many ? 'flex' : 'none';
-        $('#rxxNext').style.display = many ? 'flex' : 'none';
-        rxxApply();
-      }
-      window.rxPhotoOpen = (id) => {
-        const rows = rxxPhotos();
-        if (!rows.length) return;
-        const i = Math.max(0, rows.findIndex((r) => String(r.id) === String(id)));
-        rxxV.open = true;
-        rxx.classList.add('open');
-        rxx.setAttribute('aria-hidden', 'false');
-        document.body.style.overflow = 'hidden';
-        rxxShow(i);
-      };
-      window.rxPhotoClose = rxPhotoClose;
-
-      const rxxZoom = (k) => { rxxV.s = Math.min(6, Math.max(0.25, rxxV.s * k)); if (rxxV.s <= 1.001) { rxxV.x = 0; rxxV.y = 0; } rxxApply(); };
-      $('#rxxZoomIn').addEventListener('click', () => rxxZoom(1.25));
-      $('#rxxZoomOut').addEventListener('click', () => rxxZoom(0.8));
-      $('#rxxFit').addEventListener('click', () => { rxxV.s = 1; rxxV.x = 0; rxxV.y = 0; rxxV.rot = 0; rxxApply(); });
-      $('#rxxRot').addEventListener('click', () => { rxxV.rot = (rxxV.rot + 90) % 360; rxxApply(); });
-      $('#rxxClose').addEventListener('click', () => rxPhotoClose());
-      $('#rxxPrev').addEventListener('click', () => rxxShow(rxxV.i - 1));
-      $('#rxxNext').addEventListener('click', () => rxxShow(rxxV.i + 1));
-      const rxxStage = $('#rxxStage');
-      rxxStage.addEventListener('dblclick', () => { rxxV.s = rxxV.s > 1.25 ? 1 : 2.5; rxxV.x = 0; rxxV.y = 0; rxxApply(); });
-      rxxStage.addEventListener('wheel', (e) => { e.preventDefault(); rxxZoom(e.deltaY < 0 ? 1.15 : 0.87); }, { passive: false });
-      rxxStage.addEventListener('pointerdown', (e) => { if (rxxV.s <= 1.01) return; rxxV.drag = { x: e.clientX - rxxV.x, y: e.clientY - rxxV.y }; try { rxxStage.setPointerCapture(e.pointerId); } catch (err) { /* fine */ } });
-      rxxStage.addEventListener('pointermove', (e) => { if (!rxxV.drag) return; rxxV.x = e.clientX - rxxV.drag.x; rxxV.y = e.clientY - rxxV.drag.y; rxxApply(); });
-      ['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) => rxxStage.addEventListener(ev, () => { rxxV.drag = null; }));
-      rxxStage.querySelector('img').addEventListener('click', (e) => e.stopPropagation());
-      rxx.addEventListener('click', (e) => { if (e.target === rxxStage || e.target === rxx) rxPhotoClose(); });
-      document.addEventListener('keydown', (e) => {
-        if (!rxxV.open) return;
-        if (e.key === 'Escape') rxPhotoClose();
-        else if (e.key === 'ArrowLeft') rxxShow(rxxV.i - 1);
-        else if (e.key === 'ArrowRight') rxxShow(rxxV.i + 1);
-        else if (e.key === '+' || e.key === '=') rxxZoom(1.25);
-        else if (e.key === '-') rxxZoom(0.8);
-      });
 
       async function load() {
         if (!MF.Api.live) { render(); return; }

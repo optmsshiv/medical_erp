@@ -82,8 +82,6 @@ function shapeRx(array $row): array
         'item_count' => (int) ($row['item_count'] ?? 0),
         'medicines' => is_array($row['medicines'] ?? null) ? $row['medicines'] : [],
         'created_at' => (string) ($row['created_at'] ?? ''),
-        'image_path' => preg_match('#^rx-inbox-store/[A-Za-z0-9._-]+$#', (string) ($row['image_path'] ?? '')) ? (string) $row['image_path'] : '',
-        'has_photo' => (bool) preg_match('#^rx-inbox-store/[A-Za-z0-9._-]+$#', (string) ($row['image_path'] ?? '')),
     ];
 }
 
@@ -128,7 +126,7 @@ function shapeItem(array $row): array
 function listRows(): array
 {
     $withAge = 'SELECT p.id AS id, p.rx_no AS rx_no, p.rx_date AS rx_date, p.customer_id AS customer_id,
-            p.patient_name AS patient_name, p.patient_age AS patient_age, p.patient_phone AS patient_phone, p.image_path AS image_path, p.doctor_id AS doctor_id,
+            p.patient_name AS patient_name, p.patient_age AS patient_age, p.patient_phone AS patient_phone, p.doctor_id AS doctor_id,
             COALESCE(d.name, \'\') AS doctor_name, COALESCE(d.specialty, \'\') AS specialty,
             COALESCE(p.diagnosis, \'\') AS diagnosis, p.status AS status, p.created_at AS created_at,
             COALESCE(it.item_count, 0) AS item_count
@@ -139,7 +137,7 @@ function listRows(): array
            FROM prescription_items GROUP BY prescription_id
          ) it ON it.prescription_id = p.id';
     $ageOnly = 'SELECT p.id AS id, p.rx_no AS rx_no, p.rx_date AS rx_date, p.customer_id AS customer_id,
-            p.patient_name AS patient_name, p.patient_age AS patient_age, p.image_path AS image_path, p.doctor_id AS doctor_id,
+            p.patient_name AS patient_name, p.patient_age AS patient_age, p.doctor_id AS doctor_id,
             COALESCE(d.name, \'\') AS doctor_name, COALESCE(d.specialty, \'\') AS specialty,
             COALESCE(p.diagnosis, \'\') AS diagnosis, p.status AS status, p.created_at AS created_at,
             COALESCE(it.item_count, 0) AS item_count
@@ -192,14 +190,6 @@ function nextRxNo(): string
     }
     return 'RX-' . str_pad((string) $n, 5, '0', STR_PAD_LEFT);
 }
-
-/* Photo column (Scan & Send) — self-heal on read so the ledger can link photos. */
-try {
-    $imgCol = queryRows("SHOW COLUMNS FROM prescriptions LIKE 'image_path'");
-    if (!$imgCol) {
-        try { queryRows("ALTER TABLE prescriptions ADD COLUMN image_path VARCHAR(255) NULL"); } catch (Throwable $e) { /* legacy stays photo-less */ }
-    }
-} catch (Throwable $e) { /* introspection unavailable — read ladders still run */ }
 
 $method = $_SERVER['REQUEST_METHOD'];
 
