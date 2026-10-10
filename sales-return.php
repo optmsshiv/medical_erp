@@ -568,9 +568,31 @@ require __DIR__ . '/middleware/auth.php';
       }
 
       /* ---------------- print ---------------- */
+      /* Direct-to-paper print: the app's preview helper stacks Bootstrap modals,
+         which swallows the click when a modal is already open (both print entry
+         points here sit on/behind one). A guarded iframe has no modal at all. */
+      function srSilentPrint(innerHtml) {
+        const frame = document.createElement('iframe');
+        frame.setAttribute('aria-hidden', 'true');
+        frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+        document.body.appendChild(frame);
+        const doc = frame.contentWindow.document;
+        doc.open();
+        doc.write('<!doctype html><html><head><meta charset="utf-8"><title>Return note</title></head><body>' + innerHtml + '</body></html>');
+        doc.close();
+        const done = () => setTimeout(() => { try { frame.remove(); } catch (e) { } }, 500);
+        try {
+          frame.contentWindow.addEventListener('afterprint', done);
+          frame.contentWindow.focus();
+          setTimeout(() => {
+            try { frame.contentWindow.print(); } finally { done(); }
+          }, 90);
+        } catch (e) { done(); }
+      }
+
       function printNote(m) {
         const store = D.store || {};
-        MF.printHtml(`<style>
+        const html = `<style>
           @page { size: A5; margin: 12mm; }
           body { font-family: Arial, Helvetica, sans-serif; color: #111827; font-size: 10.5px; line-height: 1.5; }
           .sh { display:flex; gap:10px; align-items:flex-start; border-bottom:2.5px solid #B02A37; padding-bottom:8px; }
@@ -603,7 +625,8 @@ require __DIR__ . '/middleware/auth.php';
         </table>
         <div class="tot"><span><b>REFUND DUE BACK</b><div class="fs" style="margin-top:0">via ${MF.esc(m.mode || 'CASH')} · ${MF.esc(m.reason || '')}</div></span><span class="amt">${MF.fmt(m.refund || 0)}</span></div>
         <p class="fs">Returned stock is restocked to the original batches. This note is system-generated from the sales ledger; refunded money follows the mode above. Reason: ${MF.esc(m.reason || 'Customer return')}.</p>
-        <div class="sg"><div>Customer signature</div><div>For ${MF.esc(store.name || 'Optms Rx')}</div></div>`);
+        <div class="sg"><div>Customer signature</div><div>For ${MF.esc(store.name || 'Optms Rx')}</div></div>`;
+        srSilentPrint(html);
       }
 
       /* ---------------- stats + returns ledger ---------------- */
