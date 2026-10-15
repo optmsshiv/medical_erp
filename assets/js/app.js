@@ -396,7 +396,8 @@ window.MF = window.MF || {};
         { label: 'Doctors', icon: 'heart-pulse', page: 'doctors', href: 'doctors.php' },
         { label: 'Manufacturers', icon: 'buildings', page: 'manufacturers', href: 'manufacturers.php' },
         { label: 'Medicine Categories', icon: 'tags', page: 'categories', href: 'categories.php' },
-        { label: 'Schedule / Class', icon: 'shield-check', page: 'schedules', href: 'schedules.php' }
+        { label: 'Schedule / Class', icon: 'shield-check', page: 'schedules', href: 'schedules.php' },
+        { label: 'Compliance Register', icon: 'clipboard2-pulse', page: 'compliance-reports', href: 'compliance-reports.php' }
       ]
     },
     {
