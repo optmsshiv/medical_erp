@@ -77,8 +77,8 @@ try {
         WHERE UPPER(COALESCE(m.schedule_class, '')) IN ({$codes})
           AND si.qty > 0
           /* sale_date may carry a time part on some installs — a plain
-             "<= :to" (midnight) would drop every bill made later that
-             day, so compare strictly against the day after. */
+             <= :to would be midnight of that day and drop bills made
+             later, so compare strictly against the day after. */
           AND s.sale_date >= :from AND s.sale_date < DATE_ADD(:to, INTERVAL 1 DAY)
         ORDER BY s.sale_date ASC, s.id ASC, si.id ASC
         LIMIT 5000", ['from' => $from, 'to' => $to]);
