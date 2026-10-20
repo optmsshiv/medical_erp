@@ -2930,7 +2930,12 @@
       MF.printHtml(state.printFmt === 'thermal'
         ? thermalReceiptHtml(res.invoiceNo, t)
         : a4ReceiptHtml(res.invoiceNo, t));
-      if (posDocId || posPatName) MF.Api.post('sale-doctor.php', { invoiceNo: res.invoiceNo, doctorId: posDocId || 0, patientName: posPatName }).catch(() => {});
+      if (posDocId || posPatName) {
+        /* Never lose compliance data quietly: if the stamp fails (endpoint not
+           deployed yet, network blip), say so loudly and point at the fix. */
+        MF.Api.post('sale-doctor.php', { invoiceNo: res.invoiceNo, doctorId: posDocId || 0, patientName: posPatName })
+          .catch(() => { MF.toast(`${res.invoiceNo} billed, but the doctor/patient was NOT saved on it — it will show a dash in the H1/X register. Fix it from Sales Invoices → doctor icon.`, 'warn', 'Rx details not saved'); });
+      }
       saveLastBill(res.invoiceNo, t);
       paintLastBill();
       MF.toast(`${res.invoiceNo} · ${MF.fmt(res.grandTotal)} · ${state.payment.toUpperCase()}`, 'success', 'Sale completed');
