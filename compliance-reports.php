@@ -225,7 +225,9 @@ require __DIR__ . '/middleware/auth.php';
           i + 1,
           r.sale_date || '',
           r.patient_name || '—',
+          r.patient_phone || '',
           r.doctor_name || '—',
+          r.doctor_reg_no || '',
           r.medicine_name,
           r.schedule_class,
           r.batch_no || '—',
@@ -234,7 +236,7 @@ require __DIR__ . '/middleware/auth.php';
           ''
         ]);
         MF.exportCSV(`Schedule-${state.cls === 'all' ? 'H1-X' : state.cls.toUpperCase()}-register_${state.from}_to_${state.to}.csv`,
-          ['Sr No', 'Date', 'Patient Name', 'Prescribing Doctor', 'Medicine', 'Schedule', 'Batch', 'Quantity Sold', 'Bill Ref', 'Remarks'],
+          ['Sr No', 'Date', 'Patient Name', 'Patient Phone', 'Prescribing Doctor', 'Doctor Reg No', 'Medicine', 'Schedule', 'Batch', 'Quantity Sold', 'Bill Ref', 'Remarks'],
           rows);
         MF.toast('Excel file downloaded — opens in MS Excel / Google Sheets.', 'success', 'Export ready');
       });
@@ -258,62 +260,93 @@ require __DIR__ . '/middleware/auth.php';
 
       $('#crPdf').addEventListener('click', () => {
         const store = D.store || {};
+        const distinct = (fn) => new Set(state.rows.map(fn).filter((x) => x && String(x).trim())).size;
+        const nPatients = distinct((r) => r.patient_name);
+        const nDoctors = distinct((r) => r.doctor_name);
+        const h1n = state.rows.filter((r) => r.schedule_class === 'H1').length;
+        const xn = state.rows.filter((r) => r.schedule_class === 'X').length;
         const bodyRows = state.rows.map((r, i) => `
           <tr>
             <td class="c">${i + 1}</td>
-            <td class="b">${r.sale_date ? MF.fmtDate(r.sale_date) : '—'}</td>
-            <td>${MF.esc(r.patient_name || '—')}</td>
-            <td>${MF.esc(r.doctor_name || '—')}${r.doctor_reg_no ? `<div class="s">Reg ${MF.esc(r.doctor_reg_no)}</div>` : ''}</td>
-            <td>${MF.esc(r.medicine_name)} <span class="sq">${MF.esc(r.schedule_class)}</span></td>
+            <td class="b">${r.sale_date ? MF.fmtDate(r.sale_date) : '—'}${hm(r) ? `<div class="s">${hm(r)}</div>` : ''}</td>
+            <td><b>${MF.esc(r.patient_name || '—')}</b>${r.patient_phone ? `<div class="s">${MF.esc(r.patient_phone)}</div>` : ''}</td>
+            <td><b>${MF.esc(r.doctor_name || '—')}</b>${r.doctor_reg_no ? `<div class="s">Reg. No. ${MF.esc(r.doctor_reg_no)}</div>` : ''}</td>
+            <td>${MF.esc(r.medicine_name)}&nbsp;<span class="sq">${MF.esc(r.schedule_class)}</span></td>
             <td>${MF.esc(r.batch_no || '—')}</td>
             <td class="r b">${MF.num(r.qty)}</td>
             <td>${MF.esc(r.invoice_no || '—')}</td>
             <td></td>
           </tr>`).join('');
         printIframe(`<style>
-          @page { size: A4 landscape; margin: 10mm 12mm 14mm; }
+          @page { size: A4 landscape; margin: 9mm 11mm 13mm;
+            @bottom-center { content: "Schedule ${schedWord().replace(/&/g, '&amp;')} Register — Page " counter(page) " of " counter(pages); font-family: Arial; font-size: 7.5px; color: #6b7280; }
+          }
           body { font-family: Arial, Helvetica, sans-serif; color:#111827; font-size:9px; line-height:1.45; }
-          .lh { display:flex; gap:10px; align-items:flex-start; }
-          .lg { width:38px; height:38px; border-radius:9px; background:#176B5B; color:#fff; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:800; }
-          .nm { font-size:16px; font-weight:800; } .sb { font-size:8px; color:#4b5563; margin-top:2px; }
-          .rt { margin-left:auto; text-align:right; font-size:8px; color:#4b5563; line-height:1.55; }
-          h1 { text-align:center; font-size:12.5px; font-weight:800; letter-spacing:.06em; margin:10px 0 2px; border:1.8px solid #111827; border-radius:6px; padding:6px 8px; text-transform:uppercase; }
+          .band { border:1.6px solid #176B5B; border-radius:8px; padding:8px 10px; display:flex; gap:10px; align-items:center; page-break-inside:avoid; }
+          .lg { width:42px; height:42px; border-radius:10px; background:#176B5B; color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:800; }
+          .nm { font-size:17px; font-weight:800; letter-spacing:.01em; }
+          .sb { font-size:8px; color:#4b5563; margin-top:2px; line-height:1.5; }
+          .rt { margin-left:auto; text-align:right; font-size:8px; color:#4b5563; line-height:1.6; }
+          .tag { display:inline-block; border:1.6px solid #176B5B; color:#176B5B; font-size:8px; font-weight:800; letter-spacing:.14em; padding:2px 9px; border-radius:4px; text-transform:uppercase; }
+          h1 { text-align:center; font-size:13px; font-weight:800; letter-spacing:.05em; margin:10px 0 3px; border-top:2.2px solid #111827; border-bottom:2.2px solid #111827; padding:6px; text-transform:uppercase; page-break-inside:avoid; }
           .rule { text-align:center; font-size:8px; color:#4b5563; margin:0 0 8px; }
+          .meta { display:flex; border:1px solid #9ca3af; border-radius:6px; overflow:hidden; margin-bottom:8px; page-break-inside:avoid; }
+          .meta > div { flex:1; padding:4px 8px; border-right:1px solid #d1d5db; font-size:7.8px; color:#4b5563; }
+          .meta > div:last-child { border-right:0; }
+          .meta b { display:block; font-size:10px; color:#111827; }
           table { width:100%; border-collapse:collapse; }
           th, td { border:1px solid #9ca3af; padding:4px 5px; text-align:left; vertical-align:top; }
-          th { background:#eef2f7; font-size:7.5px; text-transform:uppercase; letter-spacing:.05em; color:#374151; }
+          th { background:#eef2f7; font-size:7.5px; text-transform:uppercase; letter-spacing:.05em; color:#1f2937; border-bottom:1.6px solid #111827; }
+          tbody tr:nth-child(even) { background:#f8fafc; }
           thead { display:table-header-group; }
           tr { page-break-inside:avoid; }
+          tfoot td { background:#eef2f7; border-top:1.6px solid #111827; font-weight:800; }
           .r { text-align:right; } .c { text-align:center; } .b { font-weight:700; }
           .s { font-size:7.5px; color:#6b7280; }
           .sq { display:inline-block; border:1px solid #6b7280; border-radius:4px; padding:0 4px; font-size:7.5px; font-weight:800; }
-          .sum { margin-top:6px; font-size:9px; font-weight:700; }
-          .sg { margin-top:26px; display:flex; justify-content:space-between; font-size:8.5px; page-break-inside:avoid; }
-          .sg div { border-top:1.2px solid #111827; padding-top:4px; min-width:52mm; text-align:center; }
-          .rd { border-top:1.2px solid #111827; padding-top:4px; min-width:64mm; text-align:center; }
+          .note { margin-top:8px; border:1px dashed #9ca3af; border-radius:6px; padding:6px 8px; font-size:7.6px; color:#4b5563; line-height:1.55; page-break-inside:avoid; }
+          .sg { margin-top:30px; display:flex; gap:18px; font-size:8.5px; page-break-inside:avoid; }
+          .sg > div { flex:1; border-top:1.2px solid #111827; padding-top:4px; text-align:center; }
         </style>
-        <div class="lh">
+        <div class="band">
           <div class="lg">Rx</div>
-          <div><div class="nm">${MF.esc(store.name || 'Optms Rx')}</div>
-            <div class="sb">${MF.esc(store.address || '')}${store.phone ? ' · Ph ' + MF.esc(store.phone) : ''}</div>
-            <div class="sb">${store.gstin ? 'GSTIN ' + MF.esc(store.gstin) + ' · ' : ''}${store.dl_no ? 'DL ' + MF.esc(store.dl_no) : ''}</div>
+          <div>
+            <div class="nm">${MF.esc(store.name || 'Optms Rx')}</div>
+            <div class="sb">${MF.esc(store.address || '')}${store.phone ? ' &nbsp;·&nbsp; Ph: ' + MF.esc(store.phone) : ''}${store.email ? ' &nbsp;·&nbsp; ' + MF.esc(store.email) : ''}</div>
+            <div class="sb">${store.gstin ? 'GSTIN: <b>' + MF.esc(store.gstin) + '</b>' : ''}${store.dl_no ? (store.gstin ? ' &nbsp;·&nbsp; ' : '') + 'Drug Licence: <b>' + MF.esc(store.dl_no) + '</b>' : ''}</div>
           </div>
-          <div class="rt">Generated ${MF.fmtDate(todayStr())} ${new Date().toTimeString().slice(0, 5)}<br>Period: <b>${MF.esc(periodText())}</b><br>Schedule: <b>${MF.esc(schedWord())}</b></div>
+          <div class="rt"><span class="tag">System Register</span><br>Generated: <b>${MF.fmtDate(todayStr())} · ${new Date().toTimeString().slice(0, 5)}</b><br>Period: <b>${MF.esc(periodText())}</b></div>
         </div>
         <h1>Schedule ${MF.esc(schedWord())} Drugs Register</h1>
-        <p class="rule">Register maintained under Rule 65 of the Drugs and Cosmetics Rules, 1945 — produced for inspection.</p>
+        <p class="rule">Maintained under Rule 65 of the Drugs and Cosmetics Rules, 1945 · system-generated from the pharmacy sales ledger, produced for inspection</p>
+        <div class="meta">
+          <div>Period<b>${MF.esc(periodText())}</b></div>
+          <div>Schedule covered<b>${MF.esc(schedWord())}</b></div>
+          <div>Register entries<b>${MF.num(state.summary.entries || state.rows.length)}</b></div>
+          <div>Units dispensed<b>${MF.num(state.summary.qty || 0)}</b></div>
+          <div>Medicines<b>${MF.num(state.summary.medicines || 0)} (H1: ${h1n} · X: ${xn})</b></div>
+          <div>Patients served<b>${MF.num(nPatients)}</b></div>
+          <div>Prescribers<b>${MF.num(nDoctors)}</b></div>
+        </div>
         <table>
           <thead><tr>
-            <th style="width:26px">Sr</th><th style="width:62px">Date</th><th>Patient Name</th><th>Prescribing Doctor</th>
-            <th>Medicine</th><th style="width:64px">Batch</th><th style="width:44px" class="r">Qty Sold</th>
-            <th style="width:88px">Bill Ref</th><th style="width:70px">Remarks</th>
+            <th style="width:24px">Sr</th><th style="width:64px">Date</th><th style="width:16%">Patient Name</th><th style="width:17%">Prescribing Doctor</th>
+            <th>Medicine</th><th style="width:66px">Batch</th><th style="width:42px" class="r">Qty Sold</th>
+            <th style="width:86px">Bill Ref</th><th style="width:64px">Remarks</th>
           </tr></thead>
           <tbody>${bodyRows || '<tr><td colspan="9" class="c" style="padding:14px">No entries in this period.</td></tr>'}</tbody>
+          <tfoot><tr>
+            <td colspan="4" class="c">TOTAL — ${MF.num(state.summary.entries || state.rows.length)} register entries</td>
+            <td colspan="2" class="c">${MF.num(state.summary.medicines || 0)} distinct medicines</td>
+            <td class="r">${MF.num(state.summary.qty || 0)}</td>
+            <td colspan="2"></td>
+          </tr></tfoot>
         </table>
-        <div class="sum">Total register entries: ${MF.num(state.summary.entries || state.rows.length)} · Units dispensed: ${MF.num(state.summary.qty || 0)} · Distinct medicines: ${MF.num(state.summary.medicines || 0)}</div>
+        <div class="note"><b>Source &amp; integrity:</b> This register is generated directly from the Optms Rx sales ledger and is not manually editable. Figures are billed quantities to the recorded billing customer and prescriber; each row links to its bill reference for verification against the sale invoice. Sales returns, where applicable, are maintained separately in the Returns Register. Missing prescriber/patient fields reflect what was recorded at the time of sale and are to be regularised at source, not on paper.</div>
         <div class="sg">
-          <div>Prepared by — Pharmacist (name &amp; signature)</div>
-          <div>Checked by — Drugs Inspector (name, designation, seal &amp; date)</div>
+          <div>Prepared by — Pharmacist<br>(Name, Signature &amp; Date)</div>
+          <div>Store In-charge<br>(Name, Signature &amp; Date)</div>
+          <div>Inspected by — Drugs Inspector<br>(Name, Designation, Seal &amp; Date)</div>
         </div>`);
       });
 
