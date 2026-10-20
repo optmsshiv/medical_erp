@@ -242,7 +242,21 @@ function summarize(array $rows): array
     ];
 }
 
-$rows = array_map('shapeInvoice', invoiceRows());
+$rawRows = invoiceRows();
+$docMeta = [];
+try {
+    foreach (queryRows('SELECT id, reg_no, specialty FROM doctors') as $dr) {
+        $docMeta[(int) $dr['id']] = [(string) ($dr['reg_no'] ?? ''), (string) ($dr['specialty'] ?? '')];
+    }
+} catch (Throwable $e) { /* reg numbers stay blank */ }
+foreach ($rawRows as &$rr) {
+    $did = isset($rr['doctor_id']) ? (int) $rr['doctor_id'] : 0;
+    $meta = $did && isset($docMeta[$did]) ? $docMeta[$did] : ['', ''];
+    $rr['doctor_reg_no'] = $meta[0];
+    $rr['doctor_specialty'] = $meta[1];
+}
+unset($rr);
+$rows = array_map('shapeInvoice', $rawRows);
 usort($rows, function (array $a, array $b): int {
     $date = strcmp($b['sale_date'], $a['sale_date']);
     if ($date !== 0) {

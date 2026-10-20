@@ -29,25 +29,45 @@ $in = json_decode(file_get_contents('php://input'), true) ?? [];
 
 $invoiceNo = trim((string) ($in['invoiceNo'] ?? ''));
 $doctorId  = (int) ($in['doctorId'] ?? 0);
+$patient   = trim(preg_replace('/\s+/', ' ', (string) ($in['patientName'] ?? '')) ?? '');
+if (function_exists('mb_substr')) { $patient = mb_substr($patient, 0, 150); } else { $patient = substr($patient, 0, 150); }
+
+/* patient_name column (2026-10-20) — an Rx-billed walk-in still gets its
+   patient printed on the bill and into the H1/X compliance register. */
+$hasPatCol = false;
+try {
+    $hasPatCol = (bool) Manufacturer::query("SHOW COLUMNS FROM sales LIKE 'patient_name'");
+    if (!$hasPatCol) {
+        try { Manufacturer::query("ALTER TABLE sales ADD COLUMN patient_name VARCHAR(150) NULL"); } catch (Throwable $e) { /* note-only fallback */ }
+        $hasPatCol = (bool) Manufacturer::query("SHOW COLUMNS FROM sales LIKE 'patient_name'");
+    }
+} catch (Throwable $e) { /* introspection unavailable */ }
 
 if ($invoiceNo === '' || !preg_match('/^[A-Za-z0-9\/\-]{1,30}$/', $invoiceNo)) {
     Json::error('A valid invoiceNo is required.', 422);
 }
-if ($doctorId <= 0) {
-    Json::error('A valid doctorId is required. Pass nullDoctor to clear instead.', 422);
+if ($doctorId <= 0 && $patient === '') {
+    Json::error('Nothing to save — send a doctorId and/or a patientName.', 422);
 }
 
 try {
-    $doc = Manufacturer::query('SELECT id FROM doctors WHERE id = :id LIMIT 1', ['id' => $doctorId]);
-    if (!$doc) {
-        Json::error('Doctor not found.', 422);
+    if ($doctorId > 0) {
+        $doc = Manufacturer::query('SELECT id FROM doctors WHERE id = :id LIMIT 1', ['id' => $doctorId]);
+        if (!$doc) {
+            Json::error('Doctor not found.', 422);
+        }
     }
     $row = Manufacturer::query('SELECT id FROM sales WHERE invoice_no = :n LIMIT 1', ['n' => $invoiceNo]);
     if (!$row) {
         Json::error('Invoice not found.', 404);
     }
-    Manufacturer::query('UPDATE sales SET doctor_id = :d WHERE invoice_no = :n', ['d' => $doctorId, 'n' => $invoiceNo]);
-    Json::ok(['invoiceNo' => $invoiceNo, 'doctorId' => $doctorId]);
+    if ($doctorId > 0) {
+        Manufacturer::query('UPDATE sales SET doctor_id = :d WHERE invoice_no = :n', ['d' => $doctorId, 'n' => $invoiceNo]);
+    }
+    if ($patient !== '' && $hasPatCol) {
+        Manufacturer::query('UPDATE sales SET patient_name = :p WHERE invoice_no = :n', ['p' => $patient, 'n' => $invoiceNo]);
+    }
+    Json::ok(['invoiceNo' => $invoiceNo, 'doctorId' => $doctorId, 'patient' => $patient !== '' && $hasPatCol]);
 } catch (Throwable $e) {
     Json::error('Could not save the doctor on this invoice.', 500);
 }

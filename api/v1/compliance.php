@@ -37,6 +37,16 @@ function cDay($value, string $fallback): string
     return preg_match('/^\d{4}-\d{2}-\d{2}$/', $text) ? $text : $fallback;
 }
 
+/* Rx-billed walk-ins keep their patient on the bill (patient_name column).
+   Older installs lack it — resolve from the billing customer instead. */
+$hasPat = false;
+try {
+    $hasPat = (bool) cqr("SHOW COLUMNS FROM sales LIKE 'patient_name'");
+} catch (Throwable $e) { /* customer fallback */ }
+$patientSel = $hasPat
+    ? "COALESCE(NULLIF(s.patient_name, ''), c.name, '')"
+    : "COALESCE(c.name, '')";
+
 $today = date('Y-m-d');
 $from = cDay($_GET['from'] ?? '', '1900-01-01');
 $to   = cDay($_GET['to'] ?? '', $today);
@@ -49,7 +59,7 @@ $codes = $cls === 'h1' ? "'H1'" : ($cls === 'x' ? "'X'" : "'H1','X'");
 
 try {
     $rows = cqr("SELECT s.id AS sale_id, s.invoice_no, s.sale_date, s.created_at,
-            COALESCE(c.name, '') AS patient_name, COALESCE(c.phone, '') AS patient_phone,
+            {$patientSel} AS patient_name, COALESCE(c.phone, '') AS patient_phone,
             COALESCE(d.name, '') AS doctor_name, COALESCE(d.reg_no, '') AS doctor_reg_no,
             m.name AS medicine_name, COALESCE(m.schedule_class, '') AS schedule_class,
             COALESCE(b.batch_no, '') AS batch_no,

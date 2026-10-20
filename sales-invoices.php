@@ -205,6 +205,8 @@ require __DIR__ . '/middleware/auth.php';
           customer_name: raw.customer_name || raw.customer || 'Walk-in',
           customer_phone: raw.customer_phone || raw.phone || raw.mobile || '',
           doctor_name: raw.doctor_name || raw.doctor || '',
+          doctor_reg_no: raw.doctor_reg_no || '',
+          doctor_specialty: raw.doctor_specialty || '',
           gstin: raw.gstin || '',
           dl_no: raw.dl_no || raw.dl || '',
           subtotal: Number(raw.subtotal ?? amount),
@@ -386,13 +388,15 @@ require __DIR__ . '/middleware/auth.php';
       function itemsTable(items) {
         if (!items.length) return '<div class="empty-state py-3"><i class="bi bi-list-ul"></i>Line items load from the sales invoice API.</div>';
         return `<div class="table-responsive"><table class="table table-mf mb-0">
-          <thead><tr><th>Medicine</th><th>Batch</th><th class="text-end">Qty</th><th class="text-end">Rate</th><th class="text-end">Amount</th></tr></thead>
+          <thead><tr><th>Medicine</th><th>Batch</th><th class="text-end">Qty</th><th class="text-end">Rate</th><th class="text-end">Disc%</th><th class="text-end">GST%</th><th class="text-end">Amount</th></tr></thead>
           <tbody>${items.map((l) => `<tr>
             <td><div class="fw-semibold">${MF.esc(l.medicine_name || '—')}</div>${l.returned_qty ? `<span class="si-muted">Returned ${MF.num(l.returned_qty)}</span>` : ''}</td>
             <td>${batchCell(l)}</td>
             <td class="text-end num">${MF.num(l.qty)}${l.free_qty ? `<div class="text-2 small-xs">+${MF.num(l.free_qty)} free</div>` : ''}${l.unit_sold === 'loose' ? '<div class="text-2 small-xs">Loose</div>' : ''}</td>
             <td class="text-end num">${MF.fmt(l.rate, 2)}</td>
-            <td class="text-end num">${MF.fmt(l.amount)}</td>
+            <td class="text-end num">${Number(l.disc_pct) ? MF.fmt(l.disc_pct, 1) : '<span class="text-2">—</span>'}</td>
+            <td class="text-end num">${Number(l.gst_pct) ? MF.fmt(l.gst_pct, 1) : '<span class="text-2">—</span>'}</td>
+            <td class="text-end num fw-semibold">${MF.fmt(l.amount)}</td>
           </tr>`).join('')}</tbody>
         </table></div>`;
       }
@@ -408,21 +412,107 @@ require __DIR__ . '/middleware/auth.php';
         </div>`;
       }
 
-      function receiptHtml(r) {
+      function invoiceHtml(r) {
         const store = D.store || {};
         const phone = formatPhone(r.customer_phone);
-        return `
-          <div class="text-center mb-3">
-            <h6 class="fw-bold mt-2 mb-0">${MF.esc(store.name || 'Optms Rx')}</h6>
-            ${store.address ? `<div class="text-2 small-xs">${MF.esc(store.address)}${store.gstin ? ' · GSTIN ' + MF.esc(store.gstin) : ''}</div>` : ''}
+        const split = r.payment_mode === 'split' ? ` — Cash ${MF.fmt(r.cash_amount, 2)} + UPI ${MF.fmt(r.upi_amount, 2)}` : '';
+        const when = r.sale_time || '';
+        const rows = (r.items || []).map((l, i) => `
+          <tr>
+            <td class="c">${i + 1}</td>
+            <td>${MF.esc(l.medicine_name || '—')}${l.returned_qty ? `<div class="s">returned ${MF.num(l.returned_qty)}</div>` : ''}</td>
+            <td>${MF.esc(l.batch_no || '—')}</td>
+            <td>${l.expiry_date ? MF.fmtDate(String(l.expiry_date).slice(0, 10)) : '—'}</td>
+            <td class="r">${MF.num(l.qty)}${l.free_qty ? ' +' + MF.num(l.free_qty) : ''}${l.unit_sold === 'loose' ? '<div class="s">loose</div>' : ''}</td>
+            <td class="r">${MF.fmt(l.rate, 2)}</td>
+            <td class="r">${Number(l.disc_pct) ? MF.fmt(l.disc_pct, 1) : '—'}</td>
+            <td class="r">${Number(l.gst_pct) ? MF.fmt(l.gst_pct, 1) : '—'}</td>
+            <td class="r b">${MF.fmt(l.amount)}</td>
+          </tr>`).join('');
+        const gstLines = gstRows(r).map(([k, v]) => `<div class="tl"><span>${k}</span><span>${MF.fmt(v, 2)}</span></div>`).join('');
+        return `<style>
+          @page { size: A5; margin: 10mm; }
+          body { font-family: Arial, Helvetica, sans-serif; color:#111827; font-size:9.5px; line-height:1.45; }
+          .band { border:1.5px solid #176B5B; border-radius:8px; padding:7px 9px; display:flex; gap:9px; align-items:center; }
+          .lg { width:36px; height:36px; border-radius:9px; background:#176B5B; color:#fff; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:800; }
+          .nm { font-size:14.5px; font-weight:800; } .sb { font-size:7.6px; color:#4b5563; margin-top:2px; line-height:1.5; }
+          .rt { margin-left:auto; text-align:right; font-size:7.8px; color:#4b5563; line-height:1.55; }
+          .tag { display:inline-block; border:1.4px solid #176B5B; color:#176B5B; font-size:7.5px; font-weight:800; letter-spacing:.12em; padding:1px 7px; border-radius:4px; text-transform:uppercase; }
+          .meta { display:flex; gap:6px; margin:8px 0; }
+          .meta > div { flex:1; border:1px solid #d1d5db; border-radius:6px; padding:5px 7px; font-size:8px; }
+          .lbl { font-size:6.8px; text-transform:uppercase; letter-spacing:.07em; color:#6b7280; font-weight:800; margin-bottom:2px; }
+          .who { font-weight:700; font-size:9.5px; } .s { font-size:7.5px; color:#6b7280; }
+          table { width:100%; border-collapse:collapse; margin-top:4px; }
+          th, td { border:1px solid #c9d2dd; padding:3.5px 4px; text-align:left; vertical-align:top; }
+          th { background:#eef2f7; font-size:7px; text-transform:uppercase; letter-spacing:.05em; color:#1f2937; border-bottom:1.4px solid #111827; }
+          tbody tr:nth-child(even) { background:#f8fafc; }
+          thead { display:table-header-group; } tr { page-break-inside:avoid; }
+          .r { text-align:right; } .c { text-align:center; } .b { font-weight:700; }
+          .tw { display:flex; justify-content:flex-end; margin-top:6px; page-break-inside:avoid; }
+          .tot { width:62mm; border:1px solid #c9d2dd; border-radius:6px; padding:5px 8px; }
+          .tl { display:flex; justify-content:space-between; padding:1px 0; font-size:8.5px; color:#374151; }
+          .grand { display:flex; justify-content:space-between; border-top:1.4px solid #111827; margin-top:4px; padding-top:4px; font-size:11px; font-weight:800; }
+          .pay { margin-top:6px; border:1px dashed #9ca3af; border-radius:6px; padding:5px 8px; font-size:8.5px; display:flex; justify-content:space-between; page-break-inside:avoid; }
+          .decl { margin-top:7px; font-size:7px; color:#6b7280; line-height:1.55; }
+          .sg { margin-top:20px; display:flex; justify-content:space-between; font-size:8px; page-break-inside:avoid; }
+          .sg div { border-top:1.1px solid #111827; padding-top:3px; min-width:34mm; text-align:center; }
+        </style>
+        <div class="band">
+          <div class="lg">Rx</div>
+          <div><div class="nm">${MF.esc(store.name || 'Optms Rx')}</div>
+            <div class="sb">${MF.esc(store.address || '')}${store.phone ? ' · Ph: ' + MF.esc(store.phone) : ''}</div>
+            <div class="sb">${store.gstin ? 'GSTIN: <b>' + MF.esc(store.gstin) + '</b>' : ''}${store.dl_no ? (store.gstin ? ' · ' : '') + 'Drug Licence: <b>' + MF.esc(store.dl_no) + '</b>' : ''}</div>
           </div>
-          <div class="d-flex justify-content-between small mb-2">
-            <span>Invoice: <strong>${MF.esc(r.invoice_no)}</strong></span><span>${r.sale_date ? MF.fmtDate(r.sale_date) : ''}</span>
+          <div class="rt"><span class="tag">${MF.esc(r.channel === 'wholesale' ? 'Wholesale' : 'Retail')} Invoice</span><br>
+            <b style="font-size:10px;color:#111827">${MF.esc(r.invoice_no || '—')}</b><br>
+            ${r.sale_date ? MF.fmtDate(r.sale_date) : ''}${when ? ' · ' + when : ''}</div>
+        </div>
+        <div class="meta">
+          <div><div class="lbl">Billed to</div><div class="who">${MF.esc(r.customer_name || 'Walk-in')}</div>
+            ${phone ? `<div class="s">${MF.esc(phone)}</div>` : ''}
+            ${r.gstin ? `<div class="s">GSTIN ${MF.esc(r.gstin)}</div>` : ''}${r.dl_no ? `<div class="s">DL ${MF.esc(r.dl_no)}</div>` : ''}
           </div>
-          <div class="small mb-2">Customer: <strong>${MF.esc(r.customer_name || 'Walk-in')}</strong>${phone ? ' · ' + MF.esc(phone) : ''}${r.doctor_name ? ' · Doctor: <strong>' + MF.esc(r.doctor_name) + '</strong>' : ''} · Payment: <strong>${MF.esc(payLabel(r.payment_mode))}</strong></div>
-          ${itemsTable(r.items || [])}
-          ${totalsHtml(r)}
-          <p class="text-center text-2 small-xs mt-3 mb-0">Medicines once sold will not be taken back without valid reason.</p>`;
+          <div><div class="lbl">Prescriber</div><div class="who">${r.doctor_name ? MF.esc(r.doctor_name) : '—'}</div>
+            ${r.doctor_specialty ? `<div class="s">${MF.esc(r.doctor_specialty)}</div>` : ''}
+            ${r.doctor_reg_no ? `<div class="s"><b>Reg. No. ${MF.esc(r.doctor_reg_no)}</b></div>` : ''}
+          </div>
+        </div>
+        <table>
+          <thead><tr><th style="width:16px">Sr</th><th>Item</th><th style="width:52px">Batch</th><th style="width:52px">Expiry</th>
+            <th class="r" style="width:34px">Qty</th><th class="r" style="width:44px">Rate</th><th class="r" style="width:30px">Disc%</th><th class="r" style="width:30px">GST%</th><th class="r" style="width:56px">Amount</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="9" class="c" style="padding:10px">Line items not loaded.</td></tr>'}</tbody>
+        </table>
+        <div class="tw"><div class="tot">
+          <div class="tl"><span>Subtotal</span><span>${MF.fmt(r.subtotal, 2)}</span></div>
+          ${Number(r.discount) ? `<div class="tl"><span>Discount</span><span>− ${MF.fmt(r.discount, 2)}</span></div>` : ''}
+          ${gstLines}
+          ${Number(r.round_off) ? `<div class="tl"><span>Round off</span><span>${MF.fmt(r.round_off, 2)}</span></div>` : ''}
+          <div class="grand"><span>GRAND TOTAL</span><span>${MF.fmt(r.grand_total, 2)}</span></div>
+        </div></div>
+        <div class="pay">
+          <span>Payment: <b>${MF.esc(payLabel(r.payment_mode))}</b>${split}</span>
+          <span>Paid <b>${MF.fmt(r.amount_paid, 2)}</b> · Balance due <b>${MF.fmt(r.balance_due, 2)}</b></span>
+        </div>
+        ${Number(r.refund_amount) > 0.009 ? `<div class="decl" style="color:#B45309"><b>Note:</b> ${MF.fmt(r.refund_amount, 2)} returned against this invoice${r.return_count ? ` (${r.return_count} return${r.return_count > 1 ? 's' : ''})` : ''}; see the returns register.</div>` : ''}
+        <div class="decl">E&amp;OE. Medicines once sold will not be taken back without valid reason. This is a system-generated invoice from Optms Rx — amounts, batches and parties are as recorded at billing. Prescription medicines are dispensed only against a valid prescription.</div>
+        <div class="sg"><div>Customer signature</div><div>For ${MF.esc(store.name || 'Optms Rx')}</div></div>`;
+      }
+
+      function siSilentPrint(innerHtml) {
+        const frame = document.createElement('iframe');
+        frame.setAttribute('aria-hidden', 'true');
+        frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+        document.body.appendChild(frame);
+        const doc = frame.contentWindow.document;
+        doc.open();
+        doc.write('<!doctype html><html><head><meta charset="utf-8"><title>Invoice</title></head><body>' + innerHtml + '</body></html>');
+        doc.close();
+        const done = () => setTimeout(() => { try { frame.remove(); } catch (e) { } }, 500);
+        try {
+          frame.contentWindow.addEventListener('afterprint', done);
+          frame.contentWindow.focus();
+          setTimeout(() => { try { frame.contentWindow.print(); } finally { done(); } }, 90);
+        } catch (e) { done(); }
       }
 
       async function withItems(row) {
@@ -441,18 +531,40 @@ require __DIR__ . '/middleware/auth.php';
         state.current = current;
         $('#siViewTitle').textContent = current.invoice_no || 'Invoice';
         const phone = formatPhone(current.customer_phone);
+        const split = current.payment_mode === 'split' ? `<div class="si-muted">Cash ${MF.fmt(current.cash_amount)} · UPI ${MF.fmt(current.upi_amount)}</div>` : '';
+        const settlePct = Number(current.grand_total) > 0 ? Math.min(100, Math.round(Number(current.amount_paid || 0) / Number(current.grand_total) * 100)) : null;
+        const when = current.sale_time || '';
         $('#siViewBody').innerHTML = `
           <div class="d-flex flex-wrap justify-content-between gap-2 mb-3">
             <div>
               <div class="si-name">${MF.esc(current.invoice_no || '—')}</div>
-              <div class="text-2 small">${current.sale_date ? MF.fmtDate(current.sale_date) : '—'} · ${MF.esc(payLabel(current.payment_mode))}</div>
+              <div class="text-2 small">${current.sale_date ? MF.fmtDate(current.sale_date) : '—'}${when ? ' · ' + when : ''}</div>
             </div>
             <div class="d-flex gap-1 align-items-start">${channelBadge(current.channel)}${statusBadge(current.status)}</div>
           </div>
           <div class="row g-2 mb-3">
-            <div class="col-md-6"><div class="text-2 small-xs">Customer</div><div class="fw-semibold">${MF.esc(current.customer_name || 'Walk-in')}</div>${phone ? `<span class="si-muted">${MF.esc(phone)}</span>` : ''}</div>
-            <div class="col-md-6"><div class="text-2 small-xs">Doctor</div><div class="fw-semibold">${current.doctor_name ? MF.esc(current.doctor_name) : '—'}</div>${current.gstin ? `<span class="si-muted">GSTIN ${MF.esc(current.gstin)}</span>` : ''}${current.dl_no ? `<span class="si-muted">DL ${MF.esc(current.dl_no)}</span>` : ''}</div>
+            <div class="col-md-4"><div class="p-2 px-3 rounded-3 border h-100" style="background:#FBFCFE">
+              <div class="text-2 small-xs">Billed to</div>
+              <div class="fw-semibold">${MF.esc(current.customer_name || 'Walk-in')}</div>
+              ${phone ? `<div class="si-muted">${MF.esc(phone)}</div>` : ''}
+              <div class="d-flex gap-1 flex-wrap mt-1">${current.gstin ? `<span class="si-batch"><i class="bi bi-building"></i>GSTIN ${MF.esc(current.gstin)}</span>` : ''}${current.dl_no ? `<span class="si-batch"><i class="bi bi-file-medical"></i>DL ${MF.esc(current.dl_no)}</span>` : ''}</div>
+            </div></div>
+            <div class="col-md-4"><div class="p-2 px-3 rounded-3 border h-100" style="background:#FBFCFE">
+              <div class="text-2 small-xs">Prescriber</div>
+              <div class="fw-semibold">${current.doctor_name ? MF.esc(current.doctor_name) : '—'}</div>
+              ${current.doctor_specialty ? `<div class="si-muted">${MF.esc(current.doctor_specialty)}</div>` : ''}
+              ${current.doctor_reg_no ? `<div class="mt-1"><span class="si-batch"><i class="bi bi-person-badge"></i>Reg. No. ${MF.esc(current.doctor_reg_no)}</span></div>` : ''}
+            </div></div>
+            <div class="col-md-4"><div class="p-2 px-3 rounded-3 border h-100" style="background:#FBFCFE">
+              <div class="text-2 small-xs">Payment</div>
+              <div class="fw-semibold">${MF.esc(payLabel(current.payment_mode))}</div>
+              ${split}
+              <div class="d-flex justify-content-between small mt-1"><span class="text-2">Paid</span><b class="num text-success">${MF.fmt(current.amount_paid)}</b></div>
+              <div class="d-flex justify-content-between small"><span class="text-2">Due</span><b class="num ${Number(current.balance_due) > 0.009 ? 'text-danger' : ''}">${MF.fmt(current.balance_due)}</b></div>
+              ${settlePct != null ? `<div class="si-bar" style="max-width:none"><i style="width:${settlePct}%"></i></div>` : ''}
+            </div></div>
           </div>
+          ${Number(current.refund_amount) > 0.009 ? `<div class="mb-2 px-3 py-2 rounded-3" style="background:#FEF3E2;border:1px dashed #F5DDB3;color:#B45309;font-size:.8rem;font-weight:650"><i class="bi bi-arrow-counterclockwise me-1"></i>${MF.fmt(current.refund_amount)} returned${current.return_count ? ` (${current.return_count} return${current.return_count > 1 ? 's' : ''})` : ''} on this bill — see the returns ledger.</div>` : ''}
           ${itemsTable(current.items || [])}
           ${totalsHtml(current)}`;
         bootstrap.Modal.getOrCreateInstance($('#siViewModal')).show();
@@ -462,7 +574,7 @@ require __DIR__ . '/middleware/auth.php';
         try {
           const current = await withItems(row);
           state.current = current;
-          MF.printHtml(receiptHtml(current));
+          siSilentPrint(invoiceHtml(current));
         } catch (e) {
           MF.toast(e.message, 'err', 'Could not print invoice');
         }

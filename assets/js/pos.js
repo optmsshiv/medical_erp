@@ -2913,10 +2913,12 @@
 
     $('#posComplete').disabled = true;
     const posDocId = $('#posDoctor') ? ($('#posDoctor').value || '') : '';
+    const posPatName = (state._rxBill && state._rxBill.patient) || '';
     try {
       const res = await MF.Api.post('sales.php', {
         customerId: $('#posCustomer').value,
         doctorId: posDocId || null,
+        patientName: posPatName || null,
         paymentMode: state.payment,
         globalDiscPct: Math.min(100, Math.max(0, t.billDiscPct || 0)),
         splitCash: state.split.cash,
@@ -2928,7 +2930,7 @@
       MF.printHtml(state.printFmt === 'thermal'
         ? thermalReceiptHtml(res.invoiceNo, t)
         : a4ReceiptHtml(res.invoiceNo, t));
-      if (posDocId) MF.Api.post('sale-doctor.php', { invoiceNo: res.invoiceNo, doctorId: posDocId }).catch(() => {});
+      if (posDocId || posPatName) MF.Api.post('sale-doctor.php', { invoiceNo: res.invoiceNo, doctorId: posDocId || 0, patientName: posPatName }).catch(() => {});
       saveLastBill(res.invoiceNo, t);
       paintLastBill();
       MF.toast(`${res.invoiceNo} · ${MF.fmt(res.grandTotal)} · ${state.payment.toUpperCase()}`, 'success', 'Sale completed');
