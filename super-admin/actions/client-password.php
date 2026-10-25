@@ -13,7 +13,7 @@ $name   = (string) ($client['name'] ?? '');
 if ($dbName === '') { flashErr('This client has no database on record.'); back(); }
 
 try {
-    $tenant = Database::tenant($client); // same resolution the app uses
+    $tenant = tenantDb($client); // Database::client() — the same path Tenant::db() uses
 
     // Discover the users table defensively — installs differ.
     $users  = $tenant->query("SHOW TABLES LIKE 'users'")->fetch();

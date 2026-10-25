@@ -83,6 +83,25 @@ function planCaps(string $plan): array {
     return PLAN_CAPS[strtolower($plan)] ?? PLAN_CAPS['trial'];
 }
 
+/** Connect to one tenant's own database through the SAME path the app itself uses:
+ *  core/Tenant::db() → Database::client(db_name, db_user, db_password, db_host).
+ *  Rows provisioned before credentials were stored fall back to the master-db account. */
+function tenantDb(array $client): PDO {
+    $dbName = (string) ($client['db_name'] ?? '');
+    if ($dbName === '') { throw new RuntimeException('Client row has no db_name.'); }
+    $user = (string) ($client['db_user'] ?? '');
+    $pass = (string) ($client['db_password'] ?? '');
+    $host = (string) ($client['db_host'] ?? '');
+    if ($user === '') {
+        $config = require dirname(__DIR__, 2) . '/config/database.php';
+        $user = (string) $config['username'];
+        $pass = (string) $config['password'];
+        $host = $host !== '' ? $host : (string) $config['host'];
+    }
+    if ($host === '') { $host = 'localhost'; }
+    return Database::client($dbName, $user, $pass, $host);
+}
+
 /* ---- billing helpers ---- */
 function billingSetting(string $key, string $default = ''): string {
     try {

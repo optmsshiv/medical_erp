@@ -41,8 +41,9 @@ try {
 
 /* Tenant-side vitals — each gathered independently. */
 try {
-    $tenant = Database::tenant($client);
+    $tenant = tenantDb($client);   // Database::client() — identical to Tenant::db()
     $out['online'] = true;
+    $out['offline_reason'] = null;
 
     try {
         $r = $tenant->query(
