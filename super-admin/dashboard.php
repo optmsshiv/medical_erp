@@ -175,18 +175,15 @@ $nav = 'dashboard';
     .bars.rv { height:64px; margin-top:10px; }
     .bars.rv i { cursor:default; transition:filter .15s; }
     .bars.rv i:hover { filter:brightness(1.12); }
-    /* health ledger: tidy column alignment — numbers right, dates nowrap, bars on the numbers' side */
+    /* health ledger: compact client column, everything centred — headers and data */
     table.health { width:100%; border-collapse:collapse; }
-    .health th, .health td { padding:10px 14px; border-bottom:1px solid #EFF1F6; vertical-align:middle; }
+    .health th, .health td { padding:10px 12px; border-bottom:1px solid #EFF1F6; vertical-align:middle; text-align:center; font-variant-numeric:tabular-nums; }
     .health tbody tr:last-child td { border-bottom:0; }
     .health th { font-size:10px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:var(--ink-3); background:#FAFBFE; }
     .health td { font-size:12.5px; }
-    .health th:nth-child(4), .health td:nth-child(4),
-    .health th:nth-child(5), .health td:nth-child(5),
-    .health th:nth-child(6), .health td:nth-child(6) { text-align:right; font-variant-numeric:tabular-nums; }
-    .health td:nth-child(3), .health td:nth-child(7) { white-space:nowrap; font-variant-numeric:tabular-nums; }
-    .health td:first-child { min-width:180px; }
-    .health .pulsebar { margin-left:auto; margin-right:0; }
+    .health td:first-child b { display:block; }
+    .health td:nth-child(3), .health td:nth-child(7) { white-space:nowrap; }
+    .health .pulsebar { margin-left:auto; margin-right:auto; }
     .clear b { font-size:13.5px; } .clear span { font-size:11.5px; color:var(--ink-3); }
     @media (max-width: 1020px) { .stats { grid-template-columns:repeat(3,1fr); } }
     @media (max-width: 820px) { .cols { grid-template-columns:1fr; } .stats { grid-template-columns:repeat(2,1fr); } .health th:nth-child(5), .health td:nth-child(5), .health th:nth-child(6), .health td:nth-child(6) { display:none; } }
