@@ -56,6 +56,8 @@ require __DIR__ . '/middleware/auth.php';
     .si-ellipsis { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .si-time { display:block; font-size:.68rem; font-weight:650; color:#8B9BB0; white-space:nowrap; }
     .si-doc { display:inline-block; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; font-weight:650; color:#1B2430; }
+    .si-reg { color:#176B5B; letter-spacing:.01em; }
+    .si-reg b { font-weight:700; }
     .si-doc-add { border:1px dashed #C7D3E0; background:#F8FAFC; color:#516278; border-radius:7px; font-size:.7rem; font-weight:700; padding:2px 8px; display:inline-flex; align-items:center; gap:4px; cursor:pointer; transition:all .15s ease; }
     .si-doc-add i { font-size:.72rem; color:#8B9BB0; }
     .si-doc-add:hover { border-color:var(--mf-primary); color:var(--mf-primary-dark); background:var(--mf-primary-soft); }
@@ -103,17 +105,17 @@ require __DIR__ . '/middleware/auth.php';
             <table class="table table-mf si-wide">
               <thead>
                 <tr>
-                  <th style="width:11%">Invoice</th>
+                  <th style="width:12%">Invoice</th>
                   <th style="width:9%">Date</th>
-                  <th style="width:15%">Customer</th>
-                  <th style="width:11%">Doctor</th>
+                  <th style="width:13%">Customer</th>
+                  <th style="width:16%">Doctor / Reg. No.</th>
                   <th class="text-end si-h-md" style="width:6%">Items</th>
-                  <th class="si-h-lg" style="width:9%">Payment</th>
+                  <th class="si-h-lg" style="width:8%">Payment</th>
                   <th class="text-end" style="width:8%">Total</th>
                   <th class="text-end" style="width:8%">Paid</th>
                   <th class="text-end" style="width:8%">Due</th>
-                  <th style="width:7%">Status</th>
-                  <th class="text-end" style="width:8%">Actions</th>
+                  <th style="width:6%">Status</th>
+                  <th class="text-end" style="width:6%">Actions</th>
                 </tr>
               </thead>
               <tbody id="siBody"></tbody>
@@ -275,7 +277,7 @@ require __DIR__ . '/middleware/auth.php';
           if (state.from && date && date < state.from) return false;
           if (state.to && date && date > state.to) return false;
           if (!q) return true;
-          return [r.invoice_no, r.customer_name, r.customer_phone, r.doctor_name, r.payment_mode, r.channel, r.status].join(' ').toLowerCase().includes(q);
+          return [r.invoice_no, r.customer_name, r.customer_phone, r.doctor_name, r.doctor_reg_no, r.doctor_specialty, r.payment_mode, r.channel, r.status].join(' ').toLowerCase().includes(q);
         });
       }
 
@@ -335,7 +337,7 @@ require __DIR__ . '/middleware/auth.php';
               <div class="fw-semibold si-ellipsis" title="${MF.esc(r.customer_name || 'Walk-in')}">${MF.esc(r.customer_name || 'Walk-in')}</div>
               ${phone ? `<span class="si-muted">${MF.esc(phone)}</span>` : ''}
             </td>
-            <td class="si-doccell">${r.doctor_name ? `<span class="si-doc" title="${MF.esc(r.doctor_name)}">${MF.esc(r.doctor_name)}</span>` : `<button type="button" class="si-doc-add" data-a="doctor" data-id="${MF.esc(r.id)}" data-inv="${MF.esc(r.invoice_no)}"><i class="bi bi-person-plus"></i>Attach</button>`}</td>
+            <td class="si-doccell">${r.doctor_name ? `<div class="si-doc" title="${MF.esc(r.doctor_name)}">${MF.esc(r.doctor_name)}</div>${r.doctor_specialty ? `<span class="si-muted">${MF.esc(r.doctor_specialty)}</span>` : ''}${r.doctor_reg_no ? `<span class="si-muted si-reg"><b>Reg. No. ${MF.esc(r.doctor_reg_no)}</b></span>` : ''}` : `<button type="button" class="si-doc-add" data-a="doctor" data-id="${MF.esc(r.id)}" data-inv="${MF.esc(r.invoice_no)}"><i class="bi bi-person-plus"></i>Attach</button>`}</td>
             <td class="text-end si-h-md"><div class="num fw-semibold">${MF.num(r.item_count)}</div><div class="text-2 small-xs">${MF.num(r.qty)} qty</div></td>
             <td class="si-h-lg"><div class="fw-semibold">${MF.esc(payLabel(r.payment_mode))}</div>${split}</td>
             <td class="text-end num fw-semibold">${MF.fmt(r.grand_total)}</td>
