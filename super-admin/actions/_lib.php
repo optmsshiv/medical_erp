@@ -42,10 +42,11 @@ function findClient(int $id): ?array {
 function flashOk(string $msg): void { $_SESSION['flash_ok_msg'] = $msg; }
 function flashErr(string $msg): void { $_SESSION['flash_error'] = $msg; }
 
-function back(): never {
-    header('Location: /super-admin/clients.php');
+function backTo(string $path = '/super-admin/clients.php'): never {
+    header('Location: ' . $path);
     exit;
 }
+function back(): never { backTo(); }
 
 /** True when a master table/column actually exists (defensive — never assume). */
 function hasColumn(string $table, string $column): bool {
@@ -80,4 +81,33 @@ const PLAN_CAPS = [
 
 function planCaps(string $plan): array {
     return PLAN_CAPS[strtolower($plan)] ?? PLAN_CAPS['trial'];
+}
+
+/* ---- billing helpers ---- */
+function billingSetting(string $key, string $default = ''): string {
+    try {
+        $r = master()->query('SELECT `value` FROM billing_settings WHERE `key` = ' . master()->quote($key) . ' LIMIT 1')->fetch();
+        return $r ? (string) $r['value'] : $default;
+    } catch (Throwable $e) { return $default; }
+}
+
+function planPrices(): array {
+    $out = [];
+    try {
+        foreach (master()->query('SELECT code, price, active FROM billing_plans')->fetchAll() as $p) {
+            $out[strtolower((string) $p['code'])] = ['price' => (float) $p['price'], 'active' => (int) $p['active']];
+        }
+    } catch (Throwable $e) { }
+    return $out;
+}
+
+/** One invoice row per client per covered period — UNIQUE(client_id, period_from) makes this idempotent. */
+function coverInvoiceExists(int $clientId, string $reffrom): bool {
+    try {
+        $r = master()->query(
+            'SELECT COUNT(*) AS n FROM client_invoices WHERE client_id = ' . (int) $clientId
+            . " AND period_from <= " . master()->quote($reffrom) . " AND period_to >= " . master()->quote($reffrom)
+        )->fetch();
+        return $r && (int) $r['n'] > 0;
+    } catch (Throwable $e) { return true; }   // on doubt, don't double-bill
 }
