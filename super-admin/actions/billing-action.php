@@ -37,7 +37,7 @@ try {
                     'INSERT INTO client_invoices (client_id, invoice_no, period_from, period_to, plan, amount, status, due_date) VALUES ('
                     . (int) $c['id'] . ', ' . master()->quote($invNo) . ', ' . master()->quote($from) . ', ' . master()->quote($to) . ', '
                     . master()->quote($plan) . ', ' . number_format($price, 2, '.', '') . ", 'unpaid', " . master()->quote($due) . ')'
-                    . ' ON DUPLICATE KEY UPDATE id = id'
+                    . " ON DUPLICATE KEY UPDATE status = 'unpaid', paid_at = NULL, amount = VALUES(amount), due_date = VALUES(due_date)"
                 );
                 $made++;
             }

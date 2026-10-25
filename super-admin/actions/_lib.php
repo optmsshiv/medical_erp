@@ -105,7 +105,7 @@ function planPrices(): array {
 function coverInvoiceExists(int $clientId, string $reffrom): bool {
     try {
         $r = master()->query(
-            'SELECT COUNT(*) AS n FROM client_invoices WHERE client_id = ' . (int) $clientId
+            "SELECT COUNT(*) AS n FROM client_invoices WHERE status <> 'void' AND client_id = " . (int) $clientId
             . " AND period_from <= " . master()->quote($reffrom) . " AND period_to >= " . master()->quote($reffrom)
         )->fetch();
         return $r && (int) $r['n'] > 0;
