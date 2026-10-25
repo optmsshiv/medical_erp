@@ -31,6 +31,10 @@ $overdueN    = 0;
 $grace    = (int) billingSetting('grace_days', '7');
 $upiId    = billingSetting('upi_id', '');
 $payNote  = billingSetting('pay_note', '');
+$coName   = billingSetting('company_name', '');
+$coAddr   = billingSetting('company_addr', '');
+$coContact= billingSetting('company_contact', '');
+$coGstin  = billingSetting('company_gstin', '');
 $autoSus  = billingSetting('auto_suspend_overdue', '0') === '1';
 
 if ($billingReady) {
@@ -259,6 +263,18 @@ $nav = 'billing';
                     <label for="paynote">Payment instructions shown to clients</label>
                     <input type="text" id="paynote" name="pay_note" value="<?= htmlspecialchars($payNote) ?>" placeholder="e.g. UPI to above ID, mention your store name; receipts verified daily" style="padding:9px 11px; border:1px solid #D8DBE6; border-radius:9px; font-size:13.5px; width:100%; font-family:inherit">
                 </div>
+                <div class="field" style="min-width:200px">
+                    <label for="coname">Your company name (invoice header)</label>
+                    <input type="text" id="coname" name="company_name" value="<?= htmlspecialchars($coName) ?>" placeholder="Your firm" style="padding:9px 11px; border:1px solid #D8DBE6; border-radius:9px; font-size:13.5px; width:100%; font-family:inherit">
+                </div>
+                <div class="field" style="flex:1; min-width:220px">
+                    <label for="coaddr">Address · contact · GSTIN (invoice header)</label>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <input type="text" id="coaddr" name="company_addr" value="<?= htmlspecialchars($coAddr) ?>" placeholder="Address" style="padding:9px 11px; border:1px solid #D8DBE6; border-radius:9px; font-size:13px; flex:2; min-width:180px; font-family:inherit">
+                        <input type="text" name="company_contact" value="<?= htmlspecialchars($coContact) ?>" placeholder="Phone / email" style="padding:9px 11px; border:1px solid #D8DBE6; border-radius:9px; font-size:13px; flex:1; min-width:130px; font-family:inherit">
+                        <input type="text" name="company_gstin" value="<?= htmlspecialchars($coGstin) ?>" placeholder="GSTIN (optional)" style="padding:9px 11px; border:1px solid #D8DBE6; border-radius:9px; font-size:13px; flex:1; min-width:120px; font-family:inherit">
+                    </div>
+                </div>
                 <div class="sw-wrap">
                     <label class="sw"><input type="checkbox" name="auto_suspend_overdue" <?= $autoSus ? 'checked' : '' ?>><i></i></label>
                     <span><b>Auto-suspend overdue clients</b> — when this cycle's invoice passes its due date unpaid (uses the live suspension gate).</span>
@@ -287,6 +303,8 @@ $nav = 'billing';
                     <td><?= $i['due_date'] ? htmlspecialchars(date('d M Y', strtotime($i['due_date']))) : '—' ?></td>
                     <td><span class="pill <?= htmlspecialchars($i['status']) ?>"><?= htmlspecialchars($i['status']) ?></span><?= $late ? '<span class="late">' . $daysLate . 'd late</span>' : '' ?></td>
                     <td style="text-align:right;white-space:nowrap">
+                        <a class="btn-ghost" href="/super-admin/billing-invoice.php?invoice_id=<?= (int) $i['id'] ?>" target="_blank" title="View document">View</a>
+                        <a class="btn-ghost" href="/super-admin/billing-invoice.php?invoice_id=<?= (int) $i['id'] ?>&print=1" target="_blank" title="Print / save PDF">PDF</a>
                         <?php if ($i['status'] === 'unpaid'): ?>
                             <form method="POST" action="/super-admin/actions/billing-action.php" style="display:inline"><input type="hidden" name="act" value="pay"><input type="hidden" name="invoice_id" value="<?= (int) $i['id'] ?>"><button class="btn-ghost ok">Mark paid</button></form>
                             <form method="POST" action="/super-admin/actions/billing-action.php" style="display:inline" onsubmit="return confirm('Void <?= htmlspecialchars(addslashes($i['invoice_no'])) ?>? Mistake-only — the record stays.');"><input type="hidden" name="act" value="void"><input type="hidden" name="invoice_id" value="<?= (int) $i['id'] ?>"><button class="btn-ghost danger">Void</button></form>

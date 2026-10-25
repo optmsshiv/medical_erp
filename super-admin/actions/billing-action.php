@@ -109,7 +109,11 @@ try {
             $auto  = isset($_POST['auto_suspend_overdue']) ? '1' : '0';
             foreach (['grace_days' => (string) $grace, 'auto_suspend_overdue' => $auto,
                       'upi_id' => trim((string) ($_POST['upi_id'] ?? '')),
-                      'pay_note' => trim((string) ($_POST['pay_note'] ?? ''))] as $k => $v) {
+                      'pay_note' => trim((string) ($_POST['pay_note'] ?? '')),
+                      'company_name' => trim((string) ($_POST['company_name'] ?? '')),
+                      'company_addr' => trim((string) ($_POST['company_addr'] ?? '')),
+                      'company_contact' => trim((string) ($_POST['company_contact'] ?? '')),
+                      'company_gstin' => trim((string) ($_POST['company_gstin'] ?? ''))] as $k => $v) {
                 master()->query('INSERT INTO billing_settings (`key`, `value`) VALUES (' . master()->quote($k) . ', ' . master()->quote($v) . ') ON DUPLICATE KEY UPDATE `value` = ' . master()->quote($v));
             }
             audit('BILLING_SETTINGS', null, "grace={$grace} auto_suspend={$auto}");
