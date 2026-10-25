@@ -249,27 +249,17 @@ window.MF = window.MF || {};
                 <h6 class="fw-bold mb-1">${MF.esc(title)}</h6>
                 <p class="text-2 mb-0 small">${MF.esc(message)}</p>
               </div>
-              <div class="modal-footer justify-content-center border-0 pt-0 flex-wrap">
-                <button type="button" class="btn btn-light-mf px-4" data-act="cancel" title="Esc">${MF.esc(cancelText)}</button>
-                <button type="button" class="btn btn-mf px-4" data-act="ok" title="Enter">${MF.esc(confirmText)}</button>
-                <div class="w-100 text-center mt-1" style="font-size:.68rem;color:#8B9BB0;font-weight:600"><kbd>Enter</kbd> ${MF.esc(confirmText)} &nbsp;·&nbsp; <kbd>Esc</kbd> ${MF.esc(cancelText)}</div>
+              <div class="modal-footer justify-content-center border-0 pt-0">
+                <button type="button" class="btn btn-light-mf px-4" data-act="cancel">${MF.esc(cancelText)}</button>
+                <button type="button" class="btn btn-mf px-4" data-act="ok">${MF.esc(confirmText)}</button>
               </div>
             </div>
           </div>
         </div>`;
-      const modalEl = host.querySelector('.modal');
-      const modal = new bootstrap.Modal(modalEl);
-      const okBtn = host.querySelector('[data-act="ok"]');
-      const cancelBtn = host.querySelector('[data-act="cancel"]');
-      okBtn.onclick = () => { modal.hide(); resolve(true); };
-      cancelBtn.onclick = () => { modal.hide(); resolve(false); };
-      /* Keyboard control: Enter confirms (unless Cancel itself is focused),
-         Esc dismisses (Bootstrap hide → resolves false below). */
-      modalEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && document.activeElement !== cancelBtn) { e.preventDefault(); okBtn.click(); }
-      });
-      modalEl.addEventListener('shown.bs.modal', () => okBtn.focus(), { once: true });
-      modalEl.addEventListener('hidden.bs.modal', () => resolve(false), { once: true });
+      const modal = new bootstrap.Modal(host.querySelector('.modal'));
+      host.querySelector('[data-act="ok"]').onclick = () => { modal.hide(); resolve(true); };
+      host.querySelector('[data-act="cancel"]').onclick = () => { modal.hide(); resolve(false); };
+      host.querySelector('.modal').addEventListener('hidden.bs.modal', () => resolve(false), { once: true });
       modal.show();
     });
   };
@@ -406,8 +396,7 @@ window.MF = window.MF || {};
         { label: 'Doctors', icon: 'heart-pulse', page: 'doctors', href: 'doctors.php' },
         { label: 'Manufacturers', icon: 'buildings', page: 'manufacturers', href: 'manufacturers.php' },
         { label: 'Medicine Categories', icon: 'tags', page: 'categories', href: 'categories.php' },
-        { label: 'Schedule / Class', icon: 'shield-check', page: 'schedules', href: 'schedules.php' },
-        { label: 'Compliance Register', icon: 'clipboard2-pulse', page: 'compliance-reports', href: 'compliance-reports.php' }
+        { label: 'Schedule / Class', icon: 'shield-check', page: 'schedules', href: 'schedules.php' }
       ]
     },
     {
@@ -436,7 +425,8 @@ window.MF = window.MF || {};
         { label: 'Store Settings', icon: 'shop', href: 'settings.php?tab=store' },
         { label: 'Invoice Settings', icon: 'file-earmark-sliders', href: 'settings.php?tab=invoice' },
         { label: 'Tax Settings', icon: 'calculator', href: 'settings.php?tab=tax' },
-        { label: 'Audit Logs', icon: 'journal-check', href: 'settings.php?tab=audit' }
+        { label: 'Audit Logs', icon: 'journal-check', href: 'settings.php?tab=audit' },
+        { label: 'My Subscription', icon: 'credit-card-2-front', href: 'subscription.php' }
       ]
     }
   ];

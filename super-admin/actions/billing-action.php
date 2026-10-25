@@ -105,7 +105,9 @@ try {
         case 'save_settings':
             $grace = max(0, (int) ($_POST['grace_days'] ?? 7));
             $auto  = isset($_POST['auto_suspend_overdue']) ? '1' : '0';
-            foreach (['grace_days' => (string) $grace, 'auto_suspend_overdue' => $auto] as $k => $v) {
+            foreach (['grace_days' => (string) $grace, 'auto_suspend_overdue' => $auto,
+                      'upi_id' => trim((string) ($_POST['upi_id'] ?? '')),
+                      'pay_note' => trim((string) ($_POST['pay_note'] ?? ''))] as $k => $v) {
                 master()->query('INSERT INTO billing_settings (`key`, `value`) VALUES (' . master()->quote($k) . ', ' . master()->quote($v) . ') ON DUPLICATE KEY UPDATE `value` = ' . master()->quote($v));
             }
             audit('BILLING_SETTINGS', null, "grace={$grace} auto_suspend={$auto}");

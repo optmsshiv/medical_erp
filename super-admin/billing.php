@@ -1,5 +1,18 @@
 <?php
+// TEMP DIAGNOSIS — uncomment the next two lines to print the real error instead of a 500:
+// ini_set('display_errors', 1); error_reporting(E_ALL);
 require __DIR__ . '/actions/_lib.php';   // includes _guard.php + Database.php, flash plumbing, billing helpers
+
+// Self-diagnosis: if the helpers were not uploaded with this page, say so instead of white-screening.
+if (!function_exists('billingSetting') || !function_exists('planPrices')) {
+    http_response_code(500);
+    echo '<div style="max-width:640px;margin:12vh auto;font-family:sans-serif;padding:24px;border:1px solid #E5E7F0;border-radius:14px">'
+       . '<h2 style="margin:0 0 8px">Billing page cannot start</h2>'
+       . '<p style="color:#5B6270">It needs the updated helpers file it was shipped with. Please upload<br>'
+       . '<code>super-admin/actions/_lib.php</code> (the extended version) to <code>/super-admin/actions/_lib.php</code>,<br>'
+       . 'replacing the older file, then reload.</p></div>';
+    exit;
+}
 
 $billingReady = false;
 try { $billingReady = (bool) master()->query("SHOW TABLES LIKE 'client_invoices'")->fetch(); } catch (Throwable $e) { }
@@ -16,6 +29,8 @@ $collected  = 0.0;
 $outstanding = 0;
 $overdueN    = 0;
 $grace    = (int) billingSetting('grace_days', '7');
+$upiId    = billingSetting('upi_id', '');
+$payNote  = billingSetting('pay_note', '');
 $autoSus  = billingSetting('auto_suspend_overdue', '0') === '1';
 
 if ($billingReady) {
@@ -235,6 +250,14 @@ $nav = 'billing';
                 <div class="field">
                     <label for="grace">Grace days before due</label>
                     <input type="number" id="grace" name="grace_days" min="0" max="60" value="<?= $grace ?>">
+                </div>
+                <div class="field">
+                    <label for="upi">Your UPI ID (client pays here)</label>
+                    <input type="text" id="upi" name="upi_id" value="<?= htmlspecialchars($upiId) ?>" placeholder="name@bank" style="padding:9px 11px; border:1px solid #D8DBE6; border-radius:9px; font-size:13.5px; width:210px; font-family:inherit">
+                </div>
+                <div class="field" style="flex:1; min-width:240px">
+                    <label for="paynote">Payment instructions shown to clients</label>
+                    <input type="text" id="paynote" name="pay_note" value="<?= htmlspecialchars($payNote) ?>" placeholder="e.g. UPI to above ID, mention your store name; receipts verified daily" style="padding:9px 11px; border:1px solid #D8DBE6; border-radius:9px; font-size:13.5px; width:100%; font-family:inherit">
                 </div>
                 <div class="sw-wrap">
                     <label class="sw"><input type="checkbox" name="auto_suspend_overdue" <?= $autoSus ? 'checked' : '' ?>><i></i></label>
