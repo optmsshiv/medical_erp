@@ -52,6 +52,30 @@ try {
             flashOk('“' . $name . '” is now on the ' . ucfirst($plan) . ' plan.');
             break;
 
+        case 'save_plan_trial':
+            $changes = [];
+            $newPlan = strtolower(trim((string) ($_POST['plan'] ?? '')));
+            if ($newPlan !== '' && $newPlan !== strtolower((string) ($client['plan'] ?? 'trial'))) {
+                if (!in_array($newPlan, ['trial', 'standard', 'annual'], true)) { flashErr('Unknown plan.'); back(); }
+                if (!hasColumn('clients', 'plan')) { flashErr('Run database/2026_10_20_super_admin_control.sql first — clients.plan is missing.'); back(); }
+                master()->query('UPDATE clients SET plan = ' . master()->quote($newPlan) . ' WHERE id = ' . $id . ' LIMIT 1');
+                audit('PLAN_SET', $id, $name . ' → ' . $newPlan);
+                $changes[] = 'plan → ' . ucfirst($newPlan);
+            }
+            $newDate = trim((string) ($_POST['trial_ends_at'] ?? ''));
+            $curDate = substr((string) ($client['trial_ends_at'] ?? ''), 0, 10);
+            if ($newDate !== '' && $newDate !== $curDate) {
+                if (!preg_match('/^\\d{4}-\\d{2}-\\d{2}$/', $newDate)) { flashErr('Pick a valid trial end date.'); back(); }
+                if (!hasColumn('clients', 'trial_ends_at')) { flashErr('Run database/2026_10_20_super_admin_control.sql first — clients.trial_ends_at is missing.'); back(); }
+                $status = $newDate >= date('Y-m-d') ? 'trial' : 'active';
+                master()->query('UPDATE clients SET trial_ends_at = ' . master()->quote($newDate)
+                    . ', status = ' . master()->quote($status) . ', suspended_at = NULL WHERE id = ' . $id . ' LIMIT 1');
+                audit('TRIAL_EXTEND', $id, $name . ' → ' . $newDate);
+                $changes[] = 'trial ends ' . date('d M Y', strtotime($newDate)) . ' (status: ' . $status . ')';
+            }
+            flashOk($changes ? '“' . $name . '” — ' . implode(' · ', $changes) . '.' : '“' . $name . '” — nothing changed, nothing saved.');
+            break;
+
         default:
             flashErr('Unknown action.');
     }

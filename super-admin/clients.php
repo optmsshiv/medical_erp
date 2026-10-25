@@ -425,8 +425,7 @@ $nav = 'clients';
             </div>
             <div class="macts">
                 <button type="button" class="btn-ghost" data-close>Cancel</button>
-                <button type="submit" name="act" value="set_plan" class="btn-ghost" style="border-color:#DFE3FB;color:var(--brand-strong)">Save plan only</button>
-                <button type="submit" name="act" value="extend_trial" class="btn">Save trial date</button>
+                <button type="submit" name="act" value="save_plan_trial" class="btn">Save changes</button>
             </div>
         </form>
     </div>
