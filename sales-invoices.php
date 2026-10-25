@@ -157,7 +157,29 @@ require __DIR__ . '/middleware/auth.php';
       const MF = window.MF, D = window.MF_DATA || {};
       const $ = (s) => document.querySelector(s);
       const PAY = { cash: 'Cash', upi: 'UPI', card: 'Card', bank: 'Bank', credit: 'Credit', split: 'Split' };
-      const state = { rows: [], q: '', channel: 'all', status: 'all', from: '', to: '', page: 1, per: 12, current: null, opened: false };
+      const state = { rows: [], q: '', channel: 'all', status: 'all', from: '', to: '', page: 1, per: 12, current: null, opened: false, me: '' };
+      try { MF.Api.get('whoami.php').then((r) => { const u = (r && r.data) || {}; state.me = u.name || ''; }).catch(() => {}); } catch (e) { }
+
+      /* ---------------- print identity: numbers in words (Indian), AM/PM stamp ---------------- */
+      const SI_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      function numWords(n) {
+        const a = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+        const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+        const two = (x) => (x < 20 ? a[x] : b[(x / 10) >> 0] + (x % 10 ? ' ' + a[x % 10] : ''));
+        const three = (x) => (x > 99 ? a[(x / 100) >> 0] + ' Hundred' + (x % 100 ? ' ' : '') : '') + two(x % 100);
+        n = Math.round(Math.abs(Number(n) || 0));
+        if (!n) return 'Zero';
+        let out = '';
+        [[(n / 1e7) >> 0, 'Crore'], [((n % 1e7) / 1e5) >> 0, 'Lakh'], [((n % 1e5) / 1e3) >> 0, 'Thousand'], [n % 1e3, '']]
+          .forEach(([v, w2]) => { if (v) out += three(v) + ' ' + (w2 ? w2 + ' ' : ''); });
+        return out.trim();
+      }
+      const amtWords = (n) => 'Rupees ' + numWords(n) + ' Only';
+      function nowStamp() {
+        const d = new Date(), p2 = (x) => String(x).padStart(2, '0');
+        let h = d.getHours(); const ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12;
+        return p2(d.getDate()) + ' ' + SI_MON[d.getMonth()] + ' ' + d.getFullYear() + ' · ' + p2(h) + ':' + p2(d.getMinutes()) + ' ' + ap;
+      }
 
       function formatPhone(raw) {
         const text = String(raw || '').trim();
@@ -408,6 +430,7 @@ require __DIR__ . '/middleware/auth.php';
         return `<div class="ms-auto mt-3" style="max-width:280px">
           ${rows.map(([label, value]) => `<div class="d-flex justify-content-between py-1"><span class="text-2">${label}</span><span class="num">${MF.fmt(value, 2)}</span></div>`).join('')}
           <div class="d-flex justify-content-between py-1 border-top mt-1"><strong>Total</strong><strong class="num">${MF.fmt(r.grand_total)}</strong></div>
+          <div class="mt-1 small-xs text-2" style="line-height:1.45">In words: <b>${MF.esc(amtWords(r.grand_total))}</b></div>
           <div class="d-flex justify-content-between py-1"><span class="text-2">Paid</span><span class="num">${MF.fmt(r.amount_paid)}</span></div>
           <div class="d-flex justify-content-between py-1"><span class="text-2">Due</span><span class="num">${MF.fmt(r.balance_due)}</span></div>
           ${Number(r.refund_amount) ? `<div class="d-flex justify-content-between py-1"><span class="text-2">Refunded</span><span class="num">${MF.fmt(r.refund_amount)}</span></div>` : ''}
@@ -454,6 +477,8 @@ require __DIR__ . '/middleware/auth.php';
           .tot { width:62mm; border:1px solid #c9d2dd; border-radius:6px; padding:5px 8px; }
           .tl { display:flex; justify-content:space-between; padding:1px 0; font-size:8.5px; color:#374151; }
           .grand { display:flex; justify-content:space-between; border-top:1.4px solid #111827; margin-top:4px; padding-top:4px; font-size:11px; font-weight:800; }
+          .awr { margin-top:5px; border:0.5px dashed #9ca3af; border-radius:6px; padding:4px 8px; font-size:8.2px; color:#374151; page-break-inside:avoid; }
+          .pft { margin-top:14px; border-top:0.5px solid #d1d5db; padding-top:4px; font-size:7.4px; color:#6b7280; display:flex; justify-content:space-between; gap:10px; page-break-inside:avoid; }
           .pay { margin-top:6px; border:1px dashed #9ca3af; border-radius:6px; padding:5px 8px; font-size:8.5px; display:flex; justify-content:space-between; page-break-inside:avoid; }
           .decl { margin-top:7px; font-size:7px; color:#6b7280; line-height:1.55; }
           .sg { margin-top:20px; display:flex; justify-content:space-between; font-size:8px; page-break-inside:avoid; }
@@ -491,13 +516,15 @@ require __DIR__ . '/middleware/auth.php';
           ${Number(r.round_off) ? `<div class="tl"><span>Round off</span><span>${MF.fmt(r.round_off, 2)}</span></div>` : ''}
           <div class="grand"><span>GRAND TOTAL</span><span>${MF.fmt(r.grand_total, 2)}</span></div>
         </div></div>
+        <div class="awr">Amount in words: <b>${MF.esc(amtWords(r.grand_total))}</b></div>
         <div class="pay">
           <span>Payment: <b>${MF.esc(payLabel(r.payment_mode))}</b>${split}</span>
           <span>Paid <b>${MF.fmt(r.amount_paid, 2)}</b> · Balance due <b>${MF.fmt(r.balance_due, 2)}</b></span>
         </div>
         ${Number(r.refund_amount) > 0.009 ? `<div class="decl" style="color:#B45309"><b>Note:</b> ${MF.fmt(r.refund_amount, 2)} returned against this invoice${r.return_count ? ` (${r.return_count} return${r.return_count > 1 ? 's' : ''})` : ''}; see the returns register.</div>` : ''}
         <div class="decl">E&amp;OE. Medicines once sold will not be taken back without valid reason. This is a system-generated invoice from Optms Rx — amounts, batches and parties are as recorded at billing. Prescription medicines are dispensed only against a valid prescription.</div>
-        <div class="sg"><div>Customer signature</div><div>For ${MF.esc(store.name || 'Optms Rx')}</div></div>`;
+        <div class="sg"><div>Customer signature</div><div>For ${MF.esc(store.name || 'Optms Rx')}</div></div>
+        <div class="pft"><span>Printed by: <b>${MF.esc(state.me || 'System user')}</b></span><span>Printed on: <b>${nowStamp()}</b></span><span>Optms Rx · Sales Invoice</span></div>`;
       }
 
       function siSilentPrint(innerHtml) {

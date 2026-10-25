@@ -60,9 +60,11 @@ $codes = $cls === 'h1' ? "'H1'" : ($cls === 'x' ? "'X'" : "'H1','X'");
 try {
     $rows = cqr("SELECT s.id AS sale_id, s.invoice_no, s.sale_date, s.created_at,
             {$patientSel} AS patient_name, COALESCE(c.phone, '') AS patient_phone,
+            COALESCE(c.address, '') AS patient_address,
             COALESCE(d.name, '') AS doctor_name, COALESCE(d.reg_no, '') AS doctor_reg_no,
             m.name AS medicine_name, COALESCE(m.schedule_class, '') AS schedule_class,
             COALESCE(b.batch_no, '') AS batch_no,
+            b.expiry_date AS expiry_date,
             si.qty AS qty, COALESCE(rt.returned, 0) AS returned
         FROM sale_items si
         JOIN sales s ON s.id = si.sale_id
@@ -119,11 +121,13 @@ foreach ($rows as $r) {
         'sale_time' => substr((string) ($r['created_at'] ?? ''), 11, 5),
         'patient_name' => $patient,
         'patient_phone' => (string) ($r['patient_phone'] ?? ''),
+        'patient_address' => (string) ($r['patient_address'] ?? ''),
         'doctor_name' => $doctor,
         'doctor_reg_no' => (string) ($r['doctor_reg_no'] ?? ''),
         'medicine_name' => (string) ($r['medicine_name'] ?? ''),
         'schedule_class' => $sched,
         'batch_no' => (string) ($r['batch_no'] ?? ''),
+        'expiry_date' => cDay($r['expiry_date'] ?? '', ''),
         'qty' => $qty,
         'returned' => (int) ($r['returned'] ?? 0),
     ];

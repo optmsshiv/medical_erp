@@ -23,6 +23,10 @@ require __DIR__ . '/middleware/auth.php';
     .cr-stat.accent { background:var(--mf-primary-soft); border-color:#D7EBE6; }
     .cr-stat.warn { background:#FEF9EF; border-color:#F5E3C2; }
     .cr-stat.warn strong { color:#B45309; }
+    .cr-exp { display:inline-flex; align-items:center; gap:4px; border:1px solid #E2E8F0; background:#F8FAFC; color:#516278; border-radius:6px; padding:1px 7px; font-size:.66rem; font-weight:750; letter-spacing:.02em; }
+    .cr-exp i { font-size:.7rem; }
+    .cr-exp.warn { background:#FEF9EF; border-color:#F5E3C2; color:#B45309; }
+    .cr-exp.danger { background:#FDEDEF; border-color:#F4C2CC; color:#B42318; }
     .cr-card { border:1px solid #E3EBF4; border-radius:16px; background:#fff; overflow:hidden; box-shadow:0 1px 2px rgba(22,50,92,.04), 0 10px 28px rgba(22,50,92,.04); }
     .cr-filter { display:flex; align-items:end; gap:12px; flex-wrap:wrap; padding:12px 16px; border-bottom:1px solid #E7EEF6; background:#FBFCFE; }
     .cr-field label { display:block; font-size:.68rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#8B9BB0; margin-bottom:4px; }
@@ -129,7 +133,8 @@ require __DIR__ . '/middleware/auth.php';
       const fyStart = () => { const d = new Date(); const y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1; return y + '-04-01'; };
       const hm = (r) => { const t = String(r.sale_time || '').slice(0, 5); return t && t !== '00:00' ? t : ''; };
 
-      const state = { from: fyStart(), to: todayStr(), cls: 'all', rows: [], summary: {}, busy: false };
+      const state = { from: fyStart(), to: todayStr(), cls: 'all', rows: [], summary: {}, busy: false, me: '' };
+      try { MF.Api.get('whoami.php').then((r) => { const u = (r && r.data) || {}; state.me = u.name || ''; }).catch(() => {}); } catch (e) { }
 
       /* ---------------- data ---------------- */
       async function load() {
@@ -184,9 +189,9 @@ require __DIR__ . '/middleware/auth.php';
           <tr>
             <td class="cr-num" style="color:#8B9BB0">${i + 1}</td>
             <td class="cr-num"><div>${r.sale_date ? MF.fmtDate(r.sale_date) : '—'}</div>${hm(r) ? `<span class="cr-mut">${hm(r)}</span>` : ''}</td>
-            <td>${r.patient_name ? `<span class="cr-name">${MF.esc(r.patient_name)}</span>${r.patient_phone ? `<span class="cr-mut">${MF.esc(r.patient_phone)}</span>` : ''}` : '<span class="text-2">—</span>'}</td>
+            <td>${r.patient_name ? `<span class="cr-name">${MF.esc(r.patient_name)}</span>${r.patient_phone ? `<span class="cr-mut"><i class="bi bi-telephone" style="font-size:.62rem"></i> ${MF.esc(r.patient_phone)}</span>` : ''}${r.patient_address ? `<span class="cr-mut">${MF.esc(r.patient_address)}</span>` : ''}` : '<span class="text-2">—</span>'}</td>
             <td>${r.doctor_name ? `<span class="cr-name">${MF.esc(r.doctor_name)}</span>${r.doctor_reg_no ? `<span class="cr-mut">Reg ${MF.esc(r.doctor_reg_no)}</span>` : ''}` : '<span class="text-2">—</span>'}</td>
-            <td><span class="cr-name">${MF.esc(r.medicine_name)}</span> <span class="cr-sq ${r.schedule_class === 'X' ? 'x' : 'h1'}">${MF.esc(r.schedule_class || '?')}</span></td>
+            <td><span class="cr-name">${MF.esc(r.medicine_name)}</span> <span class="cr-sq ${r.schedule_class === 'X' ? 'x' : 'h1'}">${MF.esc(r.schedule_class || '?')}</span>${expBadge(r)}</td>
             <td class="cr-num">${r.batch_no ? MF.esc(r.batch_no) : '<span class="text-2">—</span>'}</td>
             <td class="text-end cr-num fw-bold">${MF.num(r.qty)}${r.returned > 0 ? `<span class="cr-mut" style="color:#B45309">−${MF.num(r.returned)} ret</span>` : ''}</td>
             <td><a class="cr-sq" style="text-decoration:none;color:var(--mf-primary-dark)" href="sales-invoices.php?invoice=${encodeURIComponent(r.invoice_no)}" title="Open this bill">${MF.esc(r.invoice_no || '—')}</a></td>
@@ -216,6 +221,40 @@ require __DIR__ . '/middleware/auth.php';
       $('#crFrom').addEventListener('change', (e) => { state.from = e.target.value || fyStart(); load(); });
       $('#crTo').addEventListener('change', (e) => { state.to = e.target.value || todayStr(); load(); });
 
+      /* ---------------- print identity: expiry badge, numbers in words, AM/PM stamp ---------------- */
+      const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      function expLabel(r) {
+        const ym = r && r.expiry_date ? String(r.expiry_date).slice(0, 7) : '';
+        return ym.length === 7 && MON[Number(ym.slice(5, 7)) - 1] ? 'Exp ' + MON[Number(ym.slice(5, 7)) - 1] + ' ' + ym.slice(0, 4) : '';
+      }
+      function expBadge(r) {
+        const label = expLabel(r);
+        if (!label) return '';
+        const ym = String(r.expiry_date).slice(0, 7);
+        const nowYm = todayStr().slice(0, 7);
+        const w = new Date(); w.setMonth(w.getMonth() + 3);
+        const warnYm = w.getFullYear() + '-' + String(w.getMonth() + 1).padStart(2, '0');
+        const tone = ym < nowYm ? ' danger' : (ym <= warnYm ? ' warn' : '');
+        return `<div style="margin-top:3px"><span class="cr-exp${tone}"><i class="bi bi-calendar2-x${tone ? '-fill' : ''}"></i>${label}</span></div>`;
+      }
+      function numWords(n) {
+        const a = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+        const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+        const two = (x) => (x < 20 ? a[x] : b[(x / 10) >> 0] + (x % 10 ? ' ' + a[x % 10] : ''));
+        const three = (x) => (x > 99 ? a[(x / 100) >> 0] + ' Hundred' + (x % 100 ? ' ' : '') : '') + two(x % 100);
+        n = Math.round(Math.abs(Number(n) || 0));
+        if (!n) return 'Zero';
+        let out = '';
+        [[(n / 1e7) >> 0, 'Crore'], [((n % 1e7) / 1e5) >> 0, 'Lakh'], [((n % 1e5) / 1e3) >> 0, 'Thousand'], [n % 1e3, '']]
+          .forEach(([v, w2]) => { if (v) out += three(v) + ' ' + (w2 ? w2 + ' ' : ''); });
+        return out.trim();
+      }
+      function nowStamp() {
+        const d = new Date(), p2 = (x) => String(x).padStart(2, '0');
+        let h = d.getHours(); const ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12;
+        return p2(d.getDate()) + ' ' + MON[d.getMonth()] + ' ' + d.getFullYear() + ' · ' + p2(h) + ':' + p2(d.getMinutes()) + ' ' + ap;
+      }
+
       /* ---------------- exports ---------------- */
       const schedWord = () => state.cls === 'h1' ? 'H1' : (state.cls === 'x' ? 'X' : 'H1 & X');
       const periodText = () => (state.from === '1900-01-01' ? 'All time' : `${MF.fmtDate(state.from)} to ${MF.fmtDate(state.to)}`);
@@ -226,17 +265,19 @@ require __DIR__ . '/middleware/auth.php';
           r.sale_date || '',
           r.patient_name || '—',
           r.patient_phone || '',
+          r.patient_address || '',
           r.doctor_name || '—',
           r.doctor_reg_no || '',
           r.medicine_name,
           r.schedule_class,
           r.batch_no || '—',
+          r.expiry_date || '',
           r.qty,
           r.invoice_no || '—',
           ''
         ]);
         MF.exportCSV(`Schedule-${state.cls === 'all' ? 'H1-X' : state.cls.toUpperCase()}-register_${state.from}_to_${state.to}.csv`,
-          ['Sr No', 'Date', 'Patient Name', 'Patient Phone', 'Prescribing Doctor', 'Doctor Reg No', 'Medicine', 'Schedule', 'Batch', 'Quantity Sold', 'Bill Ref', 'Remarks'],
+          ['Sr No', 'Date', 'Patient Name', 'Patient Phone', 'Patient Address', 'Prescribing Doctor', 'Doctor Reg No', 'Medicine', 'Schedule', 'Batch', 'Expiry', 'Quantity Sold', 'Bill Ref', 'Remarks'],
           rows);
         MF.toast('Excel file downloaded — opens in MS Excel / Google Sheets.', 'success', 'Export ready');
       });
@@ -269,9 +310,9 @@ require __DIR__ . '/middleware/auth.php';
           <tr>
             <td class="c">${i + 1}</td>
             <td class="b">${r.sale_date ? MF.fmtDate(r.sale_date) : '—'}${hm(r) ? `<div class="s">${hm(r)}</div>` : ''}</td>
-            <td><b>${MF.esc(r.patient_name || '—')}</b>${r.patient_phone ? `<div class="s">${MF.esc(r.patient_phone)}</div>` : ''}</td>
+            <td><b>${MF.esc(r.patient_name || '—')}</b>${r.patient_phone ? `<div class="s">Ph: ${MF.esc(r.patient_phone)}</div>` : ''}${r.patient_address ? `<div class="s">${MF.esc(r.patient_address)}</div>` : ''}</td>
             <td><b>${MF.esc(r.doctor_name || '—')}</b>${r.doctor_reg_no ? `<div class="s">Reg. No. ${MF.esc(r.doctor_reg_no)}</div>` : ''}</td>
-            <td>${MF.esc(r.medicine_name)}&nbsp;<span class="sq">${MF.esc(r.schedule_class)}</span></td>
+            <td><b>${MF.esc(r.medicine_name)}</b>&nbsp;<span class="sq">${MF.esc(r.schedule_class)}</span>${expLabel(r) ? `<div class="s">${expLabel(r)}</div>` : ''}</td>
             <td>${MF.esc(r.batch_no || '—')}</td>
             <td class="r b">${MF.num(r.qty)}</td>
             <td>${MF.esc(r.invoice_no || '—')}</td>
@@ -294,13 +335,14 @@ require __DIR__ . '/middleware/auth.php';
           .meta > div { flex:1; padding:4px 8px; border-right:1px solid #d1d5db; font-size:7.8px; color:#4b5563; }
           .meta > div:last-child { border-right:0; }
           .meta b { display:block; font-size:10px; color:#111827; }
-          table { width:100%; border-collapse:collapse; }
-          th, td { border:1px solid #9ca3af; padding:4px 5px; text-align:left; vertical-align:top; }
-          th { background:#eef2f7; font-size:7.5px; text-transform:uppercase; letter-spacing:.05em; color:#1f2937; border-bottom:1.6px solid #111827; }
-          tbody tr:nth-child(even) { background:#f8fafc; }
+          table { width:100%; border-collapse:collapse; border:1px solid #B3C2CE; }
+          th, td { border:0.5px solid #C9D4DF; padding:4.5px 6px; text-align:left; vertical-align:top; }
+          th { background:#EAF3F0; font-size:7.2px; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:#17524A; border-bottom:1.1px solid #176B5B; }
+          tbody tr:nth-child(even) { background:#F7FAFC; }
           thead { display:table-header-group; }
           tr { page-break-inside:avoid; }
-          tfoot td { background:#eef2f7; border-top:1.6px solid #111827; font-weight:800; }
+          tfoot td { background:#EAF3F0; border-top:1.1px solid #176B5B; font-weight:800; }
+          .pft { margin-top:12px; border-top:0.5px dashed #9ca3af; padding-top:5px; font-size:7.6px; color:#4b5563; display:flex; justify-content:space-between; gap:10px; page-break-inside:avoid; }
           .r { text-align:right; } .c { text-align:center; } .b { font-weight:700; }
           .s { font-size:7.5px; color:#6b7280; }
           .sq { display:inline-block; border:1px solid #6b7280; border-radius:4px; padding:0 4px; font-size:7.5px; font-weight:800; }
@@ -315,7 +357,7 @@ require __DIR__ . '/middleware/auth.php';
             <div class="sb">${MF.esc(store.address || '')}${store.phone ? ' &nbsp;·&nbsp; Ph: ' + MF.esc(store.phone) : ''}${store.email ? ' &nbsp;·&nbsp; ' + MF.esc(store.email) : ''}</div>
             <div class="sb">${store.gstin ? 'GSTIN: <b>' + MF.esc(store.gstin) + '</b>' : ''}${store.dl_no ? (store.gstin ? ' &nbsp;·&nbsp; ' : '') + 'Drug Licence: <b>' + MF.esc(store.dl_no) + '</b>' : ''}</div>
           </div>
-          <div class="rt"><span class="tag">System Register</span><br>Generated: <b>${MF.fmtDate(todayStr())} · ${new Date().toTimeString().slice(0, 5)}</b><br>Period: <b>${MF.esc(periodText())}</b></div>
+          <div class="rt"><span class="tag">System Register</span><br>Generated: <b>${nowStamp()}</b><br>Period: <b>${MF.esc(periodText())}</b></div>
         </div>
         <h1>Schedule ${MF.esc(schedWord())} Drugs Register</h1>
         <p class="rule">Maintained under Rule 65 of the Drugs and Cosmetics Rules, 1945 · system-generated from the pharmacy sales ledger, produced for inspection</p>
@@ -338,7 +380,7 @@ require __DIR__ . '/middleware/auth.php';
           <tfoot><tr>
             <td colspan="4" class="c">TOTAL — ${MF.num(state.summary.entries || state.rows.length)} register entries</td>
             <td colspan="2" class="c">${MF.num(state.summary.medicines || 0)} distinct medicines</td>
-            <td class="r">${MF.num(state.summary.qty || 0)}</td>
+            <td class="r">${MF.num(state.summary.qty || 0)}<div class="s">(${numWords(state.summary.qty || 0)} units)</div></td>
             <td colspan="2"></td>
           </tr></tfoot>
         </table>
@@ -347,7 +389,8 @@ require __DIR__ . '/middleware/auth.php';
           <div>Prepared by — Pharmacist<br>(Name, Signature &amp; Date)</div>
           <div>Store In-charge<br>(Name, Signature &amp; Date)</div>
           <div>Inspected by — Drugs Inspector<br>(Name, Designation, Seal &amp; Date)</div>
-        </div>`);
+        </div>
+        <div class="pft"><span>Printed by: <b>${MF.esc(state.me || 'System user')}</b></span><span>Printed on: <b>${nowStamp()}</b></span><span>Optms Rx · H1/X Compliance Register</span></div>`);
       });
 
       $('#crRefresh').addEventListener('click', load);
