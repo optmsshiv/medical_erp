@@ -12,6 +12,10 @@ if (!Auth::check()) {
 
 $method = $_SERVER['REQUEST_METHOD'];
 
+/* Profile fields the settings UI edits; each entry = validator. */
+const EDITABLE_PROFILE_FIELDS = ['name', 'email', 'mobile', 'role'];
+const USER_ROLES = ['Owner / Admin', 'Pharmacist', 'Billing Clerk', 'Purchase Manager', 'staff'];
+
 switch ($method) {
     case 'GET':
         $rows = User::all('name');
@@ -29,6 +33,9 @@ switch ($method) {
 
         if ($name === '' || $email === '') {
             Json::error('Name and email are required.', 422);
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            Json::error('That email address is not valid.', 422);
         }
         if (User::first('email', '=', $email)) {
             Json::error('A user with this email already exists.', 422);
@@ -60,13 +67,47 @@ switch ($method) {
             Json::error('User not found.', 404);
         }
 
+        /* (a) status lifecycle — unchanged behavior from the original deploy */
         if (isset($input['status'])) {
             $newStatus = $input['status'] === 'active' ? 'active' : 'disabled';
-            if ($user['id'] === Auth::user()['id'] && $newStatus === 'disabled') {
+            if ((int) $user['id'] === (int) (Auth::user()['id'] ?? 0) && $newStatus === 'disabled') {
                 Json::error('You cannot disable your own account while logged in.', 422);
             }
             User::update($id, ['status' => $newStatus]);
             Audit::log('USER_STATUS', "{$user['name']} set to {$newStatus}");
+        }
+
+        /* (b) profile fields — name / email / mobile / role */
+        $patch = [];
+        foreach (EDITABLE_PROFILE_FIELDS as $f) {
+            if (array_key_exists($f, $input)) { $patch[$f] = trim((string) $input[$f]); }
+        }
+        if ($patch) {
+            if (isset($patch['name'])) {
+                if ($patch['name'] === '') { Json::error('Name cannot be empty.', 422); }
+                if (mb_strlen($patch['name']) > 80) { Json::error('Name is too long (80 max).', 422); }
+            }
+            if (isset($patch['email'])) {
+                if (!filter_var($patch['email'], FILTER_VALIDATE_EMAIL)) { Json::error('That email address is not valid.', 422); }
+                $taken = User::first('email', '=', $patch['email']);
+                if ($taken && (int) $taken['id'] !== $id) { Json::error('A user with this email already exists.', 422); }
+            }
+            if (isset($patch['role']) && !in_array($patch['role'], USER_ROLES, true)) {
+                Json::error('Unknown role: ' . $patch['role'], 422);
+            }
+            if (isset($patch['mobile']) && mb_strlen($patch['mobile']) > 20) {
+                Json::error('Mobile number is too long.', 422);
+            }
+
+            // only write fields that actually changed — the audit line stays truthful
+            $changed = [];
+            foreach ($patch as $f => $v) {
+                if ((string) ($user[$f] ?? '') !== $v) { $changed[$f] = $v; }
+            }
+            if ($changed) {
+                User::update($id, $changed);
+                Audit::log('USER_UPDATE', $user['name'] . ' — changed: ' . implode(', ', array_keys($changed)));
+            }
         }
 
         Json::ok();
