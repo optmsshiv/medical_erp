@@ -141,6 +141,8 @@ function shapeInvoice(array $row): array
         'customer_type' => (string) ($row['customer_type'] ?? ''),
         'doctor_id' => isset($row['doctor_id']) && $row['doctor_id'] !== null ? (int) $row['doctor_id'] : null,
         'doctor_name' => (string) ($row['doctor_name'] ?? ''),
+        'doctor_reg_no' => (string) ($row['doctor_reg_no'] ?? ''),
+        'doctor_specialty' => (string) ($row['doctor_specialty'] ?? ''),
         'gstin' => (string) ($row['gstin'] ?? ''),
         'dl_no' => (string) ($row['dl_no'] ?? ''),
         'subtotal' => money($row, 'subtotal'),
