@@ -1,5 +1,52 @@
 <?php
-require __DIR__ . '/_guard.php';
+require __DIR__ . '/actions/_lib.php';   // includes _guard.php + Database.php, flash plumbing, billing helpers
+
+$billingReady = false;
+try { $billingReady = (bool) master()->query("SHOW TABLES LIKE 'client_invoices'")->fetch(); } catch (Throwable $e) { }
+
+$flashOk    = $_SESSION['flash_ok_msg'] ?? null;
+$flashError = $_SESSION['flash_error'] ?? null;
+unset($_SESSION['flash_ok_msg'], $_SESSION['flash_error']);
+
+$today   = date('Y-m-d');
+$plans   = [];
+$invs    = [];
+$mrr     = 0.0;
+$collected  = 0.0;
+$outstanding = 0;
+$overdueN    = 0;
+$grace    = (int) billingSetting('grace_days', '7');
+$autoSus  = billingSetting('auto_suspend_overdue', '0') === '1';
+
+if ($billingReady) {
+    try { $plans = master()->query('SELECT * FROM billing_plans ORDER BY sort_order ASC, id ASC')->fetchAll(); } catch (Throwable $e) { }
+    try {
+        $invs = master()->query(
+            'SELECT ci.*, cl.name AS client_name, cl.subdomain AS client_sub
+               FROM client_invoices ci JOIN clients cl ON cl.id = ci.client_id
+              ORDER BY ci.created_at DESC, ci.id DESC LIMIT 120'
+        )->fetchAll();
+    } catch (Throwable $e) { }
+    try {
+        $c = master()->query("SELECT COALESCE(SUM(amount), 0) AS s FROM client_invoices WHERE status = 'paid' AND DATE_FORMAT(paid_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')")->fetch();
+        $collected = (float) ($c['s'] ?? 0);
+    } catch (Throwable $e) { }
+    try {
+        $c = master()->query("SELECT COUNT(*) n FROM client_invoices WHERE status = 'unpaid'")->fetch();
+        $outstanding = (int) ($c['n'] ?? 0);
+        $c = master()->query("SELECT COUNT(*) n FROM client_invoices WHERE status = 'unpaid' AND due_date < " . master()->quote($today))->fetch();
+        $overdueN = (int) ($c['n'] ?? 0);
+    } catch (Throwable $e) { }
+    try {
+        $prices = planPrices();
+        foreach (master()->query('SELECT status, plan FROM clients')->fetchAll() as $cl) {
+            if (strtolower((string) $cl['status']) === 'suspended') { continue; }
+            $pl = strtolower((string) ($cl['plan'] ?? 'trial'));
+            $p  = (float) ($prices[$pl]['price'] ?? 0);
+            $mrr += ($pl === 'annual') ? $p / 12 : $p;   // trials price 0 by definition
+        }
+    } catch (Throwable $e) { }
+}
 $nav = 'billing';
 ?>
 <!DOCTYPE html>
@@ -12,12 +59,12 @@ $nav = 'billing';
     :root {
         --ink:#1A1D27; --ink-2:#5B6270; --ink-3:#8A8F9A; --line:#E5E7F0; --bg:#F4F5F9;
         --brand:#4338CA; --brand-strong:#3730A3; --brand-soft:#EEF0FE; --ring:rgba(67,56,202,.14);
-        --ok:#1B6B3C; --ok-soft:#E8F7EE; --warn:#93650A; --warn-soft:#FFF3DC;
+        --ok:#1B6B3C; --ok-soft:#E8F7EE; --warn:#93650A; --warn-soft:#FFF3DC; --bad:#9A2E24; --bad-soft:#FDECEC;
     }
     * { box-sizing:border-box; }
     body { margin:0; background:var(--bg); color:var(--ink); font-family:-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif; font-feature-settings:"cv02","cv03","cv04"; font-size:14px; }
     .bar { position:sticky; top:0; z-index:20; background:rgba(255,255,255,.88); backdrop-filter:blur(10px); border-bottom:1px solid var(--line); }
-    .bar-in { max-width:1080px; margin:0 auto; padding:0 22px; height:58px; display:flex; align-items:center; gap:22px; }
+    .bar-in { max-width:1120px; margin:0 auto; padding:0 22px; height:58px; display:flex; align-items:center; gap:22px; }
     .logo { display:flex; align-items:center; gap:9px; text-decoration:none; }
     .logo-mark { width:28px; height:28px; border-radius:8px; background:linear-gradient(135deg,#4F46E5,#3730A3); display:flex; align-items:center; justify-content:center; color:#fff; }
     .logo-mark svg { width:15px; height:15px; }
@@ -31,48 +78,78 @@ $nav = 'billing';
     .session { display:inline-flex; align-items:center; gap:7px; font-size:11.5px; font-weight:600; color:var(--ink-2); border:1px solid var(--line); background:#fff; border-radius:999px; padding:6px 12px; }
     .session::before { content:""; width:6px; height:6px; border-radius:50%; background:#22C55E; }
 
-    .wrap { max-width:1080px; margin:0 auto; padding:30px 22px 46px; }
+    .wrap { max-width:1120px; margin:0 auto; padding:30px 22px 46px; }
     .head { display:flex; align-items:end; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:20px; }
     h1 { font-size:21px; letter-spacing:-.02em; margin:0 0 3px; }
     .sub { color:var(--ink-2); margin:0; font-size:13px; }
-    .preview-tag { font-size:10px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--brand-strong); background:var(--brand-soft); border:1px solid #DFE3FB; border-radius:999px; padding:5px 12px; }
+    .live-tag { font-size:10px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--ok); background:var(--ok-soft); border:1px solid #BFEBD0; border-radius:999px; padding:5px 12px; }
 
-    .banner {
-        display:flex; gap:12px; align-items:center; background:var(--warn-soft); border:1px solid #F0DCB0; color:var(--warn);
-        border-radius:14px; padding:13px 16px; font-size:12.5px; margin-bottom:24px; line-height:1.5;
-    }
+    .alert { display:flex; gap:12px; border-radius:14px; padding:14px 16px; margin-bottom:22px; font-size:13px; align-items:center; }
+    .alert-ok { background:var(--ok-soft); border:1px solid #BFEBD0; color:#14532D; }
+    .alert-error { background:var(--bad-soft); border:1px solid #F1C9C4; color:var(--bad); }
+    .banner { display:flex; gap:12px; align-items:center; background:var(--brand-soft); border:1px solid #DFE3FB; color:var(--brand-strong);
+              border-radius:14px; padding:13px 16px; font-size:12.5px; margin-bottom:24px; line-height:1.55; }
     .banner svg { width:17px; height:17px; flex:none; }
 
-    h2.sec { font-size:14px; letter-spacing:-.01em; margin:26px 0 12px; }
-    .plans { display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; }
-    .plan { background:#fff; border:1px solid var(--line); border-radius:16px; padding:22px; box-shadow:0 1px 2px rgba(23,25,40,.04), 0 14px 34px rgba(36,30,110,.05); display:flex; flex-direction:column; }
-    .plan.hot { border:1.5px solid var(--brand); box-shadow:0 10px 30px rgba(67,56,202,.14); position:relative; }
-    .plan .hot-chip { position:absolute; top:-10px; left:18px; font-size:9.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; background:linear-gradient(135deg,#4F46E5,#3730A3); color:#fff; padding:3px 10px; border-radius:999px; }
-    .plan .nm { font-size:12px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:var(--brand-strong); }
-    .plan .pr { margin:10px 0 4px; font-size:26px; font-weight:750; letter-spacing:-.03em; }
-    .plan .pr small { font-size:12px; color:var(--ink-3); font-weight:600; letter-spacing:0; }
-    .plan .tag { font-size:11.5px; color:var(--ink-2); margin-bottom:14px; }
-    .plan ul { list-style:none; margin:0 0 18px; padding:0; display:grid; gap:8px; font-size:12.5px; color:var(--ink-2); }
-    .plan li { display:flex; gap:8px; align-items:center; }
-    .plan li svg { width:13px; height:13px; color:var(--brand); flex:none; }
-    .plan .ghost { margin-top:auto; text-align:center; font-size:12.5px; font-weight:650; color:var(--ink-3); border:1px dashed #D6D9E6; border-radius:10px; padding:10px; }
-    .plans-note { margin-top:10px; font-size:11px; color:var(--ink-3); }
+    .stats { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:22px; }
+    .stat { background:#fff; border:1px solid var(--line); border-radius:15px; padding:14px 16px; box-shadow:0 1px 2px rgba(23,25,40,.04); }
+    .stat span { display:block; font-size:10.5px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); }
+    .stat strong { display:block; margin-top:4px; font-size:22px; font-weight:750; letter-spacing:-.03em; }
+    .stat.ok strong { color:var(--ok); } .stat.warn strong { color:var(--warn); } .stat.bad strong { color:var(--bad); }
 
-    .tbl-card { background:#fff; border:1px solid var(--line); border-radius:16px; overflow:hidden; box-shadow:0 1px 2px rgba(23,25,40,.04), 0 14px 34px rgba(36,30,110,.05); }
-    .tbl-head { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid var(--line); }
-    .tbl-head b { font-size:13.5px; }
+    .card { background:#fff; border:1px solid var(--line); border-radius:16px; padding:22px; margin-bottom:22px; box-shadow:0 1px 2px rgba(23,25,40,.04), 0 14px 34px rgba(36,30,110,.05); }
+    .card-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+    .card-head h2 { font-size:14.5px; letter-spacing:-.01em; margin:0; }
+    .cap { font-size:11.5px; color:var(--ink-3); }
+
+    .plans { display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; }
+    .plan { border:1px solid var(--line); border-radius:14px; padding:16px; background:#FCFCFE; }
+    .plan .nm { font-size:11px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:var(--brand-strong); margin-bottom:10px; }
+    .plan .row { display:flex; align-items:center; gap:8px; }
+    .plan input[type=number] { flex:1; padding:9px 11px; border:1px solid #D8DBE6; border-radius:9px; font-size:14px; font-family:inherit; }
+    .plan input[type=number]:focus { outline:none; border-color:var(--brand); box-shadow:0 0 0 4px var(--ring); }
+    .plan .cur { font-size:13px; color:var(--ink-3); font-weight:700; }
+    .plan .term { font-size:10.5px; color:var(--ink-3); margin-top:7px; }
+    .plan label.onoff { display:flex; align-items:center; gap:7px; margin-top:10px; font-size:11.5px; font-weight:650; color:var(--ink-2); text-transform:none; letter-spacing:0; }
+
+    .setrow { display:flex; gap:22px; align-items:end; flex-wrap:wrap; }
+    .setrow .field { min-width:170px; }
+    label { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3); margin-bottom:6px; display:block; }
+    .setrow input[type=number] { padding:9px 11px; border:1px solid #D8DBE6; border-radius:9px; font-size:14px; width:110px; font-family:inherit; }
+    .sw { position:relative; width:42px; height:24px; flex:none; }
+    .sw input { position:absolute; opacity:0; width:0; height:0; }
+    .sw i { position:absolute; inset:0; border-radius:999px; background:#DDE0EA; cursor:pointer; transition:background .15s; }
+    .sw i:before { content:""; position:absolute; left:3px; top:3px; width:18px; height:18px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.2); transition:transform .15s; }
+    .sw input:checked + i { background:var(--brand); }
+    .sw input:checked + i:before { transform:translateX(18px); }
+    .sw-wrap { display:flex; align-items:center; gap:10px; font-size:12.5px; color:var(--ink-2); padding-bottom:4px; }
+
+    .btn { display:inline-flex; align-items:center; gap:8px; padding:10px 18px; border:0; border-radius:11px; cursor:pointer; background:linear-gradient(135deg,#4F46E5,#3B32C4); color:#fff; font-size:13.5px; font-weight:650; box-shadow:0 6px 16px rgba(67,56,202,.26); transition:transform .15s, box-shadow .15s; font-family:inherit; }
+    .btn:hover { transform:translateY(-1px); box-shadow:0 10px 24px rgba(67,56,202,.32); }
+    .btn-ghost { border:1px solid var(--line); background:#fff; color:var(--ink-2); font-size:12.5px; font-weight:650; padding:7px 13px; border-radius:9px; cursor:pointer; font-family:inherit; transition:all .15s; }
+    .btn-ghost:hover { border-color:var(--brand); color:var(--brand-strong); background:var(--brand-soft); }
+    .btn-ghost.ok:hover { border-color:#BFEBD0; color:var(--ok); background:var(--ok-soft); }
+    .btn-ghost.danger:hover { border-color:#F1C9C4; color:var(--bad); background:var(--bad-soft); }
+
     table { width:100%; border-collapse:collapse; }
-    th, td { text-align:left; padding:12px 18px; border-bottom:1px solid #EEF0F6; font-size:13px; }
+    th, td { text-align:left; padding:12px 16px; border-bottom:1px solid #EEF0F6; font-size:13px; vertical-align:middle; }
     th { font-size:10.5px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:var(--ink-3); background:#FAFBFE; }
     tbody tr:last-child td { border-bottom:0; }
-    td .amt { font-weight:700; }
-    .pill { display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; }
-    .pill.paid { background:var(--ok-soft); color:var(--ok); }
-    .pill.pend { background:var(--warn-soft); color:var(--warn); }
-    .sample { opacity:.62; }
-
-    .foot { margin-top:26px; display:flex; justify-content:space-between; font-size:11px; color:var(--ink-3); }
-    @media (max-width: 820px) { .plans { grid-template-columns:1fr; } }
+    tbody tr.overdue { background:#FDF7F6; }
+    td .mono { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; }
+    td .mut { color:var(--ink-3); font-size:11.5px; }
+    .amt { font-weight:700; font-variant-numeric:tabular-nums; }
+    .pill { display:inline-flex; align-items:center; gap:6px; padding:4px 11px; border-radius:999px; font-size:11px; font-weight:700; }
+    .pill::before { content:""; width:6px; height:6px; border-radius:50%; }
+    .pill.paid { background:var(--ok-soft); color:var(--ok); } .pill.paid::before { background:#16A34A; }
+    .pill.unpaid { background:var(--warn-soft); color:var(--warn); } .pill.unpaid::before { background:#D97706; }
+    .pill.pill.void { background:#F1F2F6; color:var(--ink-3); } .pill.void::before { background:#B8BCD0; }
+    .late { font-size:10px; font-weight:800; color:var(--bad); margin-left:6px; text-transform:uppercase; letter-spacing:.05em; }
+    .empty { padding:34px; text-align:center; color:var(--ink-3); }
+    .todo { padding:26px; border:2px dashed #D6D9E6; border-radius:14px; background:#FBFBFE; }
+    .todo code { background:var(--brand-soft); color:var(--brand-strong); border-radius:5px; padding:1px 7px; font-size:12px; }
+    .foot { display:flex; justify-content:space-between; font-size:11px; color:var(--ink-3); }
+    @media (max-width: 860px) { .plans, .stats { grid-template-columns:1fr 1fr; } .plans .plan:last-child { grid-column:1/-1; } }
 </style>
 </head>
 <body>
@@ -95,71 +172,116 @@ $nav = 'billing';
     <div class="head">
         <div>
             <h1>Billing</h1>
-            <p class="sub">Subscription plans and collections — layout preview, nothing here is live yet.</p>
+            <p class="sub">Subscription charges and collections — you set plan prices, generate invoices, record payments.</p>
         </div>
-        <span class="preview-tag">Preview</span>
+        <span class="live-tag">Live ledger</span>
     </div>
+
+    <?php if ($flashError): ?><div class="alert alert-error"><?= htmlspecialchars($flashError) ?></div><?php endif; ?>
+    <?php if ($flashOk): ?><div class="alert alert-ok"><?= htmlspecialchars($flashOk) ?></div><?php endif; ?>
+
+    <?php if (!$billingReady): ?>
+        <div class="card"><div class="todo">
+            <b>Billing tables are not installed yet.</b><br><br>
+            Run <code>database/2026_10_20_super_admin_control.sql</code> first, then <code>database/2026_10_20_billing.sql</code>
+            against the master database (phpMyAdmin → SQL tab). Until then this page is inert — no charges can exist.
+        </div></div>
+    <?php else: ?>
 
     <div class="banner">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="M8.5 6.5L12 3l3.5 3.5"/><path d="M5 15v4a2 2 0 002 2h10a2 2 0 002-2v-4"/></svg>
-        <span><b>This page is a design preview.</b> Prices, invoices and statuses below are illustrative samples for layout approval — no billing data is stored or charged yet.</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+        <span><b>How it works:</b> invoices are generated from the plan prices below, on this cycle (Standard = monthly, Annual = yearly). Collection stays manual — you mark invoices paid when money arrives. Auto-suspend only fires if you explicitly enable it.</span>
     </div>
 
-    <h2 class="sec">Planned subscription plans</h2>
-    <div class="plans">
-        <div class="plan">
-            <span class="nm">Trial</span>
-            <div class="pr">₹0 <small>/ 14 days</small></div>
-            <div class="tag">Full product, time-boxed. Converts or suspends automatically.</div>
-            <ul>
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Retail POS &amp; inventory</li>
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Single user login</li>
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Chat onboarding support</li>
-            </ul>
-            <div class="ghost">Assigned at provisioning</div>
-        </div>
-        <div class="plan hot">
-            <span class="hot-chip">Recommended</span>
-            <span class="nm">Standard</span>
-            <div class="pr">₹— <small>/ month</small></div>
-            <div class="tag">Everyday running for an independent retail pharmacy.</div>
-            <ul>
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Everything in Trial</li>
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Compliance exports &amp; H1/X register</li>
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Priority support window</li>
-            </ul>
-            <div class="ghost">Pricing to be finalised</div>
-        </div>
-        <div class="plan">
-            <span class="nm">Annual</span>
-            <div class="pr">₹— <small>/ year</small></div>
-            <div class="tag">Two months free on yearly commitment, migration help included.</div>
-            <ul>
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Everything in Standard</li>
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Priority callback support</li>
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Data migration assistance</li>
-            </ul>
-            <div class="ghost">Pricing to be finalised</div>
-        </div>
+    <div class="stats">
+        <div class="stat"><span>MRR (live)</span><strong>₹<?= number_format($mrr, 0) ?></strong></div>
+        <div class="stat ok"><span>Collected this month</span><strong>₹<?= number_format($collected, 0) ?></strong></div>
+        <div class="stat warn"><span>Unpaid invoices</span><strong><?= $outstanding ?></strong></div>
+        <div class="stat bad"><span>Overdue</span><strong><?= $overdueN ?></strong></div>
     </div>
-    <div class="plans-note">Amounts shown as “—” are deliberate: final pricing gets published before the billing engine goes live.</div>
 
-    <h2 class="sec">Invoice ledger — sample rows</h2>
-    <div class="tbl-card">
-        <div class="tbl-head"><b>Collections ledger</b><span class="preview-tag">Preview</span></div>
+    <div class="card">
+        <div class="card-head">
+            <div><h2>Plan prices</h2><span class="cap">Edits apply to invoices generated from now on — existing invoices never change retroactively.</span></div>
+        </div>
+        <form method="POST" action="/super-admin/actions/billing-action.php">
+            <input type="hidden" name="act" value="save_plans">
+            <div class="plans">
+                <?php foreach ($plans as $p): ?>
+                    <div class="plan">
+                        <div class="nm"><?= htmlspecialchars($p['name']) ?></div>
+                        <div class="row"><span class="cur">₹</span>
+                            <input type="number" min="0" step="1" name="plans[<?= (int) $p['id'] ?>][price]" value="<?= htmlspecialchars((string) (float) $p['price']) ?>">
+                        </div>
+                        <div class="term"><?= $p['code'] === 'trial' ? 'free — never invoiced' : ($p['code'] === 'annual' ? 'charged once per year' : 'charged monthly') ?></div>
+                        <label class="onoff"><input type="checkbox" name="plans[<?= (int) $p['id'] ?>][active]" <?= $p['active'] ? 'checked' : '' ?>> Offered to new clients</label>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            <div style="margin-top:16px"><button type="submit" class="btn">Save prices</button></div>
+        </form>
+    </div>
+
+    <div class="card">
+        <div class="card-head">
+            <div><h2>Run billing cycle</h2><span class="cap">Creates this month's / year's invoice for every billed client that isn't already covered.</span></div>
+            <form method="POST" action="/super-admin/actions/billing-action.php" onsubmit="return confirm('Generate invoices for this cycle? Existing covered periods are skipped automatically.');">
+                <input type="hidden" name="act" value="generate"><button type="submit" class="btn">Generate invoices</button>
+            </form>
+        </div>
+        <form method="POST" action="/super-admin/actions/billing-action.php">
+            <input type="hidden" name="act" value="save_settings">
+            <div class="setrow">
+                <div class="field">
+                    <label for="grace">Grace days before due</label>
+                    <input type="number" id="grace" name="grace_days" min="0" max="60" value="<?= $grace ?>">
+                </div>
+                <div class="sw-wrap">
+                    <label class="sw"><input type="checkbox" name="auto_suspend_overdue" <?= $autoSus ? 'checked' : '' ?>><i></i></label>
+                    <span><b>Auto-suspend overdue clients</b> — when this cycle's invoice passes its due date unpaid (uses the live suspension gate).</span>
+                </div>
+                <div class="field"><button type="submit" class="btn-ghost">Save settings</button></div>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        <div class="card-head"><h2>Invoice ledger</h2><span class="cap">Newest first · <?= count($invs) ?> shown</span></div>
         <table>
-            <thead>
-                <tr><th>Invoice</th><th>Client</th><th>Period</th><th class="amt">Amount</th><th>Status</th></tr>
-            </thead>
-            <tbody class="sample">
-                <tr><td>INV-0001</td><td>Sample Pharmacy A</td><td>MOCK 01–30</td><td class="amt">₹—</td><td><span class="pill paid">Sample — paid</span></td></tr>
-                <tr><td>INV-0002</td><td>Sample Pharmacy B</td><td>MOCK 01–30</td><td class="amt">₹—</td><td><span class="pill pend">Sample — pending</span></td></tr>
-                <tr><td>INV-0003</td><td>Sample Pharmacy C</td><td>MOCK 01–30</td><td class="amt">₹—</td><td><span class="pill pend">Sample — pending</span></td></tr>
+            <thead><tr><th style="width:150px">Invoice</th><th>Client</th><th style="width:150px">Period</th><th style="width:86px" class="amt">Amount</th><th style="width:100px">Due</th><th style="width:122px">Status</th><th style="width:170px;text-align:right">Record</th></tr></thead>
+            <tbody>
+            <?php if (!$invs): ?>
+                <tr><td colspan="7" class="empty">No invoices yet — set plan prices above, then run a billing cycle.</td></tr>
+            <?php else: foreach ($invs as $i):
+                $late = $i['status'] === 'unpaid' && $i['due_date'] && $i['due_date'] < $today;
+                $daysLate = $late ? (int) ((strtotime($today) - strtotime($i['due_date'])) / 86400) : 0;
+            ?>
+                <tr class="<?= $late ? 'overdue' : '' ?>">
+                    <td><span class="mono"><?= htmlspecialchars($i['invoice_no']) ?></span></td>
+                    <td><b><?= htmlspecialchars($i['client_name']) ?></b><div class="mut"><?= htmlspecialchars($i['client_sub']) ?></div></td>
+                    <td><span class="mut"><?= htmlspecialchars(date('d M', strtotime($i['period_from']))) ?> → <?= htmlspecialchars(date('d M Y', strtotime($i['period_to']))) ?></span></td>
+                    <td class="amt">₹<?= number_format((float) $i['amount'], 0) ?></td>
+                    <td><?= $i['due_date'] ? htmlspecialchars(date('d M Y', strtotime($i['due_date']))) : '—' ?></td>
+                    <td><span class="pill <?= htmlspecialchars($i['status']) ?>"><?= htmlspecialchars($i['status']) ?></span><?= $late ? '<span class="late">' . $daysLate . 'd late</span>' : '' ?></td>
+                    <td style="text-align:right;white-space:nowrap">
+                        <?php if ($i['status'] === 'unpaid'): ?>
+                            <form method="POST" action="/super-admin/actions/billing-action.php" style="display:inline"><input type="hidden" name="act" value="pay"><input type="hidden" name="invoice_id" value="<?= (int) $i['id'] ?>"><button class="btn-ghost ok">Mark paid</button></form>
+                            <form method="POST" action="/super-admin/actions/billing-action.php" style="display:inline" onsubmit="return confirm('Void <?= htmlspecialchars(addslashes($i['invoice_no'])) ?>? Mistake-only — the record stays.');"><input type="hidden" name="act" value="void"><input type="hidden" name="invoice_id" value="<?= (int) $i['id'] ?>"><button class="btn-ghost danger">Void</button></form>
+                        <?php elseif ($i['status'] === 'paid'): ?>
+                            <span class="mut">paid <?= $i['paid_at'] ? htmlspecialchars(date('d M Y', strtotime($i['paid_at']))) : '' ?></span>
+                            <form method="POST" action="/super-admin/actions/billing-action.php" style="display:inline" onsubmit="return confirm('Re-open this paid invoice as unpaid?');"><input type="hidden" name="act" value="unpay"><input type="hidden" name="invoice_id" value="<?= (int) $i['id'] ?>"><button class="btn-ghost">Un-pay</button></form>
+                        <?php else: ?>
+                            <span class="mut">voided</span>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+            <?php endforeach; endif; ?>
             </tbody>
         </table>
     </div>
+    <?php endif; ?>
 
-    <div class="foot"><span>OPTMS·RX — Super Admin Console</span><span>Preview build — no charges or records exist.</span></div>
+    <div class="foot"><span>OPTMS·RX — Super Admin Console</span><span>Ledger rows are permanent records — mistakes are voided, never deleted.</span></div>
 </div>
 </body>
 </html>
