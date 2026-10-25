@@ -44,11 +44,28 @@ if ($billingReady) {
 /* ---- plan mix, invoice feed, overdue radar (billing-gated) ---- */
 $planMix = ['trial' => 0, 'standard' => 0, 'annual' => 0];
 foreach ($clients as $cl) { $pl = strtolower((string) ($cl['plan'] ?? 'trial')); if (isset($planMix[$pl])) { $planMix[$pl]++; } }
-$recentInv = []; $overdueList = [];
+$recentInv = []; $overdueList = []; $monthly = [];
 if ($billingReady) {
     try { $recentInv = Database::master()->query('SELECT ci.invoice_no, ci.amount, ci.status, ci.due_date, ci.paid_at, ci.period_from, cl.name AS cname FROM client_invoices ci JOIN clients cl ON cl.id = ci.client_id ORDER BY ci.id DESC LIMIT 6')->fetchAll(); } catch (Throwable $e) { }
     try { $overdueList = Database::master()->query("SELECT ci.invoice_no, ci.amount, ci.due_date, cl.name AS cname FROM client_invoices ci JOIN clients cl ON cl.id = ci.client_id WHERE ci.status = 'unpaid' AND ci.due_date < CURDATE() ORDER BY ci.due_date ASC LIMIT 5")->fetchAll(); } catch (Throwable $e) { }
+    try {
+        foreach (Database::master()->query(
+            "SELECT DATE_FORMAT(paid_at, '%Y-%m') AS m, SUM(amount) AS s FROM client_invoices
+              WHERE status = 'paid' AND paid_at >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 7 MONTH), '%Y-%m-01')
+              GROUP BY m"
+        )->fetchAll() as $r) { $monthly[$r['m']] = (float) $r['s']; }
+    } catch (Throwable $e) { }
 }
+/* last-8-months bar heights — real collections only, zero months are honest zeroes */
+$revSeries = []; $revMax = 0.0;
+for ($k = 7; $k >= 0; $k--) {
+    $key = date('Y-m', strtotime(date('Y-m-01') . " -{$k} months"));
+    $v = $monthly[$key] ?? 0.0;
+    $revSeries[] = ['label' => date('M Y', strtotime($key . '-01')), 'v' => $v];
+    if ($v > $revMax) { $revMax = $v; }
+}
+foreach ($revSeries as &$rm) { $rm['pct'] = $revMax > 0 ? max(6, (int) round($rm['v'] / $revMax * 94) + 6) : 6; }
+unset($rm);
 $nav = 'dashboard';
 ?>
 <!DOCTYPE html>
@@ -143,6 +160,7 @@ $nav = 'dashboard';
     .minirow { display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-top:1px solid #EFF1F6; font-size:12.5px; }
     .minirow span { color:var(--ink-3); }
     .minirow:first-of-type { margin-top:8px; }
+    .stack { display:flex; flex-direction:column; gap:16px; align-self:start; }
     .segm { display:flex; height:10px; border-radius:6px; overflow:hidden; background:#EFF1F6; margin:4px 0 12px; }
     .segm i { display:block; height:100%; }
     .segm .t { background:#FBBF24; } .segm .s { background:#6366F1; } .segm .a { background:#0F766E; }
@@ -154,6 +172,9 @@ $nav = 'dashboard';
     .ip-void { background:#F1F2F6; color:var(--ink-3); } .ip-void::before { background:#B8BCD0 !important; }
     .clear { display:flex; flex-direction:column; align-items:center; gap:4px; padding:26px 10px 22px; color:var(--ok); }
     .clear svg { width:26px; height:26px; }
+    .bars.rv { height:64px; margin-top:10px; }
+    .bars.rv i { cursor:default; transition:filter .15s; }
+    .bars.rv i:hover { filter:brightness(1.12); }
     .clear b { font-size:13.5px; } .clear span { font-size:11.5px; color:var(--ink-3); }
     @media (max-width: 1020px) { .stats { grid-template-columns:repeat(3,1fr); } }
     @media (max-width: 820px) { .cols { grid-template-columns:1fr; } .stats { grid-template-columns:repeat(2,1fr); } .health th:nth-child(5), .health td:nth-child(5), .health th:nth-child(6), .health td:nth-child(6) { display:none; } }
@@ -191,6 +212,7 @@ $nav = 'dashboard';
     </div>
 
     <div class="cols">
+        <div class="stack">
         <div class="card">
             <div class="card-head"><h2>Recently provisioned</h2><a class="linkall" style="margin:0" href="/super-admin/clients.php">Open clients →</a></div>
             <?php if (!$recent): ?>
@@ -210,8 +232,8 @@ $nav = 'dashboard';
             <?php endforeach; endif; ?>
         </div>
 
-        <div class="card" style="margin-bottom:16px">
-            <div class="card-head"><h2>Plan mix</h2><span class="cap" style="margin:0"><?= $stats['total'] ?> tenant<?= $stats['total'] === 1 ? '' : 's' ?> on roster</span></div>
+        <div class="card">
+            <div class="card-head" style="margin-bottom:10px"><h2>Plan mix</h2><span class="cap" style="margin:0"><?= $stats['total'] ?> tenant<?= $stats['total'] === 1 ? '' : 's' ?> on roster</span></div>
             <?php $mixTotal = max(1, array_sum($planMix)); if (array_sum($planMix) === 0): ?>
                 <div class="empty-mini">Plans are assigned per client from the Clients page.</div>
             <?php else: ?>
@@ -248,7 +270,9 @@ $nav = 'dashboard';
                 </div>
             <?php endforeach; endif; ?>
         </div>
+        </div>
 
+        <div class="stack">
         <div class="card">
             <div class="card-head"><h2>Revenue pulse</h2><span class="live-tag">Live</span></div>
             <?php if ($billingReady): ?>
@@ -256,7 +280,12 @@ $nav = 'dashboard';
                 <div class="minirow"><span>Collected this month</span><b>₹<?= number_format((float) $collected, 0) ?></b></div>
                 <div class="minirow"><span>Unpaid invoices</span><b><?= $openInv ?></b></div>
                 <div class="minirow"><span>Overdue</span><b style="color:<?= $overdue ? 'var(--bad)' : 'var(--ok)' ?>"><?= $overdue ?></b></div>
-                <div class="mock-note">Real figures — invoicing and plan prices live in Billing.</div>
+                <div class="bars rv">
+                    <?php foreach ($revSeries as $m): ?>
+                        <i style="height:<?= (int) $m['pct'] ?>%" title="<?= htmlspecialchars($m['label'] . ' · ₹' . number_format($m['v'], 0)) ?>"></i>
+                    <?php endforeach; ?>
+                </div>
+                <div class="mock-note">Collected per month — paid invoices, last 8 months. Hover a bar for the figure.</div>
             <?php else: ?>
                 <div class="mrr"><strong>₹0</strong><span>Billing tables not installed yet</span></div>
                 <div class="mock-note">Run <b>database/2026_10_20_billing.sql</b> on the master DB — this card turns live the moment invoices exist.</div>
@@ -284,6 +313,7 @@ $nav = 'dashboard';
             <?php endforeach; ?>
                 <div class="cta"><a href="/super-admin/billing.php">Collect in Billing →</a></div>
             <?php endif; ?>
+        </div>
         </div>
     </div>
 
@@ -345,7 +375,10 @@ $nav = 'dashboard';
             .then(function (r) { return r.json(); })
             .then(function (p) {
                 if (!p || p.error) { throw 0; }
-                if (!p.online) { set('lastsale', '<span class="offl">Tenant DB unreachable</span>'); ['month','meds','db','login'].forEach(function (k) { set(k, '<span class="mut">—</span>'); });
+                if (!p.online) {
+                    var tip = p.offline_reason ? ' title="' + String(p.offline_reason).replace(/"/g, '') + '"' : '';
+                    set('lastsale', '<span class="offl"' + tip + '>Tenant DB unreachable</span>');
+                    ['month','meds','db','login'].forEach(function (k) { set(k, '<span class="mut">—</span>'); });
                     if (p.db_size_mb !== null) set('db', p.db_size_mb + ' MB'); return; }
                 var ls = p.last_sale ? rel(p.last_sale) : 'no sales yet';
                 var q = '';

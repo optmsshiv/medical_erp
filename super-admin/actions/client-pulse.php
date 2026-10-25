@@ -24,6 +24,7 @@ $out = [
     'cap_invoices'    => null,   // cap for their plan; null = uncapped
     'cap_pct'         => null,   // 0..100, null when uncapped/unknown
     'online'          => false,
+    'offline_reason'  => null,     // real connection error, for the super-admin only
 ];
 
 $dbName = (string) ($client['db_name'] ?? '');
@@ -74,7 +75,7 @@ try {
             $out['last_login'] = $r && $r['t'] ? (string) $r['t'] : null;
         }
     } catch (Throwable $e) { }
-} catch (Throwable $e) { /* tenant offline → online stays false, sizes still shown */ }
+} catch (Throwable $e) { $out['offline_reason'] = basename(get_class($e)) . ': ' . substr($e->getMessage(), 0, 180); }
 
 /* Cap metering against the plan (display/metering only — no enforcement here). */
 $caps = planCaps((string) ($client['plan'] ?? 'trial'));
