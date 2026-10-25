@@ -120,7 +120,7 @@ function inr(float $v): string { return '₹' . number_format($v, 0); }
               <div class="sub-plan"><?= esc($planLabel) ?></div>
             </div>
             <div class="d-flex align-items-center gap-2 flex-wrap">
-              <?php if ($status === 'trial'): ?>
+              <?php if ($plan === 'trial'): ?>
                 <span class="sub-chip warn"><i class="bi bi-hourglass-split"></i>Trial<?= $trialDaysLeft ? ' · ' . $trialDaysLeft . ' day' . ($trialDaysLeft === 1 ? '' : 's') . ' left' : '' ?></span>
               <?php elseif ($status === 'active'): ?>
                 <span class="sub-chip ok"><i class="bi bi-check-circle-fill"></i>Active</span>

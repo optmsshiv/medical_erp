@@ -338,7 +338,7 @@ $nav = 'clients';
                     $cPlan    = (string) ($c['plan'] ?? 'trial');
                     $cTrial   = (string) ($c['trial_ends_at'] ?? '');
                     $trialTxt = ''; $trialCls = 'trialchip';
-                    if ($cTrial !== '') {
+                    if ($cTrial !== '' && strtolower($cPlan) === 'trial') {   // paid plans: trial date is history, not a countdown
                         $days = (int) ((strtotime($cTrial) - strtotime($today)) / 86400);
                         if ($days < 0) { $trialTxt = 'trial ended ' . abs($days) . 'd ago'; $trialCls .= ' over'; }
                         else { $trialTxt = 'trial · ' . $days . 'd left'; }
