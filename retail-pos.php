@@ -646,7 +646,7 @@ if ($cashier === '') $cashier = 'Cashier';
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="assets/js/data.js"></script>
   <script src="assets/js/config.js"></script>
-  <script src="assets/js/app.js?v=2026-10-06.16"></script>
+  <script src="assets/js/app.js?v=2026-10-20.03"></script>
   <!-- Quick Refill — slide-in side panel -->
   <div class="pos-refill-overlay" id="posRefillOverlay" hidden></div>
   <aside class="pos-refill-panel" id="posRefillPanel" role="dialog" aria-label="Quick refill" hidden>
@@ -707,7 +707,7 @@ if ($cashier === '') $cashier = 'Cashier';
   </aside>
 
   <!-- BUMP this version on EVERY pos.js change — long-cache browsers must not serve stale billing logic. -->
-  <script src="assets/js/pos.js?v=2026-10-20.02"></script>
+  <script src="assets/js/pos.js?v=2026-10-20.03"></script>
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
       await MF.boot();

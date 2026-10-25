@@ -1758,8 +1758,18 @@
 
   async function clearCart() {
     if (!state.cart.length) return;
-    const ok = await MF.confirm({ title: 'Clear current bill?', message: 'All cart items will be removed.', confirmText: 'Clear', tone: 'danger' });
-    if (ok) { state.cart = []; renderCart(); }
+    const ok = await MF.confirm({ title: 'Clear current bill?', message: 'Cart items will be removed and the customer + prescriber reset to defaults.', confirmText: 'Clear', tone: 'danger' });
+    if (!ok) return;
+    state.cart = [];
+    state.cartIdx = -1;
+    renderCart();
+    /* A cleared bill is a fresh counter: billing customer and prescribing
+       doctor must not bleed into the next sale. */
+    const custSel = $('#posCustomer'); if (custSel) custSel.value = walkInId();
+    const docSel = $('#posDoctor'); if (docSel) docSel.value = '';
+    rxFlag.cust = false; rxFlag.doc = false;
+    if (window.POSUI) POSUI.syncPickers();
+    refreshDraftBtn();
   }
 
   function selectPay(id) {
