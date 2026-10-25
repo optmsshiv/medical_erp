@@ -15,13 +15,14 @@ try {
         case 'generate':
             $plans = planPrices();
             $grace = max(0, (int) billingSetting('grace_days', '7'));
-            $made = 0; $skipped = 0;
+            $made = 0; $skip = [];
             $rows = master()->query("SELECT * FROM clients WHERE status IN ('active','trial') ORDER BY id ASC")->fetchAll();
             foreach ($rows as $c) {
+                $why = static function (string $r) use (&$skip): void { $skip[$r] = ($skip[$r] ?? 0) + 1; };
                 $plan = strtolower((string) ($c['plan'] ?? 'trial'));
-                if ($plan === 'trial') { $skipped++; continue; }          // trials are not billed
+                if ($plan === 'trial') { $why('on Trial plan — trials are never billed (move the client to Standard/Annual first)'); continue; }
                 $price = (float) ($plans[$plan]['price'] ?? 0);
-                if ($price <= 0) { $skipped++; continue; }                // price 0 = not charging yet
+                if ($price <= 0) { $why("plan '{$plan}' has price ₹0 — set it under Plan prices"); continue; }
                 if ($plan === 'annual') {
                     $from = date('Y') . '-01-01'; $to = date('Y') . '-12-31';
                     $suffix = date('Y') . 'Y';
@@ -29,7 +30,7 @@ try {
                     $from = date('Y-m-01'); $to = date('Y-m-t');
                     $suffix = date('Ym');
                 }
-                if (!coverInvoiceExists((int) $c['id'], $today)) { $skipped++; continue; }   // already covered
+                if (!coverInvoiceExists((int) $c['id'], $today)) { $why('already covered by an invoice for this period'); continue; }
                 $invNo = 'SUB-' . (int) $c['id'] . '-' . $suffix;
                 $due   = date('Y-m-d', strtotime($from . ' +' . $grace . ' days'));
                 master()->query(
@@ -40,7 +41,8 @@ try {
                 );
                 $made++;
             }
-            audit('BILLING_GENERATE', null, 'invoices created: ' . $made . ', skipped: ' . $skipped);
+            $skipText = $skip ? ' — skipped: ' . implode(' · ', array_map(static fn($k, $v) => "{$k} ×{$v}", array_keys($skip), $skip)) : '';
+            audit('BILLING_GENERATE', null, 'invoices created: ' . $made . ($skipText ?: ', none skipped'));
 
             /* overdue auto-suspend — opt-in only (billing_settings.auto_suspend_overdue) */
             $suspended = 0;
@@ -56,8 +58,8 @@ try {
                     $suspended++;
                 }
             }
-            flashOk('Billing run complete: ' . $made . ' invoice' . ($made === 1 ? '' : 's') . ' created, ' . $skipped . ' skipped'
-                . ($suspended ? ', ' . $suspended . ' suspended for overdue' : '') . '.');
+            flashOk('Billing run complete: ' . $made . ' invoice' . ($made === 1 ? '' : 's') . ' created' . $skipText
+                . ($suspended ? '. Auto-suspended for overdue: ' . $suspended : '') . '.');
             bills();
 
         /* ---------- lifecycle of one invoice ---------- */
