@@ -69,3 +69,15 @@ function clientFeaturesOn(int $clientId): array {
     } catch (Throwable $e) { /* defaults stand */ }
     return $on;
 }
+
+/* ---- Plan caps: telemetry compares live usage against these (metering only,
+   tenant-side hard blocks come with the enforcement phase). -1 = uncapped. ---- */
+const PLAN_CAPS = [
+    'trial'    => ['invoices_month' => 500,  'users' => 2, 'medicines' => 2000],
+    'standard' => ['invoices_month' => 8000, 'users' => 5, 'medicines' => 20000],
+    'annual'   => ['invoices_month' => -1,   'users' => -1, 'medicines' => -1],
+];
+
+function planCaps(string $plan): array {
+    return PLAN_CAPS[strtolower($plan)] ?? PLAN_CAPS['trial'];
+}

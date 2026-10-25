@@ -12,4 +12,6 @@ require_once dirname(__DIR__) . '/config/database.php';
 
 date_default_timezone_set('Asia/Kolkata');
 
+TenantPolicy::enforce();   // ← NEW: suspended tenants stop right here
+
 Tenant::resolve();
