@@ -47,8 +47,10 @@ try {
             $plan = strtolower(trim((string) ($_POST['plan'] ?? '')));
             if (!in_array($plan, ['trial', 'standard', 'annual'], true)) { flashErr('Unknown plan.'); back(); }
             if (!hasColumn('clients', 'plan')) { flashErr('Run database/2026_10_20_super_admin_control.sql first — clients.plan is missing.'); back(); }
-            master()->query('UPDATE clients SET plan = ' . master()->quote($plan) . ' WHERE id = ' . $id . ' LIMIT 1');
-            audit('PLAN_SET', $id, $name . ' → ' . $plan);
+            $promote = ($plan !== 'trial' && strtolower((string) ($client['status'] ?? '')) === 'trial');
+            master()->query('UPDATE clients SET plan = ' . master()->quote($plan)
+                . ($promote ? ", status = 'active'" : '') . ' WHERE id = ' . $id . ' LIMIT 1');
+            audit('PLAN_SET', $id, $name . ' → ' . $plan . ($promote ? ' (+activated)' : ''));
             flashOk('“' . $name . '” is now on the ' . ucfirst($plan) . ' plan.');
             break;
 
@@ -58,9 +60,11 @@ try {
             if ($newPlan !== '' && $newPlan !== strtolower((string) ($client['plan'] ?? 'trial'))) {
                 if (!in_array($newPlan, ['trial', 'standard', 'annual'], true)) { flashErr('Unknown plan.'); back(); }
                 if (!hasColumn('clients', 'plan')) { flashErr('Run database/2026_10_20_super_admin_control.sql first — clients.plan is missing.'); back(); }
-                master()->query('UPDATE clients SET plan = ' . master()->quote($newPlan) . ' WHERE id = ' . $id . ' LIMIT 1');
-                audit('PLAN_SET', $id, $name . ' → ' . $newPlan);
-                $changes[] = 'plan → ' . ucfirst($newPlan);
+                $promote = ($newPlan !== 'trial' && strtolower((string) ($client['status'] ?? '')) === 'trial');
+                master()->query('UPDATE clients SET plan = ' . master()->quote($newPlan)
+                    . ($promote ? ", status = 'active'" : '') . ' WHERE id = ' . $id . ' LIMIT 1');
+                audit('PLAN_SET', $id, $name . ' → ' . $newPlan . ($promote ? ' (+activated)' : ''));
+                $changes[] = 'plan → ' . ucfirst($newPlan) . ($promote ? ', status → Active' : '');
             }
             $newDate = trim((string) ($_POST['trial_ends_at'] ?? ''));
             $curDate = substr((string) ($client['trial_ends_at'] ?? ''), 0, 10);
