@@ -30,7 +30,7 @@ try {
                     $from = date('Y-m-01'); $to = date('Y-m-t');
                     $suffix = date('Ym');
                 }
-                if (!coverInvoiceExists((int) $c['id'], $today)) { $why('already covered by an invoice for this period'); continue; }
+                if (coverInvoiceExists((int) $c['id'], $today)) { $why((string) $c['name'] . ' already covered'); continue; }
                 $invNo = 'SUB-' . (int) $c['id'] . '-' . $suffix;
                 $due   = date('Y-m-d', strtotime($from . ' +' . $grace . ' days'));
                 master()->query(

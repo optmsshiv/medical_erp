@@ -109,5 +109,7 @@ function coverInvoiceExists(int $clientId, string $reffrom): bool {
             . " AND period_from <= " . master()->quote($reffrom) . " AND period_to >= " . master()->quote($reffrom)
         )->fetch();
         return $r && (int) $r['n'] > 0;
-    } catch (Throwable $e) { return true; }   // on doubt, don't double-bill
+    } catch (Throwable $e) {
+        throw new RuntimeException('Coverage check failed for client #' . $clientId . ': ' . $e->getMessage());
+    }
 }
