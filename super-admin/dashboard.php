@@ -14,6 +14,9 @@ foreach ($clients as $c) {
     if (isset($stats[$st])) { $stats[$st]++; }
 }
 $recent = array_slice($clients, 0, 5);
+$auditRows = [];
+try { $auditRows = Database::master()->query('SELECT action, detail, created_at FROM admin_audit ORDER BY id DESC LIMIT 6')->fetchAll(); }
+catch (Throwable $e) { $auditRows = []; }
 $nav = 'dashboard';
 ?>
 <!DOCTYPE html>
@@ -154,6 +157,23 @@ $nav = 'dashboard';
             <div class="mock-note">Illustrative shape only. When the billing engine ships, this widget charts real monthly recurring revenue — no numbers are stored yet.</div>
             <div class="cta"><a href="/super-admin/billing.php">See planned billing layout →</a></div>
         </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+        <div class="card-head"><h2>Recent control actions</h2><a class="linkall" style="margin:0" href="/super-admin/clients.php">Full log on Clients →</a></div>
+        <?php if (!$auditRows): ?>
+            <div class="empty-mini">No control actions recorded yet — suspends, resets, plan and feature changes appear here.</div>
+        <?php else: ?>
+            <ul style="list-style:none;margin:0;padding:0">
+                <?php foreach ($auditRows as $a): ?>
+                    <li class="row" style="padding:8px 0">
+                        <code style="font-size:10px;font-weight:800;letter-spacing:.06em;background:var(--brand-soft);color:var(--brand-strong);border-radius:5px;padding:2px 7px"><?= htmlspecialchars($a['action']) ?></code>
+                        <span style="flex:1;font-size:12.5px;color:var(--ink-2)"><?= htmlspecialchars($a['detail']) ?></span>
+                        <span style="font-size:11px;color:var(--ink-3)"><?= htmlspecialchars(date('d M · H:i', strtotime($a['created_at']))) ?></span>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        <?php endif; ?>
     </div>
 
     <div class="foot"><span>OPTMS·RX — Super Admin Console</span><span>Counts are live; revenue widgets are previews.</span></div>

@@ -1,0 +1,71 @@
+<?php
+/**
+ * Shared wiring for super-admin action endpoints:
+ * guard, master-DB handle, audit writer, flash+redirect back to clients.php.
+ */
+require __DIR__ . '/../_guard.php';
+require dirname(__DIR__, 2) . '/core/Database.php';
+
+/** The controllable module map. Keep keys stable — tenants read them verbatim. */
+const CLIENT_FEATURES = [
+    'wholesale'        => 'Wholesale billing module',
+    'quick_refill'     => 'Quick Refill (repeat prescriptions)',
+    'rx_inbox'         => 'Rx inbox (scan & send)',
+    'compliance_export'=> 'Compliance register exports (H1/X PDF/Excel)',
+    'customer_dues'    => 'Customer dues / credit book',
+    'expenses'         => 'Expense tracking',
+    'supplier_dues'    => 'Supplier dues',
+    'price_bulk'       => 'Bulk price update',
+    // WhatsApp notifications stay out: gated on Meta API approval (deferred roadmap).
+];
+
+function master(): PDO { return Database::master(); }
+
+function audit(string $action, ?int $clientId = null, string $detail = ''): void {
+    try {
+        master()->query(
+            'INSERT INTO admin_audit (actor, client_id, action, detail) VALUES ('
+            . master()->quote('key-session') . ', '
+            . ($clientId !== null ? (int) $clientId : 'NULL') . ', '
+            . master()->quote($action) . ', '
+            . master()->quote($detail) . ')'
+        );
+    } catch (Throwable $e) { /* audit must never break the action itself */ }
+}
+
+function findClient(int $id): ?array {
+    if ($id <= 0) { return null; }
+    $row = master()->query('SELECT * FROM clients WHERE id = ' . (int) $id . ' LIMIT 1')->fetch();
+    return is_array($row) && $row ? $row : null;
+}
+
+function flashOk(string $msg): void { $_SESSION['flash_ok_msg'] = $msg; }
+function flashErr(string $msg): void { $_SESSION['flash_error'] = $msg; }
+
+function back(): never {
+    header('Location: /super-admin/clients.php');
+    exit;
+}
+
+/** True when a master table/column actually exists (defensive — never assume). */
+function hasColumn(string $table, string $column): bool {
+    try {
+        $r = master()->query(
+            'SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()'
+            . ' AND TABLE_NAME = ' . master()->quote($table)
+            . ' AND COLUMN_NAME = ' . master()->quote($column)
+        )->fetch();
+        return $r && (int) array_values($r)[0] > 0;
+    } catch (Throwable $e) { return false; }
+}
+
+function clientFeaturesOn(int $clientId): array {
+    $on = [];
+    foreach (CLIENT_FEATURES as $k => $_) { $on[$k] = true; }           // fail-open default
+    try {
+        foreach (master()->query('SELECT feature, allowed FROM client_features WHERE client_id = ' . (int) $clientId)->fetchAll() as $r) {
+            if (array_key_exists($r['feature'], $on)) { $on[$r['feature']] = (bool) $r['allowed']; }
+        }
+    } catch (Throwable $e) { /* defaults stand */ }
+    return $on;
+}
