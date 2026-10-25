@@ -113,7 +113,8 @@ try {
                       'company_name' => trim((string) ($_POST['company_name'] ?? '')),
                       'company_addr' => trim((string) ($_POST['company_addr'] ?? '')),
                       'company_contact' => trim((string) ($_POST['company_contact'] ?? '')),
-                      'company_gstin' => trim((string) ($_POST['company_gstin'] ?? ''))] as $k => $v) {
+                      'company_gstin' => trim((string) ($_POST['company_gstin'] ?? '')),
+                      'company_email' => trim((string) ($_POST['company_email'] ?? ''))] as $k => $v) {
                 master()->query('INSERT INTO billing_settings (`key`, `value`) VALUES (' . master()->quote($k) . ', ' . master()->quote($v) . ') ON DUPLICATE KEY UPDATE `value` = ' . master()->quote($v));
             }
             audit('BILLING_SETTINGS', null, "grace={$grace} auto_suspend={$auto}");

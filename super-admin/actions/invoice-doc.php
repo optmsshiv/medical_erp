@@ -52,6 +52,8 @@ function renderInvoiceDocument(array $d): string
     .party h3 { font-size:10px; text-transform:uppercase; letter-spacing:.12em; color:var(--mut); margin:0 0 7px; }
     .party b { font-size:14px; }
     .party div { color:#3A4152; line-height:1.6; font-size:12.5px; }
+    .party .line-ic { display:flex; align-items:center; gap:7px; }
+    .party .line-ic svg { width:11px; height:11px; flex:none; color:#9AA1B8; }
     table.items { width:100%; border-collapse:collapse; margin-top:22px; }
     .items th { text-align:left; background:#F6F7FB; font-size:10px; text-transform:uppercase; letter-spacing:.1em; color:var(--mut); padding:10px 12px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
     .items td { padding:14px 12px; border-bottom:1px solid #EFF1F7; vertical-align:top; }
@@ -102,7 +104,12 @@ function renderInvoiceDocument(array $d): string
             <h3>From</h3>
             <b><?= iv((string) ($seller['name'] ?? 'OPTMS·RX')) ?></b>
             <div><?= nl2br(iv((string) ($seller['addr'] ?? ''))) ?></div>
-            <div><?= iv((string) ($seller['contact'] ?? '')) ?></div>
+            <?php if (!empty($seller['contact'])): ?>
+                <div class="line-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .4 2 .7 2.9a2 2 0 01-.5 2.1L8 10a16 16 0 006 6l1.3-1.3a2 2 0 012.1-.5c.9.3 1.9.6 2.9.7a2 2 0 011.7 2z"/></svg><?= iv((string) $seller['contact']) ?></div>
+            <?php endif; ?>
+            <?php if (!empty($seller['email'])): ?>
+                <div class="line-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><?= iv((string) $seller['email']) ?></div>
+            <?php endif; ?>
             <?php if (!empty($seller['gstin'])): ?><div>GSTIN: <?= iv((string) $seller['gstin']) ?></div><?php endif; ?>
         </div>
         <div class="party">

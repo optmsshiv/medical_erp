@@ -36,7 +36,7 @@ echo renderInvoiceDocument([
     'amount' => $row['amount'], 'status' => $row['status'],
     'due_date' => $row['due_date'], 'paid_at' => $row['paid_at'], 'created_at' => $row['created_at'],
     'seller' => ['name' => $kv['company_name'] ?? 'OPTMS·RX', 'addr' => $kv['company_addr'] ?? '',
-                 'contact' => $kv['company_contact'] ?? '', 'gstin' => $kv['company_gstin'] ?? ''],
+                 'contact' => $kv['company_contact'] ?? '', 'gstin' => $kv['company_gstin'] ?? '', 'email' => $kv['company_email'] ?? ''],
     'buyer' => ['name' => $client['name'], 'portal' => $client['subdomain'] . '.' . (getenv('APP_DOMAIN') ?: '')],
     'payNote' => $kv['pay_note'] ?? '', 'upiId' => $kv['upi_id'] ?? '',
     'autoPrint' => isset($_GET['print']),

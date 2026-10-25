@@ -35,6 +35,7 @@ $coName   = billingSetting('company_name', '');
 $coAddr   = billingSetting('company_addr', '');
 $coContact= billingSetting('company_contact', '');
 $coGstin  = billingSetting('company_gstin', '');
+$coEmail  = billingSetting('company_email', '');
 $autoSus  = billingSetting('auto_suspend_overdue', '0') === '1';
 
 if ($billingReady) {
@@ -135,6 +136,15 @@ $nav = 'billing';
     .setrow .field { min-width:170px; }
     label { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3); margin-bottom:6px; display:block; }
     .setrow input[type=number] { padding:9px 11px; border:1px solid #D8DBE6; border-radius:9px; font-size:14px; width:110px; font-family:inherit; }
+    .co-sec { flex:1 1 100%; border:1px solid #EBEEF6; background:#FBFBFE; border-radius:12px; padding:13px 15px; }
+    .co-sec-h { font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); margin-bottom:10px; }
+    .co-sec-h span { font-weight:600; letter-spacing:0; text-transform:none; color:var(--ink-3); margin-left:6px; opacity:.75 }
+    .co-grid { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+    .pfx { position:relative; }
+    .pfx svg { position:absolute; left:11px; top:50%; transform:translateY(-50%); width:14px; height:14px; color:#A5ABC2; pointer-events:none; }
+    .pfx input { width:100%; padding:9px 11px 9px 33px; border:1px solid #D8DBE6; border-radius:9px; font-size:13px; font-family:inherit; background:#fff; }
+    .pfx input:focus { outline:none; border-color:var(--brand); box-shadow:0 0 0 4px var(--ring); }
+    @media (max-width:700px) { .co-grid { grid-template-columns:1fr; } }
     .sw { position:relative; width:42px; height:24px; flex:none; }
     .sw input { position:absolute; opacity:0; width:0; height:0; }
     .sw i { position:absolute; inset:0; border-radius:999px; background:#DDE0EA; cursor:pointer; transition:background .15s; }
@@ -263,16 +273,29 @@ $nav = 'billing';
                     <label for="paynote">Payment instructions shown to clients</label>
                     <input type="text" id="paynote" name="pay_note" value="<?= htmlspecialchars($payNote) ?>" placeholder="e.g. UPI to above ID, mention your store name; receipts verified daily" style="padding:9px 11px; border:1px solid #D8DBE6; border-radius:9px; font-size:13.5px; width:100%; font-family:inherit">
                 </div>
-                <div class="field" style="min-width:200px">
-                    <label for="coname">Your company name (invoice header)</label>
-                    <input type="text" id="coname" name="company_name" value="<?= htmlspecialchars($coName) ?>" placeholder="Your firm" style="padding:9px 11px; border:1px solid #D8DBE6; border-radius:9px; font-size:13.5px; width:100%; font-family:inherit">
-                </div>
-                <div class="field" style="flex:1; min-width:220px">
-                    <label for="coaddr">Address · contact · GSTIN (invoice header)</label>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap">
-                        <input type="text" id="coaddr" name="company_addr" value="<?= htmlspecialchars($coAddr) ?>" placeholder="Address" style="padding:9px 11px; border:1px solid #D8DBE6; border-radius:9px; font-size:13px; flex:2; min-width:180px; font-family:inherit">
-                        <input type="text" name="company_contact" value="<?= htmlspecialchars($coContact) ?>" placeholder="Phone / email" style="padding:9px 11px; border:1px solid #D8DBE6; border-radius:9px; font-size:13px; flex:1; min-width:130px; font-family:inherit">
-                        <input type="text" name="company_gstin" value="<?= htmlspecialchars($coGstin) ?>" placeholder="GSTIN (optional)" style="padding:9px 11px; border:1px solid #D8DBE6; border-radius:9px; font-size:13px; flex:1; min-width:120px; font-family:inherit">
+                <div class="co-sec">
+                    <div class="co-sec-h">Company details <span>printed on every invoice</span></div>
+                    <div class="co-grid">
+                        <div class="pfx">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/></svg>
+                            <input type="text" name="company_name" value="<?= htmlspecialchars($coName) ?>" placeholder="Company name" title="Company name">
+                        </div>
+                        <div class="pfx">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1116 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                            <input type="text" name="company_addr" value="<?= htmlspecialchars($coAddr) ?>" placeholder="Registered address" title="Registered address">
+                        </div>
+                        <div class="pfx">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .4 2 .7 2.9a2 2 0 01-.5 2.1L8 10a16 16 0 006 6l1.3-1.3a2 2 0 012.1-.5c.9.3 1.9.6 2.9.7a2 2 0 011.7 2z"/></svg>
+                            <input type="text" name="company_contact" value="<?= htmlspecialchars($coContact) ?>" placeholder="Phone" title="Phone">
+                        </div>
+                        <div class="pfx">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+                            <input type="email" name="company_email" value="<?= htmlspecialchars($coEmail) ?>" placeholder="Billing email" title="Billing email">
+                        </div>
+                        <div class="pfx">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16M4 15h16M10 5L8 19M16 5l-2 14"/></svg>
+                            <input type="text" name="company_gstin" value="<?= htmlspecialchars($coGstin) ?>" placeholder="GSTIN (optional)" title="GSTIN (optional)">
+                        </div>
                     </div>
                 </div>
                 <div class="sw-wrap">
