@@ -436,7 +436,8 @@ window.MF = window.MF || {};
         { label: 'Store Settings', icon: 'shop', href: 'settings.php?tab=store' },
         { label: 'Invoice Settings', icon: 'file-earmark-sliders', href: 'settings.php?tab=invoice' },
         { label: 'Tax Settings', icon: 'calculator', href: 'settings.php?tab=tax' },
-        { label: 'Audit Logs', icon: 'journal-check', href: 'settings.php?tab=audit' }
+        { label: 'Audit Logs', icon: 'journal-check', href: 'settings.php?tab=audit' },
+        { label: 'My Subscription', icon: 'credit-card-2-front', href: 'subscription.php' }
       ]
     }
   ];
@@ -574,10 +575,10 @@ window.MF = window.MF || {};
           <div class="mf-vr d-none d-sm-block"></div>
           <div class="dropdown">
             <button class="btn btn-light-mf d-flex align-items-center gap-2 px-2 py-1" data-bs-toggle="dropdown">
-              <span class="mf-avatar">RK</span>
+              <span class="mf-avatar" id="mfUserIni">··</span>
               <span class="d-none d-md-block text-start" style="line-height:1.15">
-                <span class="d-block fw-semibold" style="font-size:.78rem">Rajesh Kumar</span>
-                <span class="d-block text-2 small-xs">Owner · Admin</span>
+                <span class="d-block fw-semibold" style="font-size:.78rem" id="mfUserName"></span>
+                <span class="d-block text-2 small-xs" id="mfUserRole"></span>
               </span>
               <i class="bi bi-chevron-down text-2 small d-none d-md-block"></i>
             </button>
@@ -614,6 +615,25 @@ window.MF = window.MF || {};
         MF.toast('Signed out (demo). Session management ships with the PHP backend.', 'info', 'Demo mode');
       }
     });
+
+    hydrateUserChip();
+  }
+
+  /* Top-right identity — real signed-in user from the session (whoami.php), never hardcoded. */
+  function hydrateUserChip() {
+    try {
+      if (!MF.Api.live) return;
+      MF.Api.get('whoami.php').then((r) => {
+        const u = (r && r.data) || {};
+        const nm = String(u.name || '').trim();
+        const role = String(u.role || '').trim();
+        if (!nm) return;   // session silent → leave placeholders
+        const ini = nm.split(/\s+/).map((x) => x[0] || '').join('').slice(0, 2).toUpperCase();
+        const i = document.getElementById('mfUserIni'); if (i) i.textContent = ini;
+        const n = document.getElementById('mfUserName'); if (n) n.textContent = nm;
+        const rl = document.getElementById('mfUserRole'); if (rl && role) rl.textContent = role.charAt(0).toUpperCase() + role.slice(1);
+      }).catch(() => {});
+    } catch (e) { }
   }
 
   /* ---------------- Global search ---------------- */

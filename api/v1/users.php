@@ -110,6 +110,35 @@ switch ($method) {
             }
         }
 
+        /* (c) profile photo — data-URI upload; self-migrates the users.avatar column. */
+        if (array_key_exists('avatar', $input)) {
+            $av = trim((string) $input['avatar']);
+            $pdo = Tenant::db();
+            try {
+                if (!$pdo->query("SHOW COLUMNS FROM users LIKE 'avatar'")->fetch()) {
+                    $pdo->exec('ALTER TABLE users ADD COLUMN avatar VARCHAR(190) NULL AFTER status');
+                }
+            } catch (Throwable $e) { Json::error('Avatar column could not be prepared: ' . $e->getMessage(), 500); }
+            if ($av === '') {
+                User::update($id, ['avatar' => null]);
+                Audit::log('USER_AVATAR', $user['name'] . ' — photo removed');
+                Json::ok(['avatar' => null]);
+            }
+            if (!preg_match('#^data:image/(png|jpe?g|webp);base64,([A-Za-z0-9+/=\r\n]+)$#', $av, $m)) {
+                Json::error('Avatar must be a PNG, JPG or WebP image.', 422);
+            }
+            $bin = base64_decode($m[2], true);
+            if ($bin === false || strlen($bin) > 400000) { Json::error('Avatar image is too large.', 422); }
+            $ext = $m[1] === 'png' ? 'png' : ($m[1] === 'webp' ? 'webp' : 'jpg');
+            $dir = dirname(__DIR__, 2) . '/assets/uploads/avatars';
+            if (!is_dir($dir) && !mkdir($dir, 0775, true)) { Json::error('Uploads folder is not writable on the server.', 500); }
+            $rel = 'assets/uploads/avatars/user_' . $id . '.' . $ext;
+            if (file_put_contents($dir . '/user_' . $id . '.' . $ext, $bin) === false) { Json::error('Could not save the photo file.', 500); }
+            User::update($id, ['avatar' => $rel]);
+            Audit::log('USER_AVATAR', $user['name'] . ' — photo updated');
+            Json::ok(['avatar' => $rel]);
+        }
+
         Json::ok();
         break;
 

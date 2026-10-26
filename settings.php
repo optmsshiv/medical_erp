@@ -15,6 +15,16 @@ require __DIR__ . '/middleware/auth.php';
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link href="assets/css/style.css" rel="stylesheet">
+  <style>
+    .mf-avatar { overflow:hidden; }
+    .mf-avatar img { width:100%; height:100%; object-fit:cover; display:block; }
+    .st-grp td { background:#F6F8FA; font-weight:700; font-size:.7rem; text-transform:uppercase; letter-spacing:.07em; color:#64748B; }
+    .perm-check { transform:scale(1.15); cursor:pointer; accent-color:#176B5B; }
+    .perm-check:disabled { cursor:not-allowed; opacity:.55; }
+    .avatar-ring { position:relative; display:inline-block; }
+    .avatar-cam { position:absolute; right:-2px; bottom:-2px; width:24px; height:24px; border-radius:50%; background:#fff; border:1px solid #E2E7EF; color:#176B5B; font-size:.62rem; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+    .avatar-cam:hover { background:#E9F5F1; }
+  </style>
 </head>
 <body data-page="settings">
   <div class="mf-layout">
@@ -51,6 +61,8 @@ require __DIR__ . '/middleware/auth.php';
                   <div class="col-md-4"><label class="form-label">Store Code</label><input class="form-control" id="setStoreCode" readonly></div>
                   <div class="col-md-8"><label class="form-label">Address</label><input class="form-control" id="setStoreAddress"></div>
                   <div class="col-md-4"><label class="form-label">Phone</label><input class="form-control" id="setStorePhone"></div>
+                  <div class="col-md-4"><label class="form-label"><i class="bi bi-geo-alt me-1 text-success"></i>City</label><input class="form-control" id="setStoreCity"></div>
+                  <div class="col-md-8"><label class="form-label"><i class="bi bi-map me-1 text-success"></i>State</label><select class="form-select" id="setStoreState"></select></div>
                   <div class="col-md-6"><label class="form-label">GSTIN</label><input class="form-control" id="setStoreGstin"></div>
                   <div class="col-md-6"><label class="form-label">PAN</label><input class="form-control" id="setStorePan"></div>
                   <div class="col-md-6"><label class="form-label">Drug License (20B)</label><input class="form-control" id="setStoreDl20b"></div>
@@ -100,9 +112,12 @@ require __DIR__ . '/middleware/auth.php';
               <div class="p-3">
                 <div class="alert alert-light border small mb-3"><i class="bi bi-info-circle me-1"></i>Actual GST rates are set per medicine in Medicine Master. These are reference defaults only.</div>
                 <div class="row g-3 mb-3">
-                  <div class="col-md-4"><label class="form-label">Default GST Slab (medicines)</label>
+                  <div class="col-md-4"><label class="form-label"><i class="bi bi-hash me-1 text-success"></i>GSTIN</label><input class="form-control" id="setTaxGstin" placeholder="22AAAAA0000A1Z5"></div>
+                  <div class="col-md-4"><label class="form-label"><i class="bi bi-postcard me-1 text-success"></i>PAN</label><input class="form-control" id="setTaxPan" placeholder="AAAAA0000A"></div>
+                  <div class="col-md-4"><label class="form-label"><i class="bi bi-map me-1 text-success"></i>Home State</label><select class="form-select" id="setHomeState"></select></div>
+                  <div class="col-md-4"><label class="form-label"><i class="bi bi-percent me-1 text-success"></i>Default GST Slab (medicines)</label>
                     <select class="form-select" id="setGstSlab"><option>5%</option><option>12%</option><option>18%</option></select></div>
-                  <div class="col-md-4"><label class="form-label">HSN — Medicaments</label><input class="form-control" id="setHsn"></div>
+                  <div class="col-md-4"><label class="form-label"><i class="bi bi-upc me-1 text-success"></i>HSN — Medicaments</label><input class="form-control" id="setHsn"></div>
                 </div>
                 <div class="form-check form-switch mb-2">
                   <input class="form-check-input" type="checkbox" id="setIntra">
@@ -140,9 +155,9 @@ require __DIR__ . '/middleware/auth.php';
             <div class="card-mf">
               <div class="card-head">
                 <h2 class="card-title"><i class="bi bi-shield-lock"></i>Role Permissions Matrix</h2>
-                <div class="card-tools"><span class="badge badge-soft-secondary">4 roles · 8 modules</span></div>
+                <div class="card-tools"><span class="badge badge-soft-success">4 roles · full menu matrix</span></div>
               </div>
-              <div class="alert alert-light border small m-3 mb-0"><i class="bi bi-info-circle me-1"></i>This matrix is saved for reference, but no page or action in the app currently checks these permissions yet — every logged-in user can access every module regardless of what's set here.</div>
+              <div class="alert alert-light border small m-3 mb-0"><i class="bi bi-info-circle me-1"></i>Saving applies the matrix to each role's <b>sidebar on their next page load</b> — unticked menus disappear. <b>Owner / Admin</b> always retains full access. Direct-link (typed-URL) enforcement on the server is the next hardening step.</div>
               <div class="table-scroll" style="max-height:none">
                 <table class="table table-mf">
                   <thead id="stRolesHead"></thead>
@@ -223,7 +238,11 @@ require __DIR__ . '/middleware/auth.php';
       <div class="modal-content">
         <div class="modal-header border-0 pb-1"><h5 class="modal-title"><i class="bi bi-person-circle me-1 text-success"></i>User Profile</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body text-center pt-1 pb-2">
-          <div class="mf-avatar d-inline-flex align-items-center justify-content-center mb-2" id="stViewAvatar" style="width:58px;height:58px;font-size:1.1rem"></div>
+          <div class="avatar-ring mb-2">
+            <div class="mf-avatar d-inline-flex align-items-center justify-content-center" id="stViewAvatar" style="width:64px;height:64px;font-size:1.15rem"></div>
+            <button type="button" class="avatar-cam" id="stAvatarBtn" title="Change profile photo"><i class="bi bi-camera-fill"></i></button>
+            <input type="file" id="stAvatarFile" accept="image/png,image/jpeg,image/webp" hidden>
+          </div>
           <div class="fw-bold" id="stViewName" style="font-size:1.03rem"></div>
           <div class="mb-1 mt-1" id="stViewRole"></div>
         </div>
@@ -262,13 +281,24 @@ require __DIR__ . '/middleware/auth.php';
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="assets/js/data.js"></script>
   <script src="assets/js/config.js"></script>
-  <script src="assets/js/app.js"></script>
+  <script src="assets/js/app.js?v=2026-10-26.01"></script>
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
       await window.MF.boot();
       const MF = window.MF, D = window.MF_DATA;
       const $ = (s) => document.querySelector(s);
       let settings = {}, users = [], rolePerms = [];
+      const IN_STATES = ['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Delhi','Goa','Gujarat','Haryana','Himachal Pradesh','Jammu and Kashmir','Jharkhand','Karnataka','Kerala','Ladakh','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab','Puducherry','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal'];
+      function fillStates(sel, val) {
+        const el = $(sel); if (!el) return;
+        el.innerHTML = '<option value="">— select —</option>' + IN_STATES.map((x) => `<option${x === val ? ' selected' : ''}>${x}</option>`).join('');
+      }
+      const fmt12 = (v) => {
+        const d = MF.parseDate ? MF.parseDate(v) : new Date(String(v).replace(' ', 'T'));
+        if (!d) return 'Never';
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) + ' · ' +
+               d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true }).toUpperCase();
+      };
 
       async function loadSettings() {
         const res = await MF.Api.get('settings.php');
@@ -277,6 +307,8 @@ require __DIR__ . '/middleware/auth.php';
         $('#setStoreCode').value = settings.store_code || 'MAIN';
         $('#setStoreAddress').value = settings.store_address || '';
         $('#setStorePhone').value = settings.store_phone || '';
+        $('#setStoreCity').value = settings.store_city || '';
+        fillStates('#setStoreState', settings.store_state || '');
         $('#setStoreGstin').value = settings.store_gstin || '';
         $('#setStorePan').value = settings.store_pan || '';
         $('#setStoreDl20b').value = settings.store_dl20b || '';
@@ -291,6 +323,9 @@ require __DIR__ . '/middleware/auth.php';
         $('#setWsTerms').value = settings.inv_ws_terms || '';
         $('#setAutoPrint').checked = settings.inv_auto_print === '1';
 
+        $('#setTaxGstin').value = settings.tax_gstin || '';
+        $('#setTaxPan').value = settings.tax_pan || '';
+        fillStates('#setHomeState', settings.tax_home_state || '');
         $('#setGstSlab').value = settings.tax_default_slab || '12%';
         $('#setHsn').value = settings.tax_hsn || '3004';
         $('#setIntra').checked = settings.tax_intra_state !== '0';
@@ -303,7 +338,8 @@ require __DIR__ . '/middleware/auth.php';
         if (group === 'store') {
           payload = { ...payload,
             store_name: $('#setStoreName').value, store_address: $('#setStoreAddress').value,
-            store_phone: $('#setStorePhone').value, store_gstin: $('#setStoreGstin').value,
+            store_phone: $('#setStorePhone').value, store_city: $('#setStoreCity').value,
+            store_state: $('#setStoreState').value, store_gstin: $('#setStoreGstin').value,
             store_pan: $('#setStorePan').value, store_dl20b: $('#setStoreDl20b').value,
             store_dl21b: $('#setStoreDl21b').value, store_email: $('#setStoreEmail').value,
             fy_start: $('#setFyStart').value,
@@ -316,6 +352,8 @@ require __DIR__ . '/middleware/auth.php';
           };
         } else if (group === 'tax') {
           payload = { ...payload,
+            tax_gstin: $('#setTaxGstin').value.trim(), tax_pan: $('#setTaxPan').value.trim(),
+            tax_home_state: $('#setHomeState').value,
             tax_default_slab: $('#setGstSlab').value, tax_hsn: $('#setHsn').value,
             tax_intra_state: $('#setIntra').checked ? '1' : '0', tax_mrp_inclusive: $('#setMrpInclusive').checked ? '1' : '0',
           };
@@ -338,12 +376,12 @@ require __DIR__ . '/middleware/auth.php';
       function renderUsers() {
         $('#stUsersBody').innerHTML = users.map((u) => `
           <tr>
-            <td><div class="d-flex align-items-center gap-2"><span class="mf-avatar">${u.name.split(' ').map((x) => x[0]).join('').slice(0, 2)}</span><span class="td-title">${MF.esc(u.name)}</span></div></td>
+            <td><div class="d-flex align-items-center gap-2"><span class="mf-avatar">${u.avatar ? `<img src="${MF.esc(u.avatar)}" alt="">` : u.name.split(' ').map((x) => x[0]).join('').slice(0, 2)}</span><span class="td-title">${MF.esc(u.name)}</span></div></td>
             <td>${MF.badge(u.role, u.role.includes('Admin') ? 'primary' : u.role === 'Pharmacist' ? 'success' : 'secondary')}</td>
             <td class="num">${u.mobile || '—'}</td>
             <td class="text-2">${MF.esc(u.email)}</td>
             <td>${MF.statusBadge(u.status === 'active' ? 'Active' : 'Inactive')}</td>
-            <td class="num text-2">${u.last_login ? MF.fmtDate(u.last_login) : 'Never'}</td>
+            <td class="num text-2" style="white-space:nowrap">${u.last_login ? fmt12(u.last_login) : 'Never'}</td>
             <td class="text-end row-actions">
               <button class="btn btn-icon btn-light-mf text-primary" data-view="${u.id}" title="View profile"><i class="bi bi-eye"></i></button>
               <button class="btn btn-icon btn-light-mf text-success" data-edit="${u.id}" title="Edit profile"><i class="bi bi-pencil"></i></button>
@@ -377,7 +415,7 @@ require __DIR__ . '/middleware/auth.php';
       function openUserView(u) {
         if (!u) return;
         viewingId = u.id;
-        $('#stViewAvatar').textContent = initialsOf(u.name);
+        $('#stViewAvatar').innerHTML = u.avatar ? `<img src="${MF.esc(u.avatar)}" alt="">` : initialsOf(u.name);
         $('#stViewName').textContent = u.name || '—';
         $('#stViewRole').innerHTML = MF.badge(u.role || 'Staff', String(u.role || '').includes('Admin') ? 'primary' : 'success');
         const row = (ic, lbl, val) => `<div class="d-flex align-items-center justify-content-between py-2" style="border-top:1px solid #EEF0F4">
@@ -386,7 +424,7 @@ require __DIR__ . '/middleware/auth.php';
           row('phone', 'Mobile', u.mobile ? MF.esc(u.mobile) : '—') +
           row('envelope', 'Email', MF.esc(u.email || '—')) +
           row('toggle2-on', 'Status', u.status === 'active' ? 'Active' : 'Disabled') +
-          row('clock-history', 'Last login', u.last_login ? MF.fmtDate(u.last_login) : 'Never');
+          row('clock-history', 'Last login', u.last_login ? fmt12(u.last_login) : 'Never');
         new bootstrap.Modal($('#stUserViewModal')).show();
       }
       function openUserEdit(u) {
@@ -402,6 +440,40 @@ require __DIR__ . '/middleware/auth.php';
         bootstrap.Modal.getInstance($('#stUserViewModal'))?.hide();
         openUserEdit(userById(viewingId));
       });
+      $('#stAvatarBtn').addEventListener('click', () => $('#stAvatarFile').click());
+      $('#stAvatarFile').addEventListener('change', function () {
+        const f = this.files && this.files[0]; const u = userById(viewingId);
+        if (!f || !u) return;
+        const rd = new FileReader();
+        rd.onload = () => {
+          const img = new Image();
+          img.onload = () => {
+            const sc = Math.min(1, 256 / Math.max(img.width, img.height));
+            const cv = document.createElement('canvas');
+            cv.width = Math.max(1, Math.round(img.width * sc)); cv.height = Math.max(1, Math.round(img.height * sc));
+            cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+            cv.toBlob((blob) => {
+              if (!blob) { MF.toast('Could not process that image.', 'danger'); return; }
+              const fr = new FileReader();
+              fr.onload = async () => {
+                try {
+                  await MF.Api.put('users.php', { id: u.id, avatar: fr.result });
+                  await loadUsers();
+                  bootstrap.Modal.getInstance($('#stUserViewModal'))?.hide();
+                  openUserView(userById(u.id));
+                  MF.toast('Profile photo updated.', 'success', 'User');
+                } catch (e2) { MF.toast(e2.message || 'Could not save photo.', 'danger'); }
+              };
+              fr.readAsDataURL(blob);
+            }, 'image/jpeg', 0.85);
+          };
+          img.onerror = () => MF.toast('That file is not a readable image.', 'danger');
+          img.src = rd.result;
+        };
+        rd.readAsDataURL(f);
+        this.value = '';
+      });
+
       $('#stEditSave').addEventListener('click', async () => {
         const u = userById(editingId); if (!u) return;
         const name = $('#stEditName').value.trim(), email = $('#stEditEmail').value.trim();
@@ -434,21 +506,40 @@ require __DIR__ . '/middleware/auth.php';
         }
       });
 
-      /* Roles matrix */
+      /* Roles matrix — every sidebar menu & submenu, per role.
+         Semantics: ticked = allowed. A menu is hidden from a role's sidebar
+         only after you save it unticked here; unconfigured menus stay open. */
+      const MATRIX_ROLES = ['Owner / Admin', 'Pharmacist', 'Billing Clerk', 'Purchase Manager'];
+      const MATRIX_MENUS = [
+        { group: 'Core',           items: ['Dashboard'] },
+        { group: 'Sales',          items: ['Retail POS', 'Wholesale Billing', 'Sales Invoices', 'Sales Returns', 'Customers', 'Customer Dues'] },
+        { group: 'Purchases',      items: ['New Purchase', 'Purchase Invoices', 'Purchase Returns', 'Suppliers', 'Supplier Dues'] },
+        { group: 'Inventory',      items: ['Products / Medicines', 'Stock Overview', 'Medicine Ledger', 'Batch Management', 'Expiry Management', 'Low Stock', 'Stock Adjustment', 'Stock Transfer'] },
+        { group: 'Pharmacy',       items: ['Prescriptions', 'Doctors', 'Manufacturers', 'Medicine Categories', 'Schedule / Class', 'Compliance Register'] },
+        { group: 'Accounts',       items: ['Payments', 'Expenses', 'Cash Book', 'GST'] },
+        { group: 'Reports',        items: ['Sales Reports', 'Purchase Reports', 'Stock Reports', 'Expiry Reports', 'Profit Reports', 'GST Reports', 'Due Reports'] },
+        { group: 'Administration', items: ['Users', 'Roles & Permissions', 'Store Settings', 'Invoice Settings', 'Tax Settings', 'Audit Logs', 'My Subscription'] },
+      ];
       async function loadRoles() {
-        const res = await MF.Api.get('role-permissions.php');
-        rolePerms = res.data ?? res;
+        try { const res = await MF.Api.get('role-permissions.php'); rolePerms = res.data ?? res ?? []; }
+        catch (_) { rolePerms = []; }
         renderRoles();
       }
       function renderRoles() {
-        const roleNames = [...new Set(rolePerms.map((r) => r.role))];
-        const modules = [...new Set(rolePerms.map((r) => r.module))];
-        $('#stRolesHead').innerHTML = `<tr><th>Module</th>${roleNames.map((r) => `<th class="text-center">${r}</th>`).join('')}</tr>`;
-        $('#stRolesBody').innerHTML = modules.map((mod) => `
-          <tr><td class="td-title">${mod}</td>${roleNames.map((role) => {
-            const entry = rolePerms.find((r) => r.role === role && r.module === mod);
-            return `<td class="text-center"><input type="checkbox" class="perm-check" data-role="${role}" data-module="${mod}" ${entry && entry.allowed ? 'checked' : ''}></td>`;
-          }).join('')}</tr>`).join('');
+        $('#stRolesHead').innerHTML = `<tr><th style="min-width:210px">Menu · Item</th>${MATRIX_ROLES.map((r) => `<th class="text-center" style="min-width:88px">${r.replace(' / ', '/')}</th>`).join('')}</tr>`;
+        let html = '';
+        MATRIX_MENUS.forEach((g) => {
+          html += `<tr class="st-grp"><td colspan="${MATRIX_ROLES.length + 1}"><i class="bi bi-layout-sidebar me-1"></i>${g.group}</td></tr>`;
+          g.items.forEach((mod) => {
+            html += `<tr><td class="td-title">${mod}</td>` + MATRIX_ROLES.map((role) => {
+              if (role === MATRIX_ROLES[0]) { return `<td class="text-center"><input type="checkbox" class="perm-check" checked disabled title="Owners always have full access"></td>`; }
+              const entry = rolePerms.find((r) => String(r.role) === role && String(r.module) === mod);
+              const on = entry === undefined ? true : !!Number(entry.allowed);
+              return `<td class="text-center"><input type="checkbox" class="perm-check" data-role="${role}" data-module="${mod}" ${on ? 'checked' : ''}></td>`;
+            }).join('') + '</tr>';
+          });
+        });
+        $('#stRolesBody').innerHTML = html;
       }
       $('#stRolesSave').addEventListener('click', async () => {
         const rows = [...document.querySelectorAll('.perm-check')].map((c) => ({ role: c.dataset.role, module: c.dataset.module, allowed: c.checked }));

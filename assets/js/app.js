@@ -87,6 +87,8 @@ window.MF = window.MF || {};
       MF._bootP = MF.Api.get('bootstrap.php')
         .then(async (res) => {
           Object.assign(window.MF_DATA, res.data);
+          try { const wr = await MF.Api.get('whoami.php'); MF._me = (wr && wr.data) || {}; } catch (_) { MF._me = null; }
+          try { const pr = await MF.Api.get('role-permissions.php'); MF._prms = (pr && pr.data) || []; } catch (_) { MF._prms = null; }
           try {
             const extra = await MF.Api.get('medicines.php');
             mergeMedicineCatalog(window.MF_DATA, extra);
@@ -103,6 +105,21 @@ window.MF = window.MF || {};
     return MF._bootP;
   };
   MF.rehydrate = function () { MF._bootP = null; return MF.boot(); };
+
+  /* Menu permission gate — matrix lives in Settings → Roles & Permissions.
+     Owner/Admin or privileged roles: full access. Unconfigured menu: allowed
+     (fail-open) — a menu is only hidden once an admin has explicitly unticked it. */
+  MF.menuAllowed = function (label) {
+    const me = MF._me;
+    if (!me) return true;
+    const role = String(me.role || '');
+    if (me.privileged === true || /owner|admin/i.test(role)) return true;
+    if (!Array.isArray(MF._prms)) return true;
+    const row = MF._prms.find((r) => String(r.role).toLowerCase() === role.toLowerCase()
+      && String(r.module).toLowerCase() === String(label).toLowerCase());
+    if (!row) return true;
+    return !!Number(row.allowed);
+  };
 
   /* ---------------- Formatting & date helpers ---------------- */
   MF.fmt = (n, dec = 0) =>
@@ -434,7 +451,7 @@ window.MF = window.MF || {};
         { label: 'Users', icon: 'person-badge', href: 'settings.php?tab=users' },
         { label: 'Roles & Permissions', icon: 'shield-lock', href: 'settings.php?tab=roles' },
         { label: 'Store Settings', icon: 'shop', href: 'settings.php?tab=store' },
-        { label: 'Invoice Settings', icon: 'file-earmark-sliders', href: 'settings.php?tab=invoice' },
+        { label: 'Invoice Settings', icon: 'file-earmark-text', href: 'settings.php?tab=invoice' },
         { label: 'Tax Settings', icon: 'calculator', href: 'settings.php?tab=tax' },
         { label: 'Audit Logs', icon: 'journal-check', href: 'settings.php?tab=audit' },
         { label: 'My Subscription', icon: 'credit-card-2-front', href: 'subscription.php' }
@@ -490,16 +507,19 @@ window.MF = window.MF || {};
       <nav class="mf-sidebar-nav">`;
     NAV.forEach((sec) => {
       if (!sec.items) {
+        if (!MF.menuAllowed(sec.label)) return;
         html += navLinkHtml(sec, page, hrefActiveHere);
         return;
       }
-      const hasActive = sec.items.some((it) => itemActive(it, page, hrefActiveHere));
+      const visItems = sec.items.filter((it) => MF.menuAllowed(it.label));
+      if (!visItems.length) return;
+      const hasActive = visItems.some((it) => itemActive(it, page, hrefActiveHere));
       html += `<div class="mf-nav-group${hasActive ? ' open' : ''}">
         <button type="button" class="mf-nav-parent${hasActive ? ' has-active' : ''}" aria-expanded="${hasActive}">
           <i class="bi bi-${sec.icon}"></i><span>${sec.label}</span><i class="bi bi-chevron-down mf-caret"></i>
         </button>
         <div class="mf-nav-sub"><div class="mf-nav-sub-inner">`;
-      sec.items.forEach((it) => { html += navLinkHtml(it, page, hrefActiveHere); });
+      visItems.forEach((it) => { html += navLinkHtml(it, page, hrefActiveHere); });
       html += `</div></div></div>`;
     });
     html += `</nav>
