@@ -383,7 +383,10 @@
     `;
     document.head.appendChild(st);
   }
-  const walkInId = () => D.customers.find((c) => c.name === 'Walk-in Customer')?.id ?? (D.customers[0]?.id ?? '');
+  /* Walk-in = the row Settings provisions on first POS open. Never fall back to
+     customers[0] — that silently billed OTC sales to a stranger's ledger.
+     Unknown here means "no customer", which sales.php records as Walk-in. */
+  const walkInId = () => D.customers.find((c) => c.name === 'Walk-in Customer')?.id ?? '';
 
   /* dd Mon yyyy, e.g. "08 Oct 2026" */
   function fmtExpiryDate(dateVal) {
@@ -1472,7 +1475,7 @@
         state.payment = r.value;
         if (r.value === 'credit') {
           const cust = $('#posCustomer').value;
-          if (MF.cust(cust)?.name === 'Walk-in Customer') { MF.toast('Credit sales are not allowed for Walk-in Customer', 'err', 'Payment'); $('#posPayCash').checked = true; state.payment = 'cash'; }
+          if (!MF.cust(cust) || MF.cust(cust).name === 'Walk-in Customer') { MF.toast('Credit sales are not allowed for Walk-in Customer', 'err', 'Payment'); $('#posPayCash').checked = true; state.payment = 'cash'; }
           else MF.toast('Due will be posted to the customer ledger', 'info', 'Credit sale');
         }
         if (r.value === 'split') new bootstrap.Modal($('#posSplitModal')).show();

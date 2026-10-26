@@ -21,7 +21,8 @@
     subSeed: null,       // medicine id the Substitutes tab is focused on (via "Order / substitute")
     selIdx: 0,           // arrow-key selection index over the rendered result cards
     selQuery: '',        // last search text — a new search resets the selection to card 1
-    printFmt: 'a4',      // 'a4' | 'thermal' — last chosen invoice print format
+    printFmt: 'a4',      // 'a4' | 'thermal' — session choice; Settings → Invoice Settings supplies the store default
+    autoPrint: false,    // inv_auto_print === '1' turns on after-sale auto printing
     discMode: 'percent', // 'percent' (%) | 'flat' (₹) — bill-level discount mode
     rolePrivileged: true, // whoami.php narrows this to false for staff/cashier accounts
     lossApproved: null,   // set when the cashier consciously confirmed a below-cost bill
@@ -1758,18 +1759,8 @@
 
   async function clearCart() {
     if (!state.cart.length) return;
-    const ok = await MF.confirm({ title: 'Clear current bill?', message: 'Cart items will be removed and the customer + prescriber reset to defaults.', confirmText: 'Clear', tone: 'danger' });
-    if (!ok) return;
-    state.cart = [];
-    state.cartIdx = -1;
-    renderCart();
-    /* A cleared bill is a fresh counter: billing customer and prescribing
-       doctor must not bleed into the next sale. */
-    const custSel = $('#posCustomer'); if (custSel) custSel.value = walkInId();
-    const docSel = $('#posDoctor'); if (docSel) docSel.value = '';
-    rxFlag.cust = false; rxFlag.doc = false;
-    if (window.POSUI) POSUI.syncPickers();
-    refreshDraftBtn();
+    const ok = await MF.confirm({ title: 'Clear current bill?', message: 'All cart items will be removed.', confirmText: 'Clear', tone: 'danger' });
+    if (ok) { state.cart = []; renderCart(); }
   }
 
   function selectPay(id) {
@@ -2159,6 +2150,23 @@
   function setThermalMm(mm) {
     localStorage.setItem('mf-pos-thermal-mm', mm === '58' ? '58' : '80');
     paintThermalMmLabels();
+  }
+
+  /* Store-driven print defaults (Settings → Invoice Settings):
+     inv_print_type (a4 | thermal80 | thermal58) seeds printFmt + thermal width;
+     inv_auto_print === '1' enables printing the receipt right after a sale saves. */
+  async function applyPrintPrefs() {
+    try {
+      const res = await MF.Api.get('settings.php');
+      const cfg = (res && res.data) || res || {};
+      state.autoPrint = String(cfg.inv_auto_print || '0') === '1';
+      const pt = String(cfg.inv_print_type || '');
+      if (pt === 'a4' || pt === 'thermal80' || pt === 'thermal58') {
+        state.printFmt = (pt === 'a4') ? 'a4' : 'thermal';
+        setThermalMm(pt === 'thermal58' ? '58' : '80');
+        paintPrintBtn();
+      }
+    } catch (_) { /* keep safe defaults (a4, manual print) */ }
   }
   function thermalCashier() {
     const item = [...document.querySelectorAll('#posMetaBar .pos-meta-item')].find((el) => /Cashier/i.test(el.textContent || ''));
@@ -2922,13 +2930,9 @@
     state.tender = tender;
 
     $('#posComplete').disabled = true;
-    const posDocId = $('#posDoctor') ? ($('#posDoctor').value || '') : '';
-    const posPatName = (state._rxBill && state._rxBill.patient) || '';
     try {
       const res = await MF.Api.post('sales.php', {
         customerId: $('#posCustomer').value,
-        doctorId: posDocId || null,
-        patientName: posPatName || null,
         paymentMode: state.payment,
         globalDiscPct: Math.min(100, Math.max(0, t.billDiscPct || 0)),
         splitCash: state.split.cash,
@@ -2937,14 +2941,10 @@
         changeReturned: tender.changeReturned,
         items: state.cart.map((l) => ({ medId: l.medId, batchId: l.batchId, qty: l.qty, rate: l.rate, discPct: l.discPct, unit: l.unit || 'pack' })),
       });
-      MF.printHtml(state.printFmt === 'thermal'
-        ? thermalReceiptHtml(res.invoiceNo, t)
-        : a4ReceiptHtml(res.invoiceNo, t));
-      if (posDocId || posPatName) {
-        /* Never lose compliance data quietly: if the stamp fails (endpoint not
-           deployed yet, network blip), say so loudly and point at the fix. */
-        MF.Api.post('sale-doctor.php', { invoiceNo: res.invoiceNo, doctorId: posDocId || 0, patientName: posPatName })
-          .catch(() => { MF.toast(`${res.invoiceNo} billed, but the doctor/patient was NOT saved on it — it will show a dash in the H1/X register. Fix it from Sales Invoices → doctor icon.`, 'warn', 'Rx details not saved'); });
+      if (state.autoPrint) {
+        MF.printHtml(state.printFmt === 'thermal'
+          ? thermalReceiptHtml(res.invoiceNo, t)
+          : a4ReceiptHtml(res.invoiceNo, t));
       }
       saveLastBill(res.invoiceNo, t);
       paintLastBill();
@@ -3951,6 +3951,7 @@
   document.addEventListener('DOMContentLoaded', async () => {
     if (!document.getElementById('posSearch')) return;
     await MF.boot();
+    applyPrintPrefs();
 
     initPicker('#posCustomer', '#posAddCustomer', 'customer');
     initPicker('#posDoctor', '#posAddDoctor', 'doctor');
