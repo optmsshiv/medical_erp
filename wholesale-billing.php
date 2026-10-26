@@ -246,6 +246,19 @@ require __DIR__ . '/middleware/auth.php';
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
       await MF.boot();
+      /* Store extras for the PRINTED invoice (bank A/C, email). Cached once at
+         open, then refreshed from the settings fetch the auto-print gate already
+         performs — so the first invoice after a settings change is correct too. */
+      window.wsStore = {};
+      window.wsApplyStore = function (s) {
+        s = s || {};
+        window.wsStore = {
+          bankName: s.store_bank_name || '', bankAcct: s.store_bank_account || '',
+          bankIfsc: s.store_bank_ifsc || '', bankBranch: s.store_bank_branch || '',
+          email: s.store_email || '',
+        };
+      };
+      try { const r0 = await MF.Api.get('settings.php'); window.wsApplyStore((r0 && r0.data) || r0); } catch (_) { /* settings unreachable → invoice prints without the bank block */ }
     (function () {
       const MF = window.MF, D = window.MF_DATA;
       const $ = (s) => document.querySelector(s);
@@ -720,6 +733,7 @@ require __DIR__ . '/middleware/auth.php';
       }
       function invoiceHtml(meta, t, res) {
         const store = D.store || {};
+        const wsStore = window.wsStore || {};
         const lines = res.lines || [];
         const gstin = store.gstin || store.gstNo || '';
         const dls = [store.dl20b, store.dl21b].filter(Boolean);
@@ -772,6 +786,9 @@ require __DIR__ . '/middleware/auth.php';
             <td class="wi-c">${l.gstPct}%</td>
             <td class="wi-r"><b>${MF.fmt(l.amount, 2)}</b></td>
           </tr>`).join('');
+        const wsBankBlock = (wsStore.bankName && wsStore.bankAcct)
+          ? `<h4 style="margin-top:7px">Payment \u2014 Bank A/C</h4><div>${MF.esc(wsStore.bankName)} \u00b7 A/C No. <b>${MF.esc(wsStore.bankAcct)}</b>${wsStore.bankIfsc ? ` \u00b7 IFSC <b>${MF.esc(wsStore.bankIfsc)}</b>` : ''}${wsStore.bankBranch ? `<br>Branch: ${MF.esc(wsStore.bankBranch)}` : ''}</div>`
+          : '';
         const taxCol = meta.interstate
           ? `<div class="wi-sr"><span class="wi-k">IGST (interstate)</span><span>${MF.fmt(t.igst, 2)}</span></div>`
           : (t.cgst > 0 || t.sgst > 0
@@ -936,7 +953,8 @@ require __DIR__ . '/middleware/auth.php';
               <h4 style="margin-top:7px">For the Buyer</h4>
               <div>Use this invoice for GST input tax credit as reflected in the slab table. Please retain it for your records and any audit.</div>
               <h4 style="margin-top:7px">Help</h4>
-              <div>${store.phone ? `Helpline: ${MF.esc(store.phone)}` : 'Contact the counter store for any discrepancy.'}</div>
+              <div>${store.phone ? `Helpline: ${MF.esc(store.phone)}` : 'Contact the counter store for any discrepancy.'}${(store.email || wsStore.email) ? ` \u00b7 ${MF.esc(store.email || wsStore.email)}` : ''}</div>
+              ${wsBankBlock}
             </div>
           </div>
           <div class="wi-signrow">
@@ -1024,6 +1042,7 @@ require __DIR__ . '/middleware/auth.php';
           try {
             const cfgR = await MF.Api.get('settings.php');
             const cfg = (cfgR && cfgR.data) || cfgR || {};
+            window.wsApplyStore(cfg);   // bank block on this very invoice uses the freshest settings
             if (String(cfg.inv_auto_print || '0') === '1') { MF.printHtml(invoiceHtml(meta, t, res)); }
           } catch (_) { MF.printHtml(invoiceHtml(meta, t, res)); }   // settings unreachable → legacy behavior
           rows = [];
