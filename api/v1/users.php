@@ -41,6 +41,7 @@ switch ($method) {
         $action = trim((string) ($input['action'] ?? ''));
         if (in_array($action, ['password-otp', 'otp-verify', 'password-set', 'reset-password'], true)) {
             $pdo = Tenant::db();
+            try {
             $pdo->exec('CREATE TABLE IF NOT EXISTS user_pass_challenges (
                 id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
                 user_id INT UNSIGNED NOT NULL,
@@ -52,6 +53,7 @@ switch ($method) {
                 KEY upc_user (user_id),
                 KEY upc_token (verify_token)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+            } catch (Throwable $e) { Json::error('Password challenge table could not be prepared on this database: ' . $e->getMessage(), 500); }
 
             $me = Auth::user();
             $myId = (int) ($me['id'] ?? 0);
@@ -147,7 +149,7 @@ switch ($method) {
             $tid = (int) ($input['id'] ?? 0);
             $myRole = strtolower(trim((string) ($me['role'] ?? $_SESSION['role'] ?? '')));
             $mayReset = ($myRole === '' || strpos($myRole, 'owner') !== false || strpos($myRole, 'admin') !== false);
-            if (!$mayReset) { Json::error(\"Only an Owner / Admin can force-reset another user's password.\", 403); }
+            if (!$mayReset) { Json::error("Only an Owner / Admin can force-reset another user's password.", 403); }
             if ($tid === $myId) { Json::error('Use the OTP flow to change your own password.', 422); }
             $target = User::find($tid);
             if (!$target) { Json::error('User not found.', 404); }
