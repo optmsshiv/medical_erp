@@ -224,6 +224,38 @@ if ($cashier === '') $cashier = 'Cashier';
       background:#B42318; color:#fff; font-size:.6rem; font-weight:800; letter-spacing:.05em;
       padding:1px 7px 2px; border-radius:999px; box-shadow:0 2px 6px rgba(180,35,24,.35);
     }
+    /* Search rail — icon chip, input, clear button and Quick Refill share one 38px height */
+    .pos-search-row { align-items:center; }
+    .pos-search-row .input-group { flex:1 1 auto; min-width:0; flex-wrap:nowrap; }
+    .pos-search-row .input-group-text {
+      display:inline-flex; align-items:center; height:38px; padding:0 11px;
+      border-radius:var(--mf-radius-sm) 0 0 var(--mf-radius-sm); font-size:.85rem; flex:0 0 auto;
+    }
+    .pos-search-wrap { position:relative; flex:1 1 auto; min-width:0; display:flex; }
+    .pos-search-wrap .form-control {
+      flex:1 1 auto; min-width:0; width:auto; height:38px; padding:6px 32px 6px 12px;
+      border-radius:0 var(--mf-radius-sm) var(--mf-radius-sm) 0;
+    }
+    .pos-search-wrap:focus-within { z-index:3; }
+    .pos-clear {
+      position:absolute; right:6px; top:50%; transform:translateY(-50%); z-index:5;
+      width:24px; height:24px; border:0; border-radius:999px; padding:0;
+      background:#EDF1F4; color:#64748B; font-size:.66rem; line-height:1; cursor:pointer;
+      display:inline-flex; align-items:center; justify-content:center;
+      transition:background .15s ease, color .15s ease;
+    }
+    .pos-clear:hover { background:#DFE6EE; color:#334155; }
+    .pos-clear[hidden] { display:none; }
+    .pos-refill-btn {
+      flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; height:38px;
+      padding:0 13px; border:1px solid var(--mf-primary); background:var(--mf-primary-soft);
+      color:var(--mf-primary-dark); border-radius:var(--mf-radius-sm); font-size:.8125rem;
+      font-weight:700; white-space:nowrap; cursor:pointer;
+      transition:background .15s ease, border-color .15s ease, transform .15s ease, box-shadow .15s ease;
+    }
+    .pos-refill-btn:hover { background:#D6EAE4; border-color:var(--mf-primary-dark); transform:translateY(-1px); box-shadow:0 4px 12px rgba(23,107,91,.14); }
+    .pos-refill-btn:active { transform:translateY(0); box-shadow:none; }
+    .pos-refill-btn i { font-size:.92rem; }
   </style>
 </head>
 <body data-page="retail-pos">
@@ -269,7 +301,7 @@ if ($cashier === '') $cashier = 'Cashier';
                  <span class="badge bg-light text-dark border">F2</span>
                </span>
             </label>
-            <div class="d-flex gap-2 mb-2">
+            <div class="d-flex gap-2 mb-2 pos-search-row">
               <div class="input-group">
                 <span class="input-group-text"><i class="bi bi-search"></i></span>
                 <div class="pos-search-wrap">
@@ -614,7 +646,7 @@ if ($cashier === '') $cashier = 'Cashier';
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="assets/js/data.js"></script>
   <script src="assets/js/config.js"></script>
-  <script src="assets/js/app.js?v=2026-10-06.16"></script>
+  <script src="assets/js/app.js?v=2026-10-20.03"></script>
   <!-- Quick Refill — slide-in side panel -->
   <div class="pos-refill-overlay" id="posRefillOverlay" hidden></div>
   <aside class="pos-refill-panel" id="posRefillPanel" role="dialog" aria-label="Quick refill" hidden>
@@ -675,7 +707,7 @@ if ($cashier === '') $cashier = 'Cashier';
   </aside>
 
   <!-- BUMP this version on EVERY pos.js change — long-cache browsers must not serve stale billing logic. -->
-  <script src="assets/js/pos.js?v=2026-10-20.02"></script>
+  <script src="assets/js/pos.js?v=2026-10-20.03"></script>
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
       await MF.boot();

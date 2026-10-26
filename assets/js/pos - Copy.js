@@ -1758,8 +1758,18 @@
 
   async function clearCart() {
     if (!state.cart.length) return;
-    const ok = await MF.confirm({ title: 'Clear current bill?', message: 'All cart items will be removed.', confirmText: 'Clear', tone: 'danger' });
-    if (ok) { state.cart = []; renderCart(); }
+    const ok = await MF.confirm({ title: 'Clear current bill?', message: 'Cart items will be removed and the customer + prescriber reset to defaults.', confirmText: 'Clear', tone: 'danger' });
+    if (!ok) return;
+    state.cart = [];
+    state.cartIdx = -1;
+    renderCart();
+    /* A cleared bill is a fresh counter: billing customer and prescribing
+       doctor must not bleed into the next sale. */
+    const custSel = $('#posCustomer'); if (custSel) custSel.value = walkInId();
+    const docSel = $('#posDoctor'); if (docSel) docSel.value = '';
+    rxFlag.cust = false; rxFlag.doc = false;
+    if (window.POSUI) POSUI.syncPickers();
+    refreshDraftBtn();
   }
 
   function selectPay(id) {
@@ -2913,10 +2923,12 @@
 
     $('#posComplete').disabled = true;
     const posDocId = $('#posDoctor') ? ($('#posDoctor').value || '') : '';
+    const posPatName = (state._rxBill && state._rxBill.patient) || '';
     try {
       const res = await MF.Api.post('sales.php', {
         customerId: $('#posCustomer').value,
         doctorId: posDocId || null,
+        patientName: posPatName || null,
         paymentMode: state.payment,
         globalDiscPct: Math.min(100, Math.max(0, t.billDiscPct || 0)),
         splitCash: state.split.cash,
@@ -2928,7 +2940,12 @@
       MF.printHtml(state.printFmt === 'thermal'
         ? thermalReceiptHtml(res.invoiceNo, t)
         : a4ReceiptHtml(res.invoiceNo, t));
-      if (posDocId) MF.Api.post('sale-doctor.php', { invoiceNo: res.invoiceNo, doctorId: posDocId }).catch(() => {});
+      if (posDocId || posPatName) {
+        /* Never lose compliance data quietly: if the stamp fails (endpoint not
+           deployed yet, network blip), say so loudly and point at the fix. */
+        MF.Api.post('sale-doctor.php', { invoiceNo: res.invoiceNo, doctorId: posDocId || 0, patientName: posPatName })
+          .catch(() => { MF.toast(`${res.invoiceNo} billed, but the doctor/patient was NOT saved on it — it will show a dash in the H1/X register. Fix it from Sales Invoices → doctor icon.`, 'warn', 'Rx details not saved'); });
+      }
       saveLastBill(res.invoiceNo, t);
       paintLastBill();
       MF.toast(`${res.invoiceNo} · ${MF.fmt(res.grandTotal)} · ${state.payment.toUpperCase()}`, 'success', 'Sale completed');

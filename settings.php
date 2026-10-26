@@ -83,7 +83,7 @@ require __DIR__ . '/middleware/auth.php';
             <div class="card-mf" style="max-width:860px">
               <div class="card-head"><h2 class="card-title"><i class="bi bi-file-earmark-sliders"></i>Invoice Configuration</h2><div class="card-tools"><span class="badge badge-soft-success">printing · billing · branding</span></div></div>
               <div class="p-3">
-                <div class="alert alert-light border small mb-3"><i class="bi bi-info-circle me-1"></i>These values are saved for your records. Invoice numbers themselves are still generated automatically by the system (INV-/WS- + a running number) — this panel doesn't change that behavior yet.</div>
+                <div class="alert alert-light border small mb-3"><i class="bi bi-info-circle me-1"></i><b>Default Print Type</b> is picked up by POS and wholesale billing on page load — set it once and every print uses it. <b>Auto-print</b> off means no print dialog after completing a sale (manual Print stays available). Invoice numbers are always system-generated (INV-/WS- + running number).</div>
                 <div class="row g-3">
                   <div class="col-md-4"><label class="form-label"><i class="bi bi-cash-stack me-1 text-success"></i>Default Payment Mode</label>
                     <select class="form-select" id="setDefaultPayment"><option>Cash</option><option>UPI</option><option>Card</option></select></div>
@@ -91,6 +91,12 @@ require __DIR__ . '/middleware/auth.php';
                     <select class="form-select" id="setRounding"><option>Nearest Rupee</option><option>Round Down</option><option>No Rounding</option></select></div>
                   <div class="col-md-4"><label class="form-label"><i class="bi bi-files me-1 text-success"></i>Copies on Print</label>
                     <select class="form-select" id="setCopies"><option>Original Only</option><option>Original + Duplicate</option><option>Triplicate</option></select></div>
+                  <div class="col-md-4"><label class="form-label"><i class="bi bi-printer me-1 text-success"></i>Default Print Type</label>
+                    <select class="form-select" id="setPrintType">
+                      <option value="a4">A4 invoice (full page)</option>
+                      <option value="thermal80">Thermal receipt — 80mm</option>
+                      <option value="thermal58">Thermal receipt — 58mm</option>
+                    </select></div>
                   <div class="col-12"><label class="form-label"><i class="bi bi-chat-square-text me-1 text-success"></i>Invoice Footer Note</label><textarea class="form-control" rows="2" id="setFooterNote"></textarea></div>
                   <div class="col-12"><label class="form-label"><i class="bi bi-file-earmark-text me-1 text-success"></i>Terms &amp; Conditions (wholesale)</label><textarea class="form-control" rows="2" id="setWsTerms"></textarea></div>
                 </div>
@@ -319,6 +325,7 @@ require __DIR__ . '/middleware/auth.php';
         $('#setDefaultPayment').value = settings.inv_default_payment || 'Cash';
         $('#setRounding').value = settings.inv_rounding || 'Nearest Rupee';
         $('#setCopies').value = settings.inv_copies || 'Original Only';
+        $('#setPrintType').value = settings.inv_print_type || 'a4';
         $('#setFooterNote').value = settings.inv_footer || '';
         $('#setWsTerms').value = settings.inv_ws_terms || '';
         $('#setAutoPrint').checked = settings.inv_auto_print === '1';
@@ -347,7 +354,7 @@ require __DIR__ . '/middleware/auth.php';
         } else if (group === 'invoice') {
           payload = { ...payload,
             inv_default_payment: $('#setDefaultPayment').value, inv_rounding: $('#setRounding').value,
-            inv_copies: $('#setCopies').value, inv_footer: $('#setFooterNote').value,
+            inv_copies: $('#setCopies').value, inv_print_type: $('#setPrintType').value, inv_footer: $('#setFooterNote').value,
             inv_ws_terms: $('#setWsTerms').value, inv_auto_print: $('#setAutoPrint').checked ? '1' : '0',
           };
         } else if (group === 'tax') {

@@ -241,7 +241,7 @@ require __DIR__ . '/middleware/auth.php';
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="assets/js/data.js"></script>
   <script src="assets/js/config.js"></script>
-  <script src="assets/js/app.js"></script>
+  <script src="assets/js/app.js?v=2026-10-26.01"></script>
   <script src="assets/js/qrcode.min.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
@@ -1021,7 +1021,11 @@ require __DIR__ . '/middleware/auth.php';
             schemeDiscPct: parseFloat($('#wsSchemeDisc').value) || 0,
             overallDiscPct: parseFloat($('#wsOverallDisc').value) || 0,
           };
-          MF.printHtml(invoiceHtml(meta, t, res));
+          try {
+            const cfgR = await MF.Api.get('settings.php');
+            const cfg = (cfgR && cfgR.data) || cfgR || {};
+            if (String(cfg.inv_auto_print || '0') === '1') { MF.printHtml(invoiceHtml(meta, t, res)); }
+          } catch (_) { MF.printHtml(invoiceHtml(meta, t, res)); }   // settings unreachable → legacy behavior
           rows = [];
           billId = crypto.randomUUID ? crypto.randomUUID() : 'ws-' + Date.now() + '-' + Math.random().toString(16).slice(2);
           await MF.rehydrate();
