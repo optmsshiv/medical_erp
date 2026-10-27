@@ -25,8 +25,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 $before = clientFeaturesOn($id);
 $after  = [];
 $changed = [];
-foreach (CLIENT_FEATURES as $key => $label) {
-    $after[$key] = isset($_POST['f_' . $key]);           // unchecked boxes simply don't post
+foreach (clientFeatureKeys() as $key => $label) {
+    $after[$key] = posted('f_' . $key);                 // unchecked boxes simply don't post; mangle-proof presence check
     $allowed = $after[$key] ? 1 : 0;
     master()->query(
         'INSERT INTO client_features (client_id, feature, allowed) VALUES ('

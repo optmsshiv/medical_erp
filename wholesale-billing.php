@@ -2,6 +2,7 @@
 session_start();
 require __DIR__ . '/middleware/tenant.php';
 require __DIR__ . '/middleware/auth.php';
+if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/MenuGate.php'; MenuGate::enforce(); }  // roles matrix + platform kill-switch — typed URLs obey
 ?>
 <!doctype html>
 <html lang="en">
@@ -241,7 +242,7 @@ require __DIR__ . '/middleware/auth.php';
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="assets/js/data.js"></script>
   <script src="assets/js/config.js"></script>
-  <script src="assets/js/app.js?v=2026-10-26.01"></script>
+  <script src="assets/js/app.js?v=2026-10-26.03"></script>
   <script src="assets/js/qrcode.min.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', async () => {

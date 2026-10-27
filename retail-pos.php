@@ -2,6 +2,7 @@
 session_start();
 require __DIR__ . '/middleware/tenant.php';
 require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logged in
+if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/MenuGate.php'; MenuGate::enforce(); }  // roles matrix + platform kill-switch — typed URLs obey
 
 $client = Tenant::current();
 $user   = Auth::user();
@@ -646,7 +647,7 @@ if ($cashier === '') $cashier = 'Cashier';
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="assets/js/data.js"></script>
   <script src="assets/js/config.js"></script>
-  <script src="assets/js/app.js?v=2026-10-26.02"></script>
+  <script src="assets/js/app.js?v=2026-10-26.03"></script>
   <!-- Quick Refill — slide-in side panel -->
   <div class="pos-refill-overlay" id="posRefillOverlay" hidden></div>
   <aside class="pos-refill-panel" id="posRefillPanel" role="dialog" aria-label="Quick refill" hidden>

@@ -19,69 +19,79 @@ const CLIENT_FEATURES = [
 ];
 
 /* ---- Feature control v2: every sidebar menu & submenu, per client. -------
- * 'menu:<Label>' keys mirror the tenant app verbatim (sidebar / role matrix /
- * MenuGate). The eight module keys above stay authoritative for the APIs that
- * already read them; the new page-level keys hide menus (app.js via
- * nav-state.php) AND 403 the pages (core/MenuGate.php) server-side.
- * Groups drive the clients.php modal — keep labels in sync with the NAV. */
+ * Page-level keys are 'menu_<slug>' — the sidebar label lowercased with every
+ * non-alphanumeric run collapsed to a single '_': 'Products / Medicines' →
+ * menu_products_medicines. Slugs, NOT raw labels: PHP rewrites dots and
+ * spaces in submitted form-field names, so any key containing a space cannot
+ * round-trip the modal form — that was the v2.0 "toggles snap back on" bug.
+ * MenuGate::featKey() and MF._featKey() derive the identical slug from the
+ * label, so the tenant app never needs a manual key list. The eight legacy
+ * module keys stay authoritative for the APIs that already read them. */
 const CLIENT_FEATURE_GROUPS = [
     'Sales' => [
-        'menu:Retail POS'         => ['Retail POS page', 'Counter billing screen'],
-        'menu:Wholesale Billing'  => ['Wholesale Billing page', ''],
-        'menu:Sales Invoices'     => ['Sales Invoices page', ''],
-        'menu:Sales Returns'      => ['Sales Returns page', ''],
-        'menu:Customers'          => ['Customers page', ''],
-        'menu:Customer Dues'      => ['Customer Dues page', ''],
-        'wholesale'               => ['Wholesale module (API)', 'B2B billing engine & credit notes'],
-        'customer_dues'           => ['Customer dues ledger (API)', 'Credit book & reminders'],
+        'menu_retail_pos' => ['Retail POS page', 'Counter billing screen'],
+        'menu_wholesale_billing' => ['Wholesale Billing page', ''],
+        'menu_sales_invoices' => ['Sales Invoices page', ''],
+        'menu_sales_returns' => ['Sales Returns page', ''],
+        'menu_customers' => ['Customers page', ''],
+        'menu_customer_dues' => ['Customer Dues page', ''],
+        'wholesale' => ['Wholesale module (API)', 'B2B billing engine & credit notes'],
+        'customer_dues' => ['Customer dues ledger (API)', 'Credit book & reminders'],
     ],
     'Purchases' => [
-        'menu:New Purchase'       => ['New Purchase page', ''],
-        'menu:Purchase Invoices'  => ['Purchase Invoices page', ''],
-        'menu:Purchase Returns'   => ['Purchase Returns page', ''],
-        'menu:Suppliers'          => ['Suppliers page', ''],
-        'menu:Supplier Dues'      => ['Supplier Dues page', ''],
-        'supplier_dues'           => ['Supplier dues ledger (API)', 'Outstanding payables'],
+        'menu_new_purchase' => ['New Purchase page', ''],
+        'menu_purchase_invoices' => ['Purchase Invoices page', ''],
+        'menu_purchase_returns' => ['Purchase Returns page', ''],
+        'menu_suppliers' => ['Suppliers page', ''],
+        'menu_supplier_dues' => ['Supplier Dues page', ''],
+        'supplier_dues' => ['Supplier dues ledger (API)', 'Outstanding payables'],
     ],
     'Inventory' => [
-        'menu:Products / Medicines' => ['Medicine master page', ''],
-        'menu:Stock Overview'       => ['Stock Overview page', ''],
-        'menu:Medicine Ledger'      => ['Medicine Ledger page', ''],
-        'menu:Batch Management'     => ['Batch Management tab', ''],
-        'menu:Expiry Management'    => ['Expiry Management tab', ''],
-        'menu:Low Stock'            => ['Low Stock tab', ''],
-        'menu:Stock Adjustment'     => ['Stock Adjustment tab', ''],
-        'menu:Stock Transfer'       => ['Stock Transfer tab', ''],
-        'price_bulk'                => ['Bulk price update (API)', 'Batch price corrections'],
+        'menu_products_medicines' => ['Medicine master page', ''],
+        'menu_stock_overview' => ['Stock Overview page', ''],
+        'menu_medicine_ledger' => ['Medicine Ledger page', ''],
+        'menu_batch_management' => ['Batch Management tab', ''],
+        'menu_expiry_management' => ['Expiry Management tab', ''],
+        'menu_low_stock' => ['Low Stock tab', ''],
+        'menu_stock_adjustment' => ['Stock Adjustment tab', ''],
+        'menu_stock_transfer' => ['Stock Transfer tab', ''],
+        'price_bulk' => ['Bulk price update (API)', 'Batch price corrections'],
     ],
     'Pharmacy' => [
-        'menu:Prescriptions'        => ['Prescriptions page', ''],
-        'menu:Doctors'              => ['Doctors page', ''],
-        'menu:Manufacturers'        => ['Manufacturers page', ''],
-        'menu:Medicine Categories'  => ['Medicine Categories page', ''],
-        'menu:Schedule / Class'     => ['Schedule / Class page', ''],
-        'menu:Compliance Register'  => ['Compliance Register page', ''],
-        'compliance_export'         => ['Compliance exports', 'H1/X register PDF & Excel'],
-        'rx_inbox'                  => ['Rx inbox', 'Scan & send prescriptions'],
-        'quick_refill'              => ['Quick Refill', 'Repeat previous prescriptions'],
+        'menu_prescriptions' => ['Prescriptions page', ''],
+        'menu_doctors' => ['Doctors page', ''],
+        'menu_manufacturers' => ['Manufacturers page', ''],
+        'menu_medicine_categories' => ['Medicine Categories page', ''],
+        'menu_schedule_class' => ['Schedule / Class page', ''],
+        'menu_compliance_register' => ['Compliance Register page', ''],
+        'compliance_export' => ['Compliance exports', 'H1/X register PDF & Excel'],
+        'rx_inbox' => ['Rx inbox', 'Scan & send prescriptions'],
+        'quick_refill' => ['Quick Refill', 'Repeat previous prescriptions'],
     ],
     'Accounts' => [
-        'menu:Payments'   => ['Payments page', ''],
-        'menu:Expenses'    => ['Expenses page', ''],
-        'menu:Cash Book'   => ['Cash Book page', ''],
-        'menu:GST'         => ['GST register page', ''],
-        'expenses'         => ['Expense tracking (API)', 'Shop expense ledger'],
+        'menu_payments' => ['Payments page', ''],
+        'menu_expenses' => ['Expenses page', ''],
+        'menu_cash_book' => ['Cash Book page', ''],
+        'menu_gst' => ['GST register page', ''],
+        'expenses' => ['Expense tracking (API)', 'Shop expense ledger'],
     ],
     'Reports' => [
-        'menu:Sales Reports'     => ['Sales Reports', ''],
-        'menu:Purchase Reports'  => ['Purchase Reports', ''],
-        'menu:Stock Reports'     => ['Stock Reports', ''],
-        'menu:Expiry Reports'    => ['Expiry Reports', ''],
-        'menu:Profit Reports'    => ['Profit Reports', ''],
-        'menu:GST Reports'       => ['GST Reports', ''],
-        'menu:Due Reports'       => ['Due Reports', ''],
+        'menu_sales_reports' => ['Sales Reports', ''],
+        'menu_purchase_reports' => ['Purchase Reports', ''],
+        'menu_stock_reports' => ['Stock Reports', ''],
+        'menu_expiry_reports' => ['Expiry Reports', ''],
+        'menu_profit_reports' => ['Profit Reports', ''],
+        'menu_gst_reports' => ['GST Reports', ''],
+        'menu_due_reports' => ['Due Reports', ''],
     ],
 ];
+
+/** Checkbox presence that survives PHP's name mangling (dots/spaces → '_'). */
+function posted(string $name): bool {
+    if (isset($_POST[$name])) { return true; }
+    $alt = str_replace(['.', ' '], '_', $name);
+    return $alt !== $name && isset($_POST[$alt]);
+}
 
 /** Flat key → label view (persistence loops iterate this). */
 function clientFeatureKeys(): array {
@@ -135,7 +145,7 @@ function hasColumn(string $table, string $column): bool {
 
 function clientFeaturesOn(int $clientId): array {
     $on = [];
-    foreach (CLIENT_FEATURES as $k => $_) { $on[$k] = true; }           // fail-open default
+    foreach (clientFeatureKeys() as $k => $_) { $on[$k] = true; }        // fail-open default — EVERY key (menu + legacy), the v2.0 loader bug
     try {
         foreach (master()->query('SELECT feature, allowed FROM client_features WHERE client_id = ' . (int) $clientId)->fetchAll() as $r) {
             if (array_key_exists($r['feature'], $on)) { $on[$r['feature']] = (bool) $r['allowed']; }

@@ -107,11 +107,15 @@ window.MF = window.MF || {};
   };
   MF.rehydrate = function () { MF._bootP = null; return MF.boot(); };
 
+  /* Platform feature key for a sidebar label — must equal MenuGate::featKey()
+     and the CLIENT_FEATURE_GROUPS slugs: lowercase, non-alphanumerics → '_'. */
+  MF._featKey = (l) => 'menu_' + String(l).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+
   /* Menu permission gate — matrix lives in Settings → Roles & Permissions.
      Owner/Admin or privileged roles: full access. Unconfigured menu: allowed
      (fail-open) — a menu is only hidden once an admin has explicitly unticked it. */
   MF.menuAllowed = function (label) {
-    if (MF._feats && MF._feats['menu:' + label] === false) return false;   // super-admin kill-switch — binds owners too
+    if (MF._feats && MF._feats[MF._featKey(label)] === false) return false; // super-admin kill-switch — binds owners too
     const me = MF._me;
     if (!me) return true;
     const role = String(me.role || '');

@@ -13,9 +13,9 @@
  *      open — identical fail-open semantics to the UI, so nobody can lock
  *      themselves out by forgetting a tick.
  *   2. PLATFORM kill-switch (super-admin ▸ Feature control, keys
- *      "menu:<Label>" in client_features): a paid-plan switch that binds
- *      EVERY role including the owner — if the module was sold off the plan,
- *      nobody in the tenant opens it.
+ *      'menu_<slug-of-Label>' in client_features): a paid-plan switch that
+ *      binds EVERY role including the owner — if the module was sold off the
+ *      plan, nobody in the tenant opens it.
  *
  * Upload to: <app root>/core/MenuGate.php
  */
@@ -69,7 +69,7 @@ final class MenuGate
         $anyAlive = false;
         foreach ($labels as $label) {
             $killed = false;
-            $featKeys = $isAny ? ['menu:' . $label] : array_merge(['menu:' . $label], $legacyKeys);
+            $featKeys = $isAny ? [self::featKey($label)] : array_merge([self::featKey($label)], $legacyKeys);
             foreach ($featKeys as $fk) {
                 if (array_key_exists($fk, $features) && !$features[$fk]) { $killed = true; $why = 'platform'; }
             }
@@ -80,6 +80,12 @@ final class MenuGate
         }
         if (!$anyAlive) { $why = 'platform'; }
         self::deny(implode(' / ', $labels), $why);
+    }
+
+    /** 'menu_<slug>' — identical derivation to MF._featKey() / CLIENT_FEATURE_GROUPS. */
+    public static function featKey(string $label): string
+    {
+        return 'menu_' . trim(preg_replace('/[^a-z0-9]+/', '_', strtolower($label)) ?? '', '_');
     }
 
     /** Platform feature map from TenantPolicy (empty array when absent/failing → allow all). */

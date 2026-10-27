@@ -2,6 +2,7 @@
 session_start();
 require __DIR__ . '/middleware/tenant.php';
 require __DIR__ . '/middleware/auth.php';
+if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/MenuGate.php'; MenuGate::enforce(); }  // roles matrix + platform kill-switch — typed URLs obey
 ?>
 <!doctype html>
 <html lang="en">
@@ -206,7 +207,7 @@ require __DIR__ . '/middleware/auth.php';
                   <span class="badge badge-soft-success" id="stRolesCount"></span>
                 </div>
               </div>
-              <div class="alert alert-light border small m-3 mb-0"><i class="bi bi-info-circle me-1"></i>Saving applies the matrix to each role's <b>sidebar on their next page load</b> — unticked menus disappear. <b>Owner / Admin</b> always retains full access. Use the <b>section dropdown</b> to view one menu group at a time — <b>Save always applies the complete matrix</b>, hidden rows included. Direct-link (typed-URL) enforcement on the server is the next hardening step.</div>
+              <div class="alert alert-light border small m-3 mb-0"><i class="bi bi-info-circle me-1"></i>Saving applies the matrix to each role's <b>sidebar on their next page load</b> — unticked menus disappear. <b>Owner / Admin</b> always retains full access. Use the <b>section dropdown</b> to view one menu group at a time — <b>Save always applies the complete matrix</b>, hidden rows included. Enforcement now spans both layers: the browser hides the menu, and every gated page re-checks the matrix <b>on the server</b> — typed URLs and scripted fetches included (<code>core/MenuGate.php</code>).</div>
               <div class="table-scroll" style="max-height:none">
                 <table class="table table-mf">
                   <thead id="stRolesHead"></thead>
@@ -399,7 +400,7 @@ require __DIR__ . '/middleware/auth.php';
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="assets/js/data.js"></script>
   <script src="assets/js/config.js"></script>
-  <script src="assets/js/app.js?v=2026-10-26.01"></script>
+  <script src="assets/js/app.js?v=2026-10-26.03"></script>
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
       await window.MF.boot();
