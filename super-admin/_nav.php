@@ -42,8 +42,8 @@ $__items = [
     body { padding-left: 232px; }
     .sa-side { position:fixed; top:0; bottom:0; left:0; width:232px; background:#FFFFFF; border-right:1px solid #E4E8F1; display:flex; flex-direction:column; padding:18px 14px 14px; z-index:50; color:#3A445C; font-size:13px; box-shadow:1px 0 10px rgba(16,23,40,.05); }
     .sa-brand { display:flex; gap:10px; align-items:center; text-decoration:none; color:#101728; padding:2px 8px 18px; }
-    .sa-mark { width:34px; height:34px; border-radius:10px; background:linear-gradient(135deg,#4F46E5,#3730A3); display:flex; align-items:center; justify-content:center; flex:none; }
-    .sa-mark svg { width:19px; height:19px; }
+    .sa-mark { width:34px; height:34px; border-radius:10px; background:transparent; color:#4F46E5; display:flex; align-items:center; justify-content:center; flex:none; }
+    .sa-mark svg { width:22px; height:22px; }
     .sa-name b { display:block; font-size:14.5px; letter-spacing:.01em; }
     .sa-name > span { font-size:9px; font-weight:800; letter-spacing:.16em; color:#4F46E5; }
     .sa-sect { font-size:9.5px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:#98A1B3; padding:2px 10px 8px; }
