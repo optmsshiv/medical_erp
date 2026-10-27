@@ -42,16 +42,16 @@ $__items = [
     body { padding-left: 232px; }
     .sa-side { position:fixed; top:0; bottom:0; left:0; width:232px; background:#FFFFFF; border-right:1px solid #E4E8F1; display:flex; flex-direction:column; padding:18px 14px 14px; z-index:50; color:#3A445C; font-size:13px; box-shadow:1px 0 10px rgba(16,23,40,.05); }
     .sa-brand { display:flex; gap:10px; align-items:center; text-decoration:none; color:#101728; padding:2px 8px 18px; }
-    .sa-mark { width:34px; height:34px; border-radius:10px; background:#176B5B; display:flex; align-items:center; justify-content:center; flex:none; }
+    .sa-mark { width:34px; height:34px; border-radius:10px; background:linear-gradient(135deg,#4F46E5,#3730A3); display:flex; align-items:center; justify-content:center; flex:none; }
     .sa-mark svg { width:19px; height:19px; }
     .sa-name b { display:block; font-size:14.5px; letter-spacing:.01em; }
-    .sa-name > span { font-size:9px; font-weight:800; letter-spacing:.16em; color:#0F766E; }
+    .sa-name > span { font-size:9px; font-weight:800; letter-spacing:.16em; color:#4F46E5; }
     .sa-sect { font-size:9.5px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:#98A1B3; padding:2px 10px 8px; }
     .sa-links { display:flex; flex-direction:column; gap:3px; }
     .sa-links a { display:flex; align-items:center; gap:10px; padding:9px 11px; border-radius:10px; color:#3A445C; text-decoration:none; font-weight:600; transition:background .15s, color .15s; }
     .sa-links a svg { width:16px; height:16px; opacity:.85; flex:none; }
     .sa-links a:hover { background:#F1F5FA; color:#101728; }
-    .sa-links a.on { background:#E6F4F1; color:#0F766E; font-weight:800; box-shadow:inset 3px 0 0 #0F766E; }
+    .sa-links a.on { background:#EEF0FE; color:#3B32C4; font-weight:800; box-shadow:inset 3px 0 0 #4F46E5; }
     .sa-foot { margin-top:auto; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 6px 2px; border-top:1px solid #E4E8F1; }
     .sa-session { display:inline-flex; align-items:center; gap:7px; font-size:11px; color:#6B7488; }
     .sa-session i { width:7px; height:7px; border-radius:50%; background:#31C48D; box-shadow:0 0 0 3px rgba(49,196,141,.18); }
