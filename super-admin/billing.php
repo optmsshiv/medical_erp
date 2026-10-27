@@ -192,6 +192,7 @@ $nav = 'billing';
             <a href="/super-admin/dashboard.php">Dashboard</a>
             <a href="/super-admin/clients.php">Clients</a>
             <a href="/super-admin/billing.php" class="on">Billing</a>
+            <a href="/super-admin/whatsapp.php">WhatsApp</a>
         </nav>
         <div class="bar-right"><span class="session">Key session</span></div>
     </div>

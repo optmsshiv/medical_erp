@@ -200,6 +200,7 @@ $nav = 'dashboard';
             <a href="/super-admin/dashboard.php" class="<?= $nav === 'dashboard' ? 'on' : '' ?>">Dashboard</a>
             <a href="/super-admin/clients.php" class="<?= $nav === 'clients' ? 'on' : '' ?>">Clients</a>
             <a href="/super-admin/billing.php" class="<?= $nav === 'billing' ? 'on' : '' ?>">Billing</a>
+            <a href="/super-admin/whatsapp.php" class="<?= $nav === 'whatsapp' ? 'on' : '' ?>">WhatsApp</a>
         </nav>
         <div class="bar-right"><span class="session">Key session</span></div>
     </div>

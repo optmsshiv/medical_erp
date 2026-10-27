@@ -1,6 +1,15 @@
 <?php
 require __DIR__ . '/_guard.php';
-require dirname(__DIR__) . '/core/Database.php';
+require_once dirname(__DIR__) . '/core/Database.php';
+require_once __DIR__ . '/actions/_lib.php';
+
+/* Feature matrix for the modal — grouped menu control (submenu keys are 'menu:<Label>'). */
+$featJs = [];
+foreach (CLIENT_FEATURE_GROUPS as $gname => $items) {
+    $rowItems = [];
+    foreach ($items as $k => $v) { $rowItems[] = ['key' => $k, 'label' => $v[0], 'hint' => $v[1]]; }
+    $featJs[] = ['group' => $gname, 'count' => count($items), 'items' => $rowItems];
+}
 
 $clients = Database::master()
     ->query('SELECT * FROM clients ORDER BY created_at DESC')
@@ -181,6 +190,8 @@ $nav = 'clients';
     .modal .macts { display:flex; gap:10px; justify-content:flex-end; margin-top:22px; }
     .btn-ghost { border:1px solid var(--line); background:#fff; color:var(--ink-2); font-size:13px; font-weight:650; padding:10px 16px; border-radius:11px; cursor:pointer; }
     .btn-ghost:hover { background:#F5F6FA; }
+    .fgrp { display:flex; justify-content:space-between; align-items:center; font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#8A8FA3; margin:14px 2px 6px; border-bottom:1px solid #EFF1F6; padding-bottom:5px; }
+    #featRows { max-height:56vh; overflow:auto; padding-right:6px; }
     .frow { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid #EFF1F6; }
     .frow:last-child { border-bottom:0; }
     .frow .fl { font-size:13px; font-weight:600; }
@@ -212,6 +223,7 @@ $nav = 'clients';
             <a href="/super-admin/dashboard.php">Dashboard</a>
             <a href="/super-admin/clients.php" class="on">Clients</a>
             <a href="/super-admin/billing.php">Billing</a>
+            <a href="/super-admin/whatsapp.php">WhatsApp</a>
         </nav>
         <div class="bar-right"><span class="session">Key session</span></div>
     </div>
@@ -297,6 +309,13 @@ $nav = 'clients';
                     <div class="control">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
                         <input type="email" id="admin_email" name="admin_email" placeholder="ramesh@greenpharma.example" required>
+                    </div>
+                </div>
+                <div class="field full">
+                    <label for="whatsapp">WhatsApp number <span style="font-weight:500;color:var(--ink-3)">(optional — onboarding &amp; payment alerts)</span></label>
+                    <div class="control">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l1.5-4.5A8.5 8.5 0 1112 20.5c-1.6 0-3.1-.4-4.4-1.1L3 21z"/></svg>
+                        <input type="text" id="whatsapp" name="whatsapp" placeholder="98XXXXXXXX — welcome message goes here">
                     </div>
                 </div>
                 <div class="field full">
@@ -436,6 +455,7 @@ $nav = 'clients';
     <div class="modal">
         <h3>Feature control</h3>
         <p class="msub" id="featWho"></p>
+        <p class="msub" style="margin-top:6px">Menu switches hide that screen in the tenant app <b>and 403 its URL server-side</b>; module switches additionally stop the underlying APIs. Everything unticked here overrides everything there.</p>
         <form method="POST" action="/super-admin/actions/client-features.php">
             <input type="hidden" name="client_id" id="featId">
             <div id="featRows"><p class="msub">Loading the current matrix…</p></div>
@@ -457,16 +477,19 @@ document.querySelectorAll('[data-copy]').forEach(function (b) {
     });
 });
 
-const LABELS = {
-    wholesale: ['Wholesale billing', 'B2B counter & credit notes'],
-    quick_refill: ['Quick Refill', 'Repeat a regular customer\u2019s previous prescription'],
-    rx_inbox: ['Rx inbox', 'Scan & send prescriptions from the counter'],
-    compliance_export: ['Compliance exports', 'H1/X register PDF & Excel'],
-    customer_dues: ['Customer dues', 'Credit book & due reminders'],
-    expenses: ['Expense tracking', 'Shop expense ledger'],
-    supplier_dues: ['Supplier dues', 'Outstanding payables'],
-    price_bulk: ['Bulk price update', 'Batch price corrections']
-};
+const FEATURE_GROUPS = <?= json_encode($featJs) ?>;
+function featHtml(feats) {
+    let html = '';
+    FEATURE_GROUPS.forEach(function (grp) {
+        html += '<div class="fgrp">' + grp.group + '<span>' + grp.count + '</span></div>';
+        grp.items.forEach(function (it) {
+            const on = !feats || feats[it.key] !== false;
+            html += '<div class="frow"><div class="fl">' + it.label + (it.hint ? '<span>' + it.hint + '</span>' : '') + '</div>'
+                + '<label class="sw"><input type="checkbox" name="f_' + it.key + '"' + (on ? ' checked' : '') + '><i></i></label></div>';
+        });
+    });
+    return html;
+}
 
 function openOv(id) { document.getElementById(id).classList.add('show'); }
 document.querySelectorAll('[data-close]').forEach(function (b) { b.addEventListener('click', function () { b.closest('.ov').classList.remove('show'); }); });
@@ -493,25 +516,10 @@ document.querySelectorAll('[data-feat]').forEach(function (b) {
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 if (!d || !d.features) throw new Error('bad');
-                host.innerHTML = '';
-                Object.keys(LABELS).forEach(function (key) {
-                    const on = d.features[key] !== false;
-                    const row = document.createElement('div');
-                    row.className = 'frow';
-                    row.innerHTML = '<div class="fl">' + LABELS[key][0] + '<span>' + LABELS[key][1] + '</span></div>' +
-                        '<label class="sw"><input type="checkbox" name="f_' + key + '"' + (on ? ' checked' : '') + '><i></i></label>';
-                    host.appendChild(row);
-                });
+                host.innerHTML = featHtml(d.features || {});
             })
             .catch(function () {
-                host.innerHTML = '<p class="msub">Could not load the current matrix — the switches below show defaults (everything on). Saving persists your choices.</p>';
-                Object.keys(LABELS).forEach(function (key) {
-                    const row = document.createElement('div');
-                    row.className = 'frow';
-                    row.innerHTML = '<div class="fl">' + LABELS[key][0] + '<span>' + LABELS[key][1] + '</span></div>' +
-                        '<label class="sw"><input type="checkbox" name="f_' + key + '" checked><i></i></label>';
-                    host.appendChild(row);
-                });
+                host.innerHTML = '<p class="msub">Could not load the current matrix — switches show defaults (everything on). Saving persists your choices.</p>' + featHtml({});
             });
     });
 });
