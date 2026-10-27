@@ -35,9 +35,6 @@ unset($_SESSION['flash_ok_msg'], $_SESSION['flash_error']);
 <style>
   :root { --bg:#F4F5F9; --ink:#1A1D27; --mut:#5B6270; --line:#E5E7F0; --brand:#176B5B; --bad:#C0392F; }
   * { box-sizing:border-box; } body { margin:0; background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,sans-serif; font-size:14px; }
-  header { display:flex; align-items:center; justify-content:space-between; padding:18px 28px; background:#fff; border-bottom:1px solid var(--line); position:sticky; top:0; z-index:5; }
-  header .brand { font-weight:800; letter-spacing:.02em; } header .brand span { color:var(--brand); }
-  header nav a { color:var(--mut); text-decoration:none; font-weight:600; margin-left:18px; } header nav a:hover, header nav a.on { color:var(--ink); }
   main { max-width:1180px; margin:26px auto; padding:0 24px 60px; display:grid; grid-template-columns:1fr 1fr; gap:18px; }
   .card { background:#fff; border:1px solid var(--line); border-radius:16px; padding:20px 22px; box-shadow:0 10px 30px rgba(36,30,110,.05); }
   .card.wide { grid-column:1 / -1; }
@@ -61,10 +58,7 @@ unset($_SESSION['flash_ok_msg'], $_SESSION['flash_error']);
 </style>
 </head>
 <body>
-<header>
-  <div class="brand">OPTMS<span>·</span>RX <span>control</span></div>
-  <nav><a href="/super-admin/dashboard.php">Dashboard</a><a href="/super-admin/clients.php">Clients</a><a href="/super-admin/billing.php">Billing</a><a class="on" href="/super-admin/whatsapp.php">WhatsApp</a><a href="/super-admin/login.php">Logout</a></nav>
-</header>
+<?php include __DIR__ . '/_nav.php'; ?>
 <main>
   <?php if ($okFlash): ?><div class="flash ok"><?= htmlspecialchars($okFlash) ?></div><?php endif; ?>
   <?php if ($errFlash): ?><div class="flash err"><?= htmlspecialchars($errFlash) ?></div><?php endif; ?>

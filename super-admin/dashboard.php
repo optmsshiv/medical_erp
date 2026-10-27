@@ -190,21 +190,7 @@ $nav = 'dashboard';
 </style>
 </head>
 <body>
-<div class="bar">
-    <div class="bar-in">
-        <a class="logo" href="/super-admin/clients.php">
-            <span class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-2.9 8.2-7 9.5-4.1-1.3-7-5.1-7-9.5V6l7-3z"/><path d="M9.2 12.1l2 2 3.9-4.2"/></svg></span>
-            <span><b>OPTMS·RX</b><span class="cap">Super Admin</span></span>
-        </a>
-        <nav class="nav">
-            <a href="/super-admin/dashboard.php" class="<?= $nav === 'dashboard' ? 'on' : '' ?>">Dashboard</a>
-            <a href="/super-admin/clients.php" class="<?= $nav === 'clients' ? 'on' : '' ?>">Clients</a>
-            <a href="/super-admin/billing.php" class="<?= $nav === 'billing' ? 'on' : '' ?>">Billing</a>
-            <a href="/super-admin/whatsapp.php" class="<?= $nav === 'whatsapp' ? 'on' : '' ?>">WhatsApp</a>
-        </nav>
-        <div class="bar-right"><span class="session">Key session</span></div>
-    </div>
-</div>
+<?php include __DIR__ . '/_nav.php'; ?>
 
 <div class="wrap">
     <div class="head">

@@ -2,6 +2,18 @@
 session_start();
 require dirname(__DIR__) . '/config/database.php'; // for env() helper
 
+/* Real sign-out for the portal shell (sidebar → Sign out). */
+if (isset($_GET['logout'])) {
+    $_SESSION = [];
+    if (ini_get('session.use_cookies')) {
+        $c = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000, $c['path'], $c['domain'], $c['secure'], $c['httponly']);
+    }
+    session_destroy();
+    header('Location: /super-admin/login.php');
+    exit;
+}
+
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
