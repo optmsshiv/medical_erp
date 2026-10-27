@@ -89,6 +89,7 @@ window.MF = window.MF || {};
           Object.assign(window.MF_DATA, res.data);
           try { const wr = await MF.Api.get('whoami.php'); MF._me = (wr && wr.data) || {}; } catch (_) { MF._me = null; }
           try { const pr = await MF.Api.get('role-permissions.php'); MF._prms = (pr && pr.data) || []; } catch (_) { MF._prms = null; }
+          try { const nr = await MF.Api.get('nav-state.php'); MF._feats = ((nr && nr.data) || {}).features || null; } catch (_) { MF._feats = null; }
           try {
             const extra = await MF.Api.get('medicines.php');
             mergeMedicineCatalog(window.MF_DATA, extra);
@@ -110,6 +111,7 @@ window.MF = window.MF || {};
      Owner/Admin or privileged roles: full access. Unconfigured menu: allowed
      (fail-open) — a menu is only hidden once an admin has explicitly unticked it. */
   MF.menuAllowed = function (label) {
+    if (MF._feats && MF._feats['menu:' + label] === false) return false;   // super-admin kill-switch — binds owners too
     const me = MF._me;
     if (!me) return true;
     const role = String(me.role || '');

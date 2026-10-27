@@ -3,8 +3,8 @@
  * Shared wiring for super-admin action endpoints:
  * guard, master-DB handle, audit writer, flash+redirect back to clients.php.
  */
-require __DIR__ . '/../_guard.php';
-require dirname(__DIR__, 2) . '/core/Database.php';
+require_once __DIR__ . '/../_guard.php';
+require_once dirname(__DIR__, 2) . '/core/Database.php';
 
 /** The controllable module map. Keep keys stable — tenants read them verbatim. */
 const CLIENT_FEATURES = [
@@ -16,8 +16,81 @@ const CLIENT_FEATURES = [
     'expenses'         => 'Expense tracking',
     'supplier_dues'    => 'Supplier dues',
     'price_bulk'       => 'Bulk price update',
-    // WhatsApp notifications stay out: gated on Meta API approval (deferred roadmap).
 ];
+
+/* ---- Feature control v2: every sidebar menu & submenu, per client. -------
+ * 'menu:<Label>' keys mirror the tenant app verbatim (sidebar / role matrix /
+ * MenuGate). The eight module keys above stay authoritative for the APIs that
+ * already read them; the new page-level keys hide menus (app.js via
+ * nav-state.php) AND 403 the pages (core/MenuGate.php) server-side.
+ * Groups drive the clients.php modal — keep labels in sync with the NAV. */
+const CLIENT_FEATURE_GROUPS = [
+    'Sales' => [
+        'menu:Retail POS'         => ['Retail POS page', 'Counter billing screen'],
+        'menu:Wholesale Billing'  => ['Wholesale Billing page', ''],
+        'menu:Sales Invoices'     => ['Sales Invoices page', ''],
+        'menu:Sales Returns'      => ['Sales Returns page', ''],
+        'menu:Customers'          => ['Customers page', ''],
+        'menu:Customer Dues'      => ['Customer Dues page', ''],
+        'wholesale'               => ['Wholesale module (API)', 'B2B billing engine & credit notes'],
+        'customer_dues'           => ['Customer dues ledger (API)', 'Credit book & reminders'],
+    ],
+    'Purchases' => [
+        'menu:New Purchase'       => ['New Purchase page', ''],
+        'menu:Purchase Invoices'  => ['Purchase Invoices page', ''],
+        'menu:Purchase Returns'   => ['Purchase Returns page', ''],
+        'menu:Suppliers'          => ['Suppliers page', ''],
+        'menu:Supplier Dues'      => ['Supplier Dues page', ''],
+        'supplier_dues'           => ['Supplier dues ledger (API)', 'Outstanding payables'],
+    ],
+    'Inventory' => [
+        'menu:Products / Medicines' => ['Medicine master page', ''],
+        'menu:Stock Overview'       => ['Stock Overview page', ''],
+        'menu:Medicine Ledger'      => ['Medicine Ledger page', ''],
+        'menu:Batch Management'     => ['Batch Management tab', ''],
+        'menu:Expiry Management'    => ['Expiry Management tab', ''],
+        'menu:Low Stock'            => ['Low Stock tab', ''],
+        'menu:Stock Adjustment'     => ['Stock Adjustment tab', ''],
+        'menu:Stock Transfer'       => ['Stock Transfer tab', ''],
+        'price_bulk'                => ['Bulk price update (API)', 'Batch price corrections'],
+    ],
+    'Pharmacy' => [
+        'menu:Prescriptions'        => ['Prescriptions page', ''],
+        'menu:Doctors'              => ['Doctors page', ''],
+        'menu:Manufacturers'        => ['Manufacturers page', ''],
+        'menu:Medicine Categories'  => ['Medicine Categories page', ''],
+        'menu:Schedule / Class'     => ['Schedule / Class page', ''],
+        'menu:Compliance Register'  => ['Compliance Register page', ''],
+        'compliance_export'         => ['Compliance exports', 'H1/X register PDF & Excel'],
+        'rx_inbox'                  => ['Rx inbox', 'Scan & send prescriptions'],
+        'quick_refill'              => ['Quick Refill', 'Repeat previous prescriptions'],
+    ],
+    'Accounts' => [
+        'menu:Payments'   => ['Payments page', ''],
+        'menu:Expenses'    => ['Expenses page', ''],
+        'menu:Cash Book'   => ['Cash Book page', ''],
+        'menu:GST'         => ['GST register page', ''],
+        'expenses'         => ['Expense tracking (API)', 'Shop expense ledger'],
+    ],
+    'Reports' => [
+        'menu:Sales Reports'     => ['Sales Reports', ''],
+        'menu:Purchase Reports'  => ['Purchase Reports', ''],
+        'menu:Stock Reports'     => ['Stock Reports', ''],
+        'menu:Expiry Reports'    => ['Expiry Reports', ''],
+        'menu:Profit Reports'    => ['Profit Reports', ''],
+        'menu:GST Reports'       => ['GST Reports', ''],
+        'menu:Due Reports'       => ['Due Reports', ''],
+    ],
+];
+
+/** Flat key → label view (persistence loops iterate this). */
+function clientFeatureKeys(): array {
+    $flat = CLIENT_FEATURES;
+    foreach (CLIENT_FEATURE_GROUPS as $items) {
+        foreach ($items as $k => $v) { $flat[$k] = $v[0]; }
+    }
+    return $flat;
+}
 
 function master(): PDO { return Database::master(); }
 
@@ -118,6 +191,122 @@ function planPrices(): array {
         }
     } catch (Throwable $e) { }
     return $out;
+}
+
+/* ==================== WhatsApp (Meta Cloud API) ============================
+ * Config lives in billing_settings (wa_* keys). Sends are REST-only — no
+ * webhook, no SDK. Everything degrades to a logged failure; a broken Meta
+ * call must never break billing or onboarding. */
+
+function waCfg(): array {
+    $out = ['enabled' => false, 'token' => '', 'phone_id' => '', 'ver' => 'v21.0',
+            'lang' => 'en', 'cc' => '91', 'tpl_onboard' => '', 'tpl_paid' => '', 'tpl_alert' => ''];
+    try {
+        foreach (master()->query("SELECT `key`, `value` FROM billing_settings WHERE `key` LIKE 'wa_%'")->fetchAll() as $r) {
+            $k = substr((string) $r['key'], 3);
+            if (array_key_exists($k, $out)) { $out[$k] = (string) $r['value']; }
+        }
+    } catch (Throwable $e) { /* no settings table yet → everything off */ }
+    $out['enabled'] = $out['enabled'] === '1';
+    return $out;
+}
+
+/** 9876543210 / +91 9876543210 / 09876543210 → 919876543210. */
+function waNorm(string $raw, string $cc = '91'): string {
+    $d = preg_replace('/\D+/', '', $raw) ?? '';
+    if ($d === '') { return ''; }
+    if (strlen($d) === 10) { return $cc . $d; }
+    if (strlen($d) === 11 && $d[0] === '0') { return $cc . substr($d, 1); }
+    if (strlen($d) === strlen($cc) + 10 && strpos($d, $cc) === 0) { return $d; }
+    if (strlen($d) === strlen($cc) + 11 && $d[strlen($cc)] === '0') { return $cc . substr($d, strlen($cc) + 1); }
+    return $d;
+}
+
+/** Self-migrate: clients.whatsapp + wa_log. Cheap, once per request. */
+function waEnsure(): void {
+    static $done = false;
+    if ($done) { return; }
+    $done = true;
+    try { if (!hasColumn('clients', 'whatsapp')) { master()->query('ALTER TABLE clients ADD COLUMN whatsapp VARCHAR(20) NULL'); } } catch (Throwable $e) { }
+    try {
+        master()->query('CREATE TABLE IF NOT EXISTS wa_log (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            client_id INT NULL,
+            to_number VARCHAR(20) NOT NULL,
+            kind VARCHAR(24) NOT NULL,
+            via VARCHAR(16) NOT NULL DEFAULT "template",
+            ok TINYINT(1) NOT NULL DEFAULT 0,
+            api_id VARCHAR(80) NULL,
+            error VARCHAR(255) NULL,
+            payload TEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY wl_client (client_id), KEY wl_kind (kind)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+    } catch (Throwable $e) { }
+}
+
+function waPost(string $url, array $payload, string $token): array {
+    $body = json_encode($payload, JSON_UNESCAPED_UNICODE);
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true, CURLOPT_HTTPHEADER => ["Authorization: Bearer {$token}", 'Content-Type: application/json'],
+            CURLOPT_POSTFIELDS => $body, CURLOPT_CONNECTTIMEOUT => 8, CURLOPT_TIMEOUT => 15, CURLOPT_SSL_VERIFYPEER => true]);
+        $raw = curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        $err = (string) curl_error($ch);
+        curl_close($ch);
+    } else {
+        $ctx = stream_context_create(['http' => ['method' => 'POST', 'header' => "Authorization: Bearer {$token}\r\nContent-Type: application/json\r\n",
+            'content' => $body, 'timeout' => 15, 'ignore_errors' => true]]);
+        $raw = @file_get_contents($url, false, $ctx);
+        $code = 0;
+        foreach ((array) ($http_response_header ?? []) as $h) { if (preg_match('#^HTTP/\S+ (\d{3})#', $h, $m)) { $code = (int) $m[1]; break; } }
+        $err = $raw === false ? 'transport failed' : '';
+    }
+    $json = is_string($raw) ? json_decode($raw, true) : null;
+    if ($code >= 200 && $code < 300 && is_array($json)) {
+        return ['ok' => true, 'api_id' => (string) ($json['messages'][0]['id'] ?? ''), 'payload' => $payload];
+    }
+    $why = $err !== '' ? $err : (is_array($json) ? (string) ($json['error']['message'] ?? json_encode($json)) : substr((string) $raw, 0, 160));
+    return ['ok' => false, 'error' => substr($why . ' (HTTP ' . $code . ')', 0, 240), 'payload' => $payload];
+}
+
+/** One entry point for every send. Template kinds: onboard · paid · alert · test. */
+function waSend(?int $clientId, string $to, string $kind, array $params = [], string $text = '', string $tplOverride = ''): array {
+    $cfg = waCfg();
+    if (!$cfg['enabled'] || $cfg['token'] === '' || $cfg['phone_id'] === '') {
+        return ['ok' => false, 'skipped' => true, 'error' => 'WhatsApp not configured/enabled'];
+    }
+    waEnsure();
+    $num = waNorm($to, $cfg['cc']);
+    if ($num === '') { return ['ok' => false, 'error' => 'No valid WhatsApp number on file']; }
+    $tpl = trim($tplOverride) !== '' ? trim($tplOverride) : (string) ($cfg['tpl_' . $kind] ?? '');
+    $url = "https://graph.facebook.com/{$cfg['ver']}/{$cfg['phone_id']}/messages";
+    if ($tpl !== '') {
+        $comp = [];
+        $clean = [];
+        foreach (array_slice($params, 0, 10) as $pv) { $clean[] = ['type' => 'text', 'text' => mb_substr((string) $pv, 0, 300)]; }
+        if ($clean) { $comp[] = ['type' => 'body', 'parameters' => $clean]; }
+        $payload = ['messaging_product' => 'whatsapp', 'to' => $num, 'type' => 'template',
+                    'template' => ['name' => $tpl, 'language' => ['code' => $cfg['lang']]]];
+        if ($comp) { $payload['template']['components'] = $comp; }
+        $via = 'template';
+    } elseif (trim($text) !== '') {
+        $payload = ['messaging_product' => 'whatsapp', 'to' => $num, 'type' => 'text', 'text' => ['body' => mb_substr(trim($text), 0, 1000)]];
+        $via = 'session';
+    } else {
+        return ['ok' => false, 'error' => "No template configured for kind '{$kind}' and no free text given"];
+    }
+    $res = waPost($url, $payload, $cfg['token']);
+    try {
+        master()->query('INSERT INTO wa_log (client_id, to_number, kind, via, ok, api_id, error, payload) VALUES ('
+            . ($clientId !== null ? (int) $clientId : 'NULL') . ', ' . master()->quote($num) . ', ' . master()->quote($kind) . ', '
+            . master()->quote($via) . ', ' . ($res['ok'] ? 1 : 0) . ', '
+            . (isset($res['api_id']) && $res['api_id'] !== '' ? master()->quote($res['api_id']) : 'NULL') . ', '
+            . (isset($res['error']) && $res['error'] !== '' ? master()->quote(substr($res['error'], 0, 240)) : 'NULL') . ', '
+            . master()->quote(mb_substr(json_encode($payload, JSON_UNESCAPED_UNICODE) ?: '', 0, 1200)) . ')');
+    } catch (Throwable $e) { /* logging must not sink the send */ }
+    return $res;
 }
 
 /** One invoice row per client per covered period — UNIQUE(client_id, period_from) makes this idempotent. */

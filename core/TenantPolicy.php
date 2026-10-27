@@ -55,6 +55,11 @@ final class TenantPolicy
         self::$cache = null;
         try {
             $id = (int) ($tenant['id'] ?? $tenant['client_id'] ?? 0);
+            if ($id <= 0) {
+                // Page context carries no resolved row — identify by host, same as enforce().
+                $byHost = self::bootstrapByHost();
+                $id = (int) ($byHost['id'] ?? 0);
+            }
             if ($id <= 0) { return null; }
             $row = Database::master()->query(
                 "SELECT status, trial_ends_at FROM clients WHERE id = {$id} LIMIT 1"

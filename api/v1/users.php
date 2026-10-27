@@ -164,6 +164,14 @@ switch ($method) {
             Json::ok(['data' => ['tempPassword' => $temp, 'emailed' => $emailed, 'email' => $target['email'] ?? '']]);
         }
 
+        /* User management is an owner/admin privilege — the same trust the
+           Settings ▸ Users tab assumes. The password/OTP actions handled
+           above stay open to every signed-in user (they are self-service). */
+        $meU = Auth::user();
+        $roleU = strtolower(trim((string) ($meU['role'] ?? $_SESSION['role'] ?? $_SESSION['user_role'] ?? '')));
+        if (!($roleU === '' || strpos($roleU, 'owner') !== false || strpos($roleU, 'admin') !== false)) {
+            Json::error('User management is restricted to Owner / Admin.', 403);
+        }
         $name = trim($input['name'] ?? '');
         $email = trim($input['email'] ?? '');
 
@@ -201,6 +209,16 @@ switch ($method) {
         $user = User::find($id);
         if (!$user) {
             Json::error('User not found.', 404);
+        }
+        /* Non-owners may touch exactly one thing: their own profile photo. */
+        $meP = Auth::user();
+        $roleP = strtolower(trim((string) ($meP['role'] ?? $_SESSION['role'] ?? $_SESSION['user_role'] ?? '')));
+        if (!($roleP === '' || strpos($roleP, 'owner') !== false || strpos($roleP, 'admin') !== false)) {
+            $selfId = (int) ($meP['id'] ?? $_SESSION['user_id'] ?? 0);
+            $ownOnly = ((int) $id === $selfId) && !array_diff(array_keys($input), ['id', 'avatar']);
+            if (!$ownOnly) {
+                Json::error('You may only change your own profile photo.', 403);
+            }
         }
 
         /* (a) status lifecycle — unchanged behavior from the original deploy */
