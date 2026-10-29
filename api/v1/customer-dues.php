@@ -18,9 +18,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
  * Reads v_customer_dues from database/migrations/2026_09_26_customer_dues.sql.
  * Falls back to the same joins if the views have not been created yet.
  *
- * Due is the stored sale balance. A payment already saved on the bill
- * (amount_paid) is not subtracted again. Only customer payments above that
- * reduce the outstanding amount.
+ * Due is the stored sale balance MINUS account-level receipts. Counter
+ * settlements are already baked into balance_due; the payments table never
+ * mirrors them (payments.php is its only writer), so receipts subtract whole.
  */
 function queryRows(string $sql): array
 {
@@ -132,11 +132,13 @@ function ageDays(string $date): ?int
 
 function outstanding(array $row): float
 {
+    // Two disjoint books: bill-level collections live on the sales/purchase row and
+    // are already reflected in balance_due, while the payments table holds ONLY
+    // account-level receipts (its single writer is api/v1/payments.php POST).
+    // Neither book mirrors the other, so due = open balance - receipts, floored at 0.
     $balance = money($row, 'balance_due');
-    $paidOnBills = money($row, 'amount_paid');
     $payments = money($row, 'payments');
-    $extra = max(0, $payments - $paidOnBills);
-    return round(max(0, $balance - $extra), 2);
+    return round(max(0, $balance - $payments), 2);
 }
 
 function positionOf(array $row): string
@@ -149,7 +151,7 @@ function positionOf(array $row): string
     if ($days !== null && $days > 30) {
         return 'Overdue';
     }
-    if (money($row, 'amount_paid') > 0.009) {
+    if (money($row, 'amount_paid') > 0.009 || money($row, 'payments') > 0.009) {
         return 'Partial';
     }
     return 'Due';
@@ -178,8 +180,7 @@ function shapeCustomer(array $row): array
         'age_days' => ageDays($oldest),
     ];
     $shaped['outstanding'] = outstanding($shaped);
-    $extraPaid = max(0, money($shaped, 'payments') - money($shaped, 'amount_paid'));
-    $shaped['advance'] = round(max(0, $extraPaid - money($shaped, 'balance_due')), 2);
+    $shaped['advance'] = round(max(0, money($shaped, 'payments') - money($shaped, 'balance_due')), 2);
     $shaped['position'] = positionOf($shaped);
     if ($shaped['advance'] > 0.009 && $shaped['outstanding'] <= 0.009) {
         $shaped['position'] = 'Advance';

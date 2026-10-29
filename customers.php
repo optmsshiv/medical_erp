@@ -2,6 +2,7 @@
 session_start();
 require __DIR__ . '/middleware/tenant.php';
 require __DIR__ . '/middleware/auth.php';
+if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/MenuGate.php'; MenuGate::enforce(); }  // roles matrix + platform kill-switch — typed URLs obey
 ?>
 <!doctype html>
 <html lang="en">
@@ -772,7 +773,7 @@ require __DIR__ . '/middleware/auth.php';
             c.due = Math.round((+r.outstanding || 0) * 100) / 100;
             c.advance = Math.round((+r.advance || 0) * 100) / 100;
             if (r.billed != null) c.totalSales = Math.round((+r.billed || 0) * 100) / 100;
-            c.paid = Math.round(Math.max(+r.amount_paid || 0, +r.payments || 0) * 100) / 100;
+            c.paid = Math.round(((+r.amount_paid || 0) + (+r.payments || 0)) * 100) / 100;
           });
           renderKpis(); render();
         } catch (e) { /* local figures remain */ }

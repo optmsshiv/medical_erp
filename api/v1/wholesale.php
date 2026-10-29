@@ -221,15 +221,15 @@ try {
     if ($paymentMode === 'credit') {
         $limit = (float) ($customer['credit_limit'] ?? 0);
         if ($limit > 0) {
-            // Outstanding identical to the dues-ledger formula: bill balances, minus
-            // only the part of customer payments above bill-level collections.
+            // Outstanding identical to the dues-ledger formula: open bill balances
+            // minus every account-level receipt (payments never mirror bill collections).
             $s1 = $pdo->prepare('SELECT COALESCE(SUM(balance_due),0) AS bal, COALESCE(SUM(amount_paid),0) AS paid FROM sales WHERE customer_id = :id');
             $s1->execute(['id' => $customerId]);
             $b = $s1->fetch() ?: ['bal' => 0, 'paid' => 0];
             $s2 = $pdo->prepare("SELECT COALESCE(SUM(amount),0) AS pays FROM payments WHERE party_type = 'customer' AND party_id = :id");
             $s2->execute(['id' => $customerId]);
             $pay = (float) ($s2->fetch()['pays'] ?? 0);
-            $outstanding = max(0.0, (float) $b['bal'] - max(0.0, $pay - (float) $b['paid']));
+            $outstanding = max(0.0, (float) $b['bal'] - $pay);
             $projected   = $outstanding + $grand;
             if ($projected > $limit + 0.004 && !$creditAck) {
                 throw new RuntimeException(sprintf(

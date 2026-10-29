@@ -2,6 +2,7 @@
 session_start();
 require __DIR__ . '/middleware/tenant.php';
 require __DIR__ . '/middleware/auth.php';
+if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/MenuGate.php'; MenuGate::enforce(); }  // roles matrix + platform kill-switch — typed URLs obey
 ?>
 <!doctype html>
 <html lang="en">
@@ -166,18 +167,18 @@ require __DIR__ . '/middleware/auth.php';
       }
 
       function outstanding(row) {
+        // Disjoint books: receipt ledger minus open bill balances; bills'
+        // counter settlements are already inside balance_due and must not be netted again.
         const balance = Number(row.balance_due) || 0;
-        const paidOnBills = Number(row.amount_paid) || 0;
         const payments = Number(row.payments) || 0;
-        return Math.max(0, Math.round((balance - Math.max(0, payments - paidOnBills)) * 100) / 100);
+        return Math.max(0, Math.round((balance - payments) * 100) / 100);
       }
 
-      /* Advance = money already in the ledger beyond what bills owe.
+      /* Advance = receipts beyond what the bills owe, parked on the account.
          Future bills auto-absorb it (outstanding math already counts it). */
       function advOf(r) {
         if (r.advance != null) return Number(r.advance) || 0;
-        const extra = Math.max(0, (Number(r.payments) || 0) - (Number(r.amount_paid) || 0));
-        return Math.max(0, Math.round((extra - (Number(r.balance_due) || 0)) * 100) / 100);
+        return Math.max(0, Math.round(((Number(r.payments) || 0) - (Number(r.balance_due) || 0)) * 100) / 100);
       }
 
       function positionOf(row) {
@@ -185,7 +186,7 @@ require __DIR__ . '/middleware/auth.php';
         if (due <= 0.009) return advOf(row) > 0.009 ? 'Advance' : 'Settled';
         const days = row.age_days == null ? ageDays(row.oldest_open) : Number(row.age_days);
         if (days != null && days > 30) return 'Overdue';
-        if ((Number(row.amount_paid) || 0) > 0.009) return 'Partial';
+        if ((Number(row.amount_paid) || 0) > 0.009 || (Number(row.payments) || 0) > 0.009) return 'Partial';
         return 'Due';
       }
 
