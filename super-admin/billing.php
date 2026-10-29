@@ -244,6 +244,11 @@ $nav = 'billing';
             <form method="POST" action="/super-admin/actions/billing-action.php" onsubmit="return confirm('Generate invoices for this cycle? Existing covered periods are skipped automatically.');">
                 <input type="hidden" name="act" value="generate"><button type="submit" class="btn">Generate invoices</button>
             </form>
+            <?php if (!empty($overdueN)): ?>
+            <form method="POST" action="/super-admin/actions/billing-action.php" onsubmit="return confirm('Send a WhatsApp reminder for every overdue invoice (max 25, once per invoice per day)?');">
+                <input type="hidden" name="act" value="remind_overdue"><button type="submit" class="btn" style="background:var(--warn-soft); color:var(--warn); border-color:#EFD9A9">Remind <?= (int) $overdueN ?> overdue</button>
+            </form>
+            <?php endif; ?>
         </div>
         <form method="POST" action="/super-admin/actions/billing-action.php">
             <input type="hidden" name="act" value="save_settings">
@@ -317,6 +322,7 @@ $nav = 'billing';
                         <a class="btn-ghost" href="/super-admin/billing-invoice.php?invoice_id=<?= (int) $i['id'] ?>&print=1" target="_blank" title="Print / save PDF">PDF</a>
                         <?php if ($i['status'] === 'unpaid'): ?>
                             <form method="POST" action="/super-admin/actions/billing-action.php" style="display:inline"><input type="hidden" name="act" value="pay"><input type="hidden" name="invoice_id" value="<?= (int) $i['id'] ?>"><button class="btn-ghost ok">Mark paid</button></form>
+                            <form method="POST" action="/super-admin/actions/billing-action.php" style="display:inline" onsubmit="return confirm('WhatsApp a dues reminder for <?= htmlspecialchars(addslashes($i['invoice_no'])) ?> to <?= htmlspecialchars(addslashes($i['client_name'])) ?>?');"><input type="hidden" name="act" value="remind"><input type="hidden" name="invoice_id" value="<?= (int) $i['id'] ?>"><button class="btn-ghost" title="WhatsApp reminder — once per invoice per day">Remind</button></form>
                             <form method="POST" action="/super-admin/actions/billing-action.php" style="display:inline" onsubmit="return confirm('Void <?= htmlspecialchars(addslashes($i['invoice_no'])) ?>? Mistake-only — the record stays.');"><input type="hidden" name="act" value="void"><input type="hidden" name="invoice_id" value="<?= (int) $i['id'] ?>"><button class="btn-ghost danger">Void</button></form>
                         <?php elseif ($i['status'] === 'paid'): ?>
                             <span class="mut">paid <?= $i['paid_at'] ? htmlspecialchars(date('d M Y', strtotime($i['paid_at']))) : '' ?></span>

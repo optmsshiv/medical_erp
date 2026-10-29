@@ -3,6 +3,60 @@
 require __DIR__ . '/_lib.php';
 
 function bills(): never { backTo('/super-admin/billing.php'); }
+
+/**
+ * WhatsApp dues reminder for ONE unpaid invoice row (joined with its client;
+ * client_status + due_date expected). Dedupe: once per invoice per day, counted
+ * from wa_log payloads (the invoice number is embedded in every message).
+ * Returns ['ok' => bool, 'why' => string]. Never throws — billing UX first.
+ */
+function remindInvoice(array $i): array
+{
+    $to = trim((string) ($i['whatsapp'] ?? ''));
+    if ($to === '') { $to = trim((string) ($i['phone'] ?? '')); }
+    if ($to === '') { return ['ok' => false, 'why' => 'no number on file']; }
+    $invNo = (string) ($i['invoice_no'] ?? '');
+    try {
+        $n = master()->query("SELECT COUNT(*) n FROM wa_log WHERE kind = 'due_reminder' AND created_at >= CURDATE() AND payload LIKE "
+            . master()->quote('%' . $invNo . '%'))->fetch();
+        if ($n && (int) ($n['n'] ?? 0) > 0) { return ['ok' => false, 'why' => 'already reminded today']; }
+    } catch (Throwable $e) { /* no log table yet → dedupe skipped, send still one call */ }
+
+    $dueTs = strtotime((string) ($i['due_date'] ?? ''));
+    $dueTxt = $dueTs ? date('d M Y', $dueTs) : 'now';
+    $amt = '₹' . number_format((float) ($i['amount'] ?? 0), 2);
+    $overdue = $dueTs && $dueTs < strtotime(date('Y-m-d'));
+    $days = $overdue ? (int) floor((time() - $dueTs) / 86400) : 0;
+    $msg = $overdue
+        ? 'Invoice ' . $invNo . ' of ' . $amt . ' is overdue by ' . $days . ' day(s) (was due ' . $dueTxt . ').'
+        : 'Invoice ' . $invNo . ' of ' . $amt . ' is due on ' . $dueTxt . '.';
+    $upi = trim(billingSetting('upi_id', ''));
+    if ($upi !== '') {
+        $msg .= ' Pay via UPI ' . $upi;
+        $note = trim(billingSetting('pay_note', ''));
+        if ($note !== '') { $msg .= ' — ' . $note; }
+        $msg .= '.';
+    }
+    if (strtolower((string) ($i['client_status'] ?? '')) === 'suspended') {
+        $msg .= ' Your OPTMS-RX console is currently suspended — payment restores access immediately.';
+    } else {
+        $msg .= ' Your OPTMS-RX service continues uninterrupted once received. Thank you!';
+    }
+    waEnsure();
+    $r = waSend((int) ($i['client_id'] ?? 0), $to, 'alert',
+                [(string) ($i['name'] ?? 'there'), mb_substr($msg, 0, 300), date('d M Y')], $msg);
+    return ['ok' => !empty($r['ok']), 'why' => empty($r['ok']) ? substr((string) ($r['error'] ?? 'send failed'), 0, 140) : 'sent'];
+}
+
+/** Rows for the reminder queries — one place, both actions. */
+function remindRowsSql(string $where): string
+{
+    return "SELECT ci.id, ci.client_id, ci.invoice_no, ci.amount, ci.due_date,
+                   c.name, c.whatsapp, c.phone, c.status AS client_status
+              FROM client_invoices ci JOIN clients c ON c.id = ci.client_id
+             WHERE {$where}
+             ORDER BY ci.due_date ASC, ci.id ASC";
+}
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { bills(); }
 
 $act = trim((string) ($_POST['act'] ?? ''));
@@ -89,7 +143,52 @@ try {
                     }
                 }
             }
+            /* WhatsApp receipt when a payment is marked collected — best-effort,
+               billing itself already committed. */
+            if ($act === 'pay' && $row) {
+                try {
+                    waEnsure();
+                    $inv2 = master()->query(
+                        "SELECT ci.invoice_no, ci.amount, ci.period_from, ci.period_to, c.name, c.whatsapp
+                           FROM client_invoices ci JOIN clients c ON c.id = ci.client_id
+                          WHERE ci.id = {$inv} LIMIT 1")->fetch();
+                    if ($inv2 && (string) ($inv2['whatsapp'] ?? '') !== '') {
+                        $r = waSend((int) $row['client_id'], (string) $inv2['whatsapp'], 'paid', [
+                            (string) $inv2['name'], (string) $inv2['invoice_no'],
+                            '₹' . number_format((float) $inv2['amount'], 2),
+                            date('d M Y', strtotime((string) $inv2['period_from'])) . '–' . date('d M Y', strtotime((string) $inv2['period_to'])),
+                        ], 'Payment received — invoice ' . $inv2['invoice_no'] . ' of ₹' . number_format((float) $inv2['amount'], 2)
+                          . ' for ' . date('d M Y', strtotime((string) $inv2['period_from'])) . '–' . date('d M Y', strtotime((string) $inv2['period_to'])) . '. Thank you! Your OPTMS-RX console stays active.');
+                        audit('WA_RECEIPT', (int) $row['client_id'], (string) $row['invoice_no'] . ' → ' . ($r['ok'] ? 'receipt sent' : ($r['error'] ?? 'failed')));
+                    }
+                } catch (Throwable $waErr) { /* never breaks billing */ }
+            }
             flashOk('Invoice updated.');
+            bills();
+
+        /* ---------- dues reminders (WhatsApp) ---------- */
+        case 'remind':
+            $inv = (int) ($_POST['invoice_id'] ?? 0);
+            $i = master()->query(remindRowsSql("ci.id = {$inv} AND ci.status = 'unpaid'") . ' LIMIT 1')->fetch();
+            if (!$i) { flashErr('Only unpaid invoices can be reminded.'); bills(); }
+            $res = remindInvoice($i);
+            audit('WA_DUE_REMIND', (int) $i['client_id'], (string) $i['invoice_no'] . ' → ' . $res['why']);
+            if ($res['ok']) { flashOk('WhatsApp reminder sent to ' . $i['invoice_no'] . '.'); }
+            else { flashErr('Reminder not sent: ' . $res['why'] . '.'); }
+            bills();
+
+        case 'remind_overdue':
+            $qt = master()->quote($today);
+            $rows = master()->query(remindRowsSql("ci.status = 'unpaid' AND ci.due_date < {$qt}") . ' LIMIT 25')->fetchAll();
+            if (!$rows) { flashOk('Nothing overdue — no reminders sent.'); bills(); }
+            $sent = 0; $skipped = [];
+            foreach ($rows as $i) {
+                $res = remindInvoice($i);
+                if ($res['ok']) { $sent++; } else { $skipped[] = $i['invoice_no'] . ' (' . $res['why'] . ')'; }
+            }
+            audit('WA_DUE_BULK', null, 'sent=' . $sent . ' skipped=' . count($skipped));
+            $note = $skipped ? ' · skipped: ' . implode(', ', array_slice($skipped, 0, 6)) : '';
+            flashOk($sent . ' reminder(s) sent' . $note);
             bills();
 
         /* ---------- plan pricing ---------- */
