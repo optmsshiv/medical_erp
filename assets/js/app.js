@@ -457,6 +457,7 @@ window.MF = window.MF || {};
         { label: 'Users', icon: 'person-badge', href: 'settings.php?tab=users' },
         { label: 'Roles & Permissions', icon: 'shield-lock', href: 'settings.php?tab=roles' },
         { label: 'Store Settings', icon: 'shop', href: 'settings.php?tab=store' },
+        { label: 'WhatsApp', icon: 'whatsapp', page: 'whatsapp', href: 'whatsapp.php' },
         { label: 'Invoice Settings', icon: 'file-earmark-text', href: 'settings.php?tab=invoice' },
         { label: 'Tax Settings', icon: 'calculator', href: 'settings.php?tab=tax' },
         { label: 'Audit Logs', icon: 'journal-check', href: 'settings.php?tab=audit' },

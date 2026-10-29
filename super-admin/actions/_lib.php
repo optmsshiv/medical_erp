@@ -84,6 +84,9 @@ const CLIENT_FEATURE_GROUPS = [
         'menu_gst_reports' => ['GST Reports', ''],
         'menu_due_reports' => ['Due Reports', ''],
     ],
+    'Administration' => [
+        'menu_whatsapp' => ['WhatsApp page', 'Customer numbers & due-reminder control'],
+    ],
 ];
 
 /** Checkbox presence that survives PHP's name mangling (dots/spaces → '_'). */

@@ -1,0 +1,932 @@
+<?php
+session_start();
+require __DIR__ . '/middleware/tenant.php';
+require __DIR__ . '/middleware/auth.php';
+if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/MenuGate.php'; MenuGate::enforce(); }  // roles matrix + platform kill-switch — typed URLs obey
+?>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings · OPTMS-RX</title>
+  <link rel="icon" href="assets/images/logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="assets/css/style.css" rel="stylesheet">
+  <style>
+    .mf-avatar { overflow:hidden; }
+    .mf-avatar img { width:100%; height:100%; object-fit:cover; display:block; }
+    .st-grp td { background:#F6F8FA; font-weight:700; font-size:.7rem; text-transform:uppercase; letter-spacing:.07em; color:#64748B; }
+    .perm-check { transform:scale(1.15); cursor:pointer; accent-color:#176B5B; }
+    .perm-check:disabled { cursor:not-allowed; opacity:.55; }
+    .avatar-ring { position:relative; display:inline-block; }
+    .avatar-cam { position:absolute; right:-2px; bottom:-2px; width:24px; height:24px; border-radius:50%; background:#fff; border:1px solid #E2E7EF; color:#176B5B; font-size:.62rem; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+    .avatar-cam:hover { background:#E9F5F1; }
+    .set-sec { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:#64748B; margin:1.05rem 0 .15rem; }
+    .set-sec:first-child { margin-top:0; }
+    .mf-upper { text-transform:uppercase; letter-spacing:.05em; }
+    .mf-upper::placeholder { text-transform:uppercase; }
+    .mf-upper:invalid { border-color:#E5484D !important; box-shadow:0 0 0 3px rgba(229,72,77,.10) !important; }
+    .pp-step { flex:1; text-align:center; font-size:.64rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#94A3B8; position:relative; padding-top:1.6rem; }
+    .pp-step::before { content:attr(data-n); position:absolute; top:0; left:50%; transform:translateX(-50%); width:26px; height:26px; border-radius:50%; background:#EDF1F6; color:#64748B; display:flex; align-items:center; justify-content:center; font-size:.74rem; font-weight:800; }
+    .pp-step.on { color:#176B5B; }
+    .pp-step.on::before { background:#176B5B; color:#fff; }
+    .pp-step.done { color:#0CA678; }
+    .pp-step.done::before { content:'\2713'; background:#D9F0E7; color:#0CA678; }
+    .pp-step + .pp-step::after { content:''; position:absolute; top:12px; left:calc(-50% + 17px); right:calc(50% + 17px); height:2px; background:#EDF1F6; }
+    .pp-otp { flex:1; min-width:0; height:52px; padding:0; text-align:center; font-size:1.3rem; font-weight:700; border:1px solid #D9E1EC; border-radius:10px; color:#0F172A; }
+    .pp-otp:focus { outline:none; border-color:#176B5B; box-shadow:0 0 0 3px rgba(23,107,91,.12); }
+    .pw-bar { height:6px; border-radius:99px; background:#EDF1F6; overflow:hidden; }
+    .pw-bar i { display:block; height:100%; width:0; border-radius:99px; background:#E5484D; transition:.25s; }
+  </style>
+</head>
+<body data-page="settings">
+  <div class="mf-layout">
+    <aside class="mf-sidebar" id="mf-sidebar"></aside>
+    <div class="mf-body">
+      <header class="mf-topbar" id="mf-topbar"></header>
+      <main class="mf-main">
+
+        <div class="page-head">
+          <div>
+            <h1 class="page-title"><i class="bi bi-gear me-2 text-success"></i>Administration &amp; Settings</h1>
+            <p class="page-sub">Store profile · invoice &amp; tax configuration · users, roles and audit trail</p>
+          </div>
+        </div>
+
+        <ul class="nav nav-pills-mf mb-3" id="setTabs">
+          <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#st-store" data-tab="store"><i class="bi bi-shop"></i>Store Settings</button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#st-invoice" data-tab="invoice"><i class="bi bi-file-earmark-sliders"></i>Invoice Settings</button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#st-tax" data-tab="tax"><i class="bi bi-calculator"></i>Tax Settings</button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#st-users" data-tab="users"><i class="bi bi-person-badge"></i>Users</button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#st-roles" data-tab="roles"><i class="bi bi-shield-lock"></i>Roles &amp; Permissions</button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#st-audit" data-tab="audit"><i class="bi bi-journal-check"></i>Audit Logs</button></li>
+        </ul>
+
+        <div class="tab-content">
+
+          <!-- STORE -->
+          <div class="tab-pane fade show active" id="st-store">
+            <div class="card-mf" style="max-width:860px">
+              <div class="card-head"><h2 class="card-title"><i class="bi bi-shop"></i>Store Profile</h2></div>
+              <div class="p-3">
+                <div class="set-sec"><i class="bi bi-shop me-1"></i>Identity</div>
+                <div class="row g-3">
+                  <div class="col-md-8"><label class="form-label">Store Name</label><input class="form-control" id="setStoreName"></div>
+                  <div class="col-md-4"><label class="form-label">Store Code</label><input class="form-control" id="setStoreCode" readonly></div>
+                  <div class="col-md-8"><label class="form-label">Address</label><input class="form-control" id="setStoreAddress"></div>
+                  <div class="col-md-4"><label class="form-label"><i class="bi bi-tag me-1 text-success"></i>Store Type</label>
+                    <select class="form-select" id="setStoreType">
+                      <option value="retail">Retail pharmacy (counter)</option>
+                      <option value="wholesale">Wholesale / distributor</option>
+                      <option value="hybrid">Retail + wholesale (hybrid)</option>
+                      <option value="hospital">Hospital / institutional</option>
+                      <option value="echain">E-pharmacy / chain outlet</option>
+                    </select></div>
+                </div>
+                <div class="set-sec"><i class="bi bi-person-lines-fill me-1"></i>Contact</div>
+                <div class="row g-3">
+                  <div class="col-md-4"><label class="form-label">Phone</label><input class="form-control" id="setStorePhone"></div>
+                  <div class="col-md-8"><label class="form-label"><i class="bi bi-envelope me-1 text-success"></i>Email</label><input type="email" class="form-control" id="setStoreEmail" placeholder="store@example.com"></div>
+                  <div class="col-md-4"><label class="form-label"><i class="bi bi-geo-alt me-1 text-success"></i>City</label><input class="form-control" id="setStoreCity"></div>
+                  <div class="col-md-8"><label class="form-label"><i class="bi bi-map me-1 text-success"></i>State</label><select class="form-select" id="setStoreState"></select></div>
+                </div>
+                <div class="set-sec"><i class="bi bi-patch-check me-1"></i>Tax &amp; Licences</div>
+                <div class="row g-3">
+                  <div class="col-md-6"><label class="form-label">GSTIN</label><input class="form-control mf-upper" id="setStoreGstin" maxlength="15" pattern="[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]{3}" placeholder="22AAAAA0000A1Z5" autocomplete="off"></div>
+                  <div class="col-md-6"><label class="form-label">PAN</label><input class="form-control mf-upper" id="setStorePan" maxlength="10" pattern="[A-Z]{5}[0-9]{4}[A-Z]" placeholder="AAAAA0000A" autocomplete="off"></div>
+                  <div class="col-md-6"><label class="form-label">Drug License (20B)</label><input class="form-control" id="setStoreDl20b"></div>
+                  <div class="col-md-6"><label class="form-label">Drug License (21B)</label><input class="form-control" id="setStoreDl21b"></div>
+                  <div class="col-md-6"><label class="form-label">Financial Year Start</label>
+                    <select class="form-select" id="setFyStart"><option value="April">April</option><option value="January">January</option></select></div>
+                </div>
+                <div class="set-sec"><i class="bi bi-bank me-1"></i>Bank A/C — for invoices</div>
+                <div class="alert alert-light border small mb-2"><i class="bi bi-info-circle me-1"></i>Fill <b>Bank Name</b> + <b>A/C No.</b> and wholesale invoices print a <b>Payment — Bank A/C</b> block automatically (email also joins the Help line). Leave blank and invoices stay exactly as they are.</div>
+                <div class="row g-3">
+                  <div class="col-md-6"><label class="form-label">Bank Name</label><input class="form-control" id="setBankName" placeholder="e.g. HDFC Bank"></div>
+                  <div class="col-md-6"><label class="form-label">Account Number</label><input class="form-control" id="setBankAccount" inputmode="numeric" autocomplete="off" maxlength="20"></div>
+                  <div class="col-md-6"><label class="form-label">Confirm Account Number</label><input class="form-control" id="setBankAccountC" inputmode="numeric" autocomplete="off" maxlength="20"></div>
+                  <div class="col-md-3"><label class="form-label">IFSC</label><input class="form-control mf-upper" id="setBankIfsc" maxlength="11" pattern="[A-Z]{4}0[A-Z0-9]{6}" placeholder="HDFC0001234" autocomplete="off"></div>
+                  <div class="col-md-3"><label class="form-label">Branch</label><input class="form-control" id="setBankBranch"></div>
+                </div>
+                <div class="d-flex gap-2 mt-4">
+                  <button class="btn btn-mf" data-save-group="store"><i class="bi bi-check2 me-1"></i>Save Changes</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- INVOICE -->
+          <div class="tab-pane fade" id="st-invoice">
+            <div class="card-mf" style="max-width:860px">
+              <div class="card-head"><h2 class="card-title"><i class="bi bi-file-earmark-sliders"></i>Invoice Configuration</h2><div class="card-tools"><span class="badge badge-soft-success">printing · billing · branding</span></div></div>
+              <div class="p-3">
+                <div class="alert alert-light border small mb-3"><i class="bi bi-info-circle me-1"></i><b>Default Print Type</b> is picked up by POS and wholesale billing on page load — set it once and every print uses it. <b>Auto-print</b> off means no print dialog after completing a sale (manual Print stays available). Invoice numbers are always system-generated (INV-/WS- + running number).</div>
+                <div class="row g-3">
+                  <div class="col-md-4"><label class="form-label"><i class="bi bi-cash-stack me-1 text-success"></i>Default Payment Mode</label>
+                    <select class="form-select" id="setDefaultPayment"><option>Cash</option><option>UPI</option><option>Card</option></select></div>
+                  <div class="col-md-4"><label class="form-label"><i class="bi bi-scales me-1 text-success"></i>Rounding</label>
+                    <select class="form-select" id="setRounding"><option>Nearest Rupee</option><option>Round Down</option><option>No Rounding</option></select></div>
+                  <div class="col-md-4"><label class="form-label"><i class="bi bi-files me-1 text-success"></i>Copies on Print</label>
+                    <select class="form-select" id="setCopies"><option>Original Only</option><option>Original + Duplicate</option><option>Triplicate</option></select></div>
+                  <div class="col-md-4"><label class="form-label"><i class="bi bi-printer me-1 text-success"></i>Default Print Type</label>
+                    <select class="form-select" id="setPrintType">
+                      <option value="a4">A4 invoice (full page)</option>
+                      <option value="thermal80">Thermal receipt — 80mm</option>
+                      <option value="thermal58">Thermal receipt — 58mm</option>
+                    </select></div>
+                  <div class="col-12"><label class="form-label"><i class="bi bi-chat-square-text me-1 text-success"></i>Invoice Footer Note</label><textarea class="form-control" rows="2" id="setFooterNote"></textarea></div>
+                  <div class="col-12"><label class="form-label"><i class="bi bi-file-earmark-text me-1 text-success"></i>Terms &amp; Conditions (wholesale)</label><textarea class="form-control" rows="2" id="setWsTerms"></textarea></div>
+                </div>
+                <div class="form-check form-switch mt-3">
+                  <input class="form-check-input" type="checkbox" id="setAutoPrint">
+                  <label class="form-check-label small" for="setAutoPrint">Auto-print invoice after completing sale</label>
+                </div>
+                <div class="d-flex gap-2 mt-4">
+                  <button class="btn btn-mf" data-save-group="invoice"><i class="bi bi-check2 me-1"></i>Save Changes</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAX -->
+          <div class="tab-pane fade" id="st-tax">
+            <div class="card-mf" style="max-width:860px">
+              <div class="card-head"><h2 class="card-title"><i class="bi bi-calculator"></i>Tax / GST Configuration</h2></div>
+              <div class="p-3">
+                <div class="alert alert-light border small mb-3"><i class="bi bi-info-circle me-1"></i>Actual GST rates are set per medicine in Medicine Master. These are reference defaults only. <b>GSTIN and PAN type in any case — they are capitalised as you enter and saved in capitals</b>; a red ring means the format does not match the official 15-digit GSTIN / 10-character PAN pattern.</div>
+                <div class="row g-3 mb-3">
+                  <div class="col-md-4"><label class="form-label"><i class="bi bi-hash me-1 text-success"></i>GSTIN <span class="small text-2">(auto-caps)</span></label><input class="form-control mf-upper" id="setTaxGstin" maxlength="15" pattern="[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]{3}" placeholder="22AAAAA0000A1Z5" autocomplete="off"></div>
+                  <div class="col-md-4"><label class="form-label"><i class="bi bi-postcard me-1 text-success"></i>PAN <span class="small text-2">(auto-caps)</span></label><input class="form-control mf-upper" id="setTaxPan" maxlength="10" pattern="[A-Z]{5}[0-9]{4}[A-Z]" placeholder="AAAAA0000A" autocomplete="off"></div>
+                  <div class="col-md-4"><label class="form-label"><i class="bi bi-map me-1 text-success"></i>Home State</label><select class="form-select" id="setHomeState"></select></div>
+                  <div class="col-md-4"><label class="form-label"><i class="bi bi-percent me-1 text-success"></i>Default GST Slab (medicines)</label>
+                    <select class="form-select" id="setGstSlab"><option>5%</option><option>12%</option><option>18%</option></select></div>
+                  <div class="col-md-4"><label class="form-label"><i class="bi bi-upc me-1 text-success"></i>HSN — Medicaments</label><input class="form-control" id="setHsn"></div>
+                </div>
+                <div class="form-check form-switch mb-2">
+                  <input class="form-check-input" type="checkbox" id="setIntra">
+                  <label class="form-check-label small" for="setIntra">Default to intra-state (CGST + SGST) billing</label>
+                </div>
+                <div class="form-check form-switch mb-3">
+                  <input class="form-check-input" type="checkbox" id="setMrpInclusive">
+                  <label class="form-check-label small" for="setMrpInclusive">Retail bills are tax-inclusive (MRP billing)</label>
+                </div>
+                <div class="d-flex gap-2">
+                  <button class="btn btn-mf" data-save-group="tax"><i class="bi bi-check2 me-1"></i>Save Changes</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- USERS -->
+          <div class="tab-pane fade" id="st-users">
+            <div class="card-mf">
+              <div class="card-head">
+                <h2 class="card-title"><i class="bi bi-person-badge"></i>System Users</h2>
+                <div class="card-tools d-flex align-items-center gap-2"><button class="btn btn-sm btn-light-mf" id="stMyPass" title="OTP-verified self-service change"><i class="bi bi-key me-1"></i>Change Password</button><button class="btn btn-sm btn-mf" id="stAddUser"><i class="bi bi-person-plus me-1"></i>Add User</button></div>
+              </div>
+              <div class="table-scroll" style="max-height:none">
+                <table class="table table-mf">
+                  <thead><tr><th>Name</th><th>Role</th><th>Mobile</th><th>Email</th><th>Status</th><th>Last Login</th><th class="text-end">Actions</th></tr></thead>
+                  <tbody id="stUsersBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ROLES -->
+          <div class="tab-pane fade" id="st-roles">
+            <div class="card-mf">
+              <div class="card-head">
+                <h2 class="card-title"><i class="bi bi-shield-lock"></i>Role Permissions Matrix</h2>
+                <div class="card-tools d-flex align-items-center gap-2">
+                  <select class="form-select form-select-sm" id="stRolesFilter" style="min-width:215px" title="View one section at a time — saving always covers every section"></select>
+                  <span class="badge badge-soft-success" id="stRolesCount"></span>
+                </div>
+              </div>
+              <div class="alert alert-light border small m-3 mb-0"><i class="bi bi-info-circle me-1"></i>Saving applies the matrix to each role's <b>sidebar on their next page load</b> — unticked menus disappear. <b>Owner / Admin</b> always retains full access. Use the <b>section dropdown</b> to view one menu group at a time — <b>Save always applies the complete matrix</b>, hidden rows included. Enforcement now spans both layers: the browser hides the menu, and every gated page re-checks the matrix <b>on the server</b> — typed URLs and scripted fetches included (<code>core/MenuGate.php</code>).</div>
+              <div class="table-scroll" style="max-height:none">
+                <table class="table table-mf">
+                  <thead id="stRolesHead"></thead>
+                  <tbody id="stRolesBody"></tbody>
+                </table>
+              </div>
+              <div class="p-3 border-top"><button class="btn btn-mf" id="stRolesSave"><i class="bi bi-check2 me-1"></i>Save Permissions</button></div>
+            </div>
+          </div>
+
+          <!-- AUDIT -->
+          <div class="tab-pane fade" id="st-audit">
+            <div class="card-mf">
+              <div class="card-head">
+                <h2 class="card-title"><i class="bi bi-journal-check"></i>Audit Trail</h2>
+                <div class="card-tools">
+                  <input class="form-control form-control-sm" id="stAuditSearch" placeholder="Filter actions…" style="width:220px">
+                </div>
+              </div>
+              <div class="table-scroll" style="max-height:none">
+                <table class="table table-mf">
+                  <thead><tr><th>Timestamp</th><th>User</th><th>Action</th><th>Detail</th></tr></thead>
+                  <tbody id="stAuditBody"></tbody>
+                </table>
+              </div>
+              <div id="stAuditFoot" style="display:flex;align-items:center;gap:8px;padding:8px 4px 2px;border-top:1px solid #eef2f6">
+                <span class="text-2 small" id="stAuditInfo"></span>
+                <button class="btn btn-sm btn-light-mf ms-auto" id="stAuditMore" type="button" hidden><i class="bi bi-arrow-down-short me-1"></i>Load more</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Add user modal -->
+  <div class="modal fade" id="stUserModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Add User</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-2"><label class="form-label">Full Name <span class="req">*</span></label><input class="form-control" id="stUserName"></div>
+          <div class="row g-2 mb-2">
+            <div class="col-7"><label class="form-label">Mobile</label><input class="form-control" id="stUserMobile"></div>
+            <div class="col-5"><label class="form-label">Role</label>
+              <select class="form-select" id="stUserRole"><option>Owner / Admin</option><option>Pharmacist</option><option>Billing Clerk</option><option>Purchase Manager</option></select></div>
+          </div>
+          <div><label class="form-label">Email <span class="req">*</span></label><input type="email" class="form-control" id="stUserEmail"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-light-mf" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-mf" id="stUserSave">Create User</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- New user credentials (shown once) -->
+  <div class="modal fade" id="stUserCredModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title" id="stCredTitle">User Created</h5></div>
+        <div class="modal-body">
+          <div class="alert alert-warning small mb-3" id="stCredNote"><i class="bi bi-exclamation-triangle me-1"></i>This password is shown once and cannot be retrieved again — share it with the user now.</div>
+          <div class="mb-2"><label class="form-label">Email</label><input class="form-control" id="stCredEmail" readonly></div>
+          <div><label class="form-label">Temporary Password</label><input class="form-control" id="stCredPass" readonly></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-mf" data-bs-dismiss="modal">Done</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- User profile — view -->
+  <div class="modal fade" id="stUserViewModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:400px">
+      <div class="modal-content">
+        <div class="modal-header border-0 pb-1"><h5 class="modal-title"><i class="bi bi-person-circle me-1 text-success"></i>User Profile</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body text-center pt-1 pb-2">
+          <div class="avatar-ring mb-2">
+            <div class="mf-avatar d-inline-flex align-items-center justify-content-center" id="stViewAvatar" style="width:64px;height:64px;font-size:1.15rem"></div>
+            <button type="button" class="avatar-cam" id="stAvatarBtn" title="Change profile photo"><i class="bi bi-camera-fill"></i></button>
+            <input type="file" id="stAvatarFile" accept="image/png,image/jpeg,image/webp" hidden>
+          </div>
+          <div class="fw-bold" id="stViewName" style="font-size:1.03rem"></div>
+          <div class="mb-1 mt-1" id="stViewRole"></div>
+        </div>
+        <div class="small px-4 pb-2" id="stViewRows"></div>
+        <div class="modal-footer border-0 pt-1">
+          <button class="btn btn-light-mf" data-bs-dismiss="modal">Close</button>
+          <button class="btn btn-mf" id="stViewEdit"><i class="bi bi-pencil me-1"></i>Edit Profile</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- User profile — edit -->
+  <div class="modal fade" id="stUserEditModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title"><i class="bi bi-pencil-square me-1 text-success"></i>Edit User</h5><button class="btn btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-2"><label class="form-label"><i class="bi bi-person me-1 text-success"></i>Full Name <span class="req">*</span></label><input class="form-control" id="stEditName"></div>
+          <div class="row g-2 mb-2">
+            <div class="col-7"><label class="form-label"><i class="bi bi-phone me-1 text-success"></i>Mobile</label><input class="form-control" id="stEditMobile"></div>
+            <div class="col-5"><label class="form-label"><i class="bi bi-person-badge me-1 text-success"></i>Role</label>
+              <select class="form-select" id="stEditRole"><option>Owner / Admin</option><option>Pharmacist</option><option>Billing Clerk</option><option>Purchase Manager</option></select></div>
+          </div>
+          <div><label class="form-label"><i class="bi bi-envelope me-1 text-success"></i>Email <span class="req">*</span></label><input type="email" class="form-control" id="stEditEmail"></div>
+          <div class="alert alert-light border small mt-3 mb-0 d-flex align-items-center justify-content-between gap-2 flex-wrap">
+            <span id="stEditPassHint" class="me-2"><i class="bi bi-shield-lock me-1"></i>Password changes are OTP-verified for security.</span>
+            <button class="btn btn-sm btn-outline-success text-nowrap" id="stEditPassBtn" type="button"><i class="bi bi-key me-1"></i><span id="stEditPassLbl">Change via OTP</span></button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-light-mf" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-mf" id="stEditSave"><i class="bi bi-check2 me-1"></i>Save Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Change password — OTP-protected self-service wizard -->
+  <div class="modal fade" id="stPassModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:470px">
+      <div class="modal-content" style="border:0;box-shadow:0 24px 64px rgba(15,23,42,.20)">
+        <div class="modal-header border-0 pb-0">
+          <div>
+            <h5 class="modal-title mb-0" id="stPassTitle">Change password</h5>
+            <div class="small text-2 mt-1" id="stPassSub">Step 1 — prove it is you with the current password.</div>
+          </div>
+          <button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body pt-3">
+          <div class="d-flex mb-4">
+            <div class="pp-step on" id="ppChip1" data-n="1">Verify</div>
+            <div class="pp-step" id="ppChip2" data-n="2">OTP code</div>
+            <div class="pp-step" id="ppChip3" data-n="3">New password</div>
+          </div>
+          <div id="ppStep1">
+            <label class="form-label">Current password <span class="req">*</span></label>
+            <div class="input-group mb-2">
+              <input type="password" class="form-control" id="ppCurrent" autocomplete="current-password" placeholder="Your existing sign-in password">
+              <button class="btn btn-outline-secondary" type="button" id="ppEye1" title="Show / hide"><i class="bi bi-eye"></i></button>
+            </div>
+            <div class="small text-2 mb-3"><i class="bi bi-envelope-check me-1 text-success"></i>We email a one-time 6-digit code to your registered address. Nothing changes until the final step is confirmed.</div>
+            <button class="btn btn-mf w-100" type="button" id="ppSendOtp"><i class="bi bi-send me-1"></i>Verify &amp; send OTP</button>
+          </div>
+          <div id="ppStep2" hidden>
+            <div class="small text-2 mb-2">Code sent to <b id="ppEmail">—</b> · valid 10 minutes · 5 tries before it self-destructs.</div>
+            <div class="d-flex gap-2 mb-2">
+              <input class="form-control pp-otp" id="ppOtp0" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
+              <input class="form-control pp-otp" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
+              <input class="form-control pp-otp" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
+              <input class="form-control pp-otp" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
+              <input class="form-control pp-otp" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
+              <input class="form-control pp-otp" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
+            </div>
+            <div class="small mb-2" id="ppOtpMsg" style="min-height:1.25rem;color:#E5484D"></div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-mf flex-fill" type="button" id="ppVerifyOtp"><i class="bi bi-shield-check me-1"></i>Verify code</button>
+              <button class="btn btn-light-mf" type="button" id="ppResend" disabled>Resend in 45s</button>
+            </div>
+          </div>
+          <div id="ppStep3" hidden>
+            <label class="form-label">New password <span class="req">*</span></label>
+            <div class="input-group mb-2">
+              <input type="password" class="form-control" id="ppNew1" autocomplete="new-password" placeholder="8+ characters — letters and numbers">
+              <button class="btn btn-outline-secondary" type="button" id="ppEye2" title="Show / hide"><i class="bi bi-eye"></i></button>
+            </div>
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <div class="pw-bar flex-grow-1"><i id="pwBar"></i></div>
+              <span class="small text-2 text-nowrap" id="pwLbl"></span>
+            </div>
+            <div class="small text-2 mb-3"><span id="pwOk1" class="me-3">8+ characters</span><span id="pwOk2">letters + numbers</span></div>
+            <label class="form-label">Confirm new password <span class="req">*</span></label>
+            <input type="password" class="form-control mb-3" id="ppNew2" autocomplete="new-password">
+            <button class="btn btn-mf w-100" type="button" id="ppSave"><i class="bi bi-check2-circle me-1"></i>Update password</button>
+          </div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <span class="small text-2 me-auto"><i class="bi bi-lock-fill me-1 text-success"></i>Codes are stored hashed and expire in 10 minutes.</span>
+          <button class="btn btn-light-mf btn-sm" data-bs-dismiss="modal">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/app.js?v=2026-10-26.03"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      await window.MF.boot();
+      const MF = window.MF, D = window.MF_DATA;
+      const $ = (s) => document.querySelector(s);
+      let settings = {}, users = [], rolePerms = [];
+      const IN_STATES = ['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Delhi','Goa','Gujarat','Haryana','Himachal Pradesh','Jammu and Kashmir','Jharkhand','Karnataka','Kerala','Ladakh','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab','Puducherry','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal'];
+      function fillStates(sel, val) {
+        const el = $(sel); if (!el) return;
+        el.innerHTML = '<option value="">— select —</option>' + IN_STATES.map((x) => `<option${x === val ? ' selected' : ''}>${x}</option>`).join('');
+      }
+      const fmt12 = (v) => {
+        const d = MF.parseDate ? MF.parseDate(v) : new Date(String(v).replace(' ', 'T'));
+        if (!d) return 'Never';
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) + ' · ' +
+               d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true }).toUpperCase();
+      };
+
+      async function loadSettings() {
+        const res = await MF.Api.get('settings.php');
+        settings = res.data ?? res;
+        $('#setStoreName').value = settings.store_name || D.store.name || '';
+        $('#setStoreCode').value = settings.store_code || 'MAIN';
+        $('#setStoreAddress').value = settings.store_address || '';
+        $('#setStorePhone').value = settings.store_phone || '';
+        $('#setStoreCity').value = settings.store_city || '';
+        fillStates('#setStoreState', settings.store_state || '');
+        $('#setStoreGstin').value = (settings.store_gstin || '').toUpperCase();
+        $('#setStorePan').value = (settings.store_pan || '').toUpperCase();
+        $('#setStoreDl20b').value = settings.store_dl20b || '';
+        $('#setStoreDl21b').value = settings.store_dl21b || '';
+        $('#setStoreEmail').value = settings.store_email || '';
+        $('#setStoreType').value = ['retail', 'wholesale', 'hybrid', 'hospital', 'echain'].includes(settings.store_type) ? settings.store_type : 'retail';
+        $('#setBankName').value = settings.store_bank_name || '';
+        $('#setBankAccount').value = settings.store_bank_account || '';
+        $('#setBankAccountC').value = settings.store_bank_account || '';
+        $('#setBankIfsc').value = (settings.store_bank_ifsc || '').toUpperCase();
+        $('#setBankBranch').value = settings.store_bank_branch || '';
+        $('#setFyStart').value = settings.fy_start || 'April';
+
+        $('#setDefaultPayment').value = settings.inv_default_payment || 'Cash';
+        $('#setRounding').value = settings.inv_rounding || 'Nearest Rupee';
+        $('#setCopies').value = settings.inv_copies || 'Original Only';
+        $('#setPrintType').value = settings.inv_print_type || 'a4';
+        $('#setFooterNote').value = settings.inv_footer || '';
+        $('#setWsTerms').value = settings.inv_ws_terms || '';
+        $('#setAutoPrint').checked = settings.inv_auto_print === '1';
+
+        $('#setTaxGstin').value = (settings.tax_gstin || '').toUpperCase();
+        $('#setTaxPan').value = (settings.tax_pan || '').toUpperCase();
+        fillStates('#setHomeState', settings.tax_home_state || '');
+        $('#setGstSlab').value = settings.tax_default_slab || '12%';
+        $('#setHsn').value = settings.tax_hsn || '3004';
+        $('#setIntra').checked = settings.tax_intra_state !== '0';
+        $('#setMrpInclusive').checked = settings.tax_mrp_inclusive !== '0';
+      }
+
+      document.querySelectorAll('[data-save-group]').forEach((b) => b.addEventListener('click', async () => {
+        const group = b.dataset.saveGroup;
+        let payload = { group };
+        if (group === 'store') {
+          const acct = $('#setBankAccount').value.replace(/[\s-]/g, ''), acctC = $('#setBankAccountC').value.replace(/[\s-]/g, '');
+          const ifscV = $('#setBankIfsc').value.trim().toUpperCase();
+          const mailV = $('#setStoreEmail').value.trim();
+          if (mailV && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(mailV)) { MF.toast('Store email address does not look valid.', 'err', 'Validation'); return; }
+          if (acct && !/^\d{6,20}$/.test(acct)) { MF.toast('Account number should be 6–20 digits (spaces and dashes are ignored).', 'err', 'Validation'); return; }
+          if (acct && acctC !== acct) { MF.toast('Account number and confirmation do not match — typos here cost NEFTs.', 'err', 'Validation'); return; }
+          if (ifscV && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifscV)) { MF.toast('IFSC format is 4 letters, a 0, then 6 characters — e.g. HDFC0001234.', 'err', 'Validation'); return; }
+          payload = { ...payload,
+            store_name: $('#setStoreName').value, store_address: $('#setStoreAddress').value,
+            store_phone: $('#setStorePhone').value, store_city: $('#setStoreCity').value,
+            store_state: $('#setStoreState').value, store_gstin: $('#setStoreGstin').value.trim().toUpperCase(),
+            store_pan: $('#setStorePan').value.trim().toUpperCase(), store_dl20b: $('#setStoreDl20b').value,
+            store_dl21b: $('#setStoreDl21b').value, store_email: mailV,
+            store_type: $('#setStoreType').value,
+            store_bank_name: $('#setBankName').value.trim(), store_bank_account: acct,
+            store_bank_ifsc: ifscV, store_bank_branch: $('#setBankBranch').value.trim(),
+            fy_start: $('#setFyStart').value,
+          };
+        } else if (group === 'invoice') {
+          payload = { ...payload,
+            inv_default_payment: $('#setDefaultPayment').value, inv_rounding: $('#setRounding').value,
+            inv_copies: $('#setCopies').value, inv_print_type: $('#setPrintType').value, inv_footer: $('#setFooterNote').value,
+            inv_ws_terms: $('#setWsTerms').value, inv_auto_print: $('#setAutoPrint').checked ? '1' : '0',
+          };
+        } else if (group === 'tax') {
+          payload = { ...payload,
+            tax_gstin: $('#setTaxGstin').value.trim().toUpperCase(), tax_pan: $('#setTaxPan').value.trim().toUpperCase(),
+            tax_home_state: $('#setHomeState').value,
+            tax_default_slab: $('#setGstSlab').value, tax_hsn: $('#setHsn').value,
+            tax_intra_state: $('#setIntra').checked ? '1' : '0', tax_mrp_inclusive: $('#setMrpInclusive').checked ? '1' : '0',
+          };
+        }
+        try {
+          await MF.Api.post('settings.php', payload);
+          MF.toast(group.charAt(0).toUpperCase() + group.slice(1) + ' settings saved.', 'success', 'Settings saved');
+          if (group === 'store') await MF.rehydrate(); // refresh D.store for receipts app-wide
+        } catch (err) {
+          MF.toast(err.message || 'Could not save settings.', 'danger');
+        }
+      }));
+
+      /* Users */
+      async function loadUsers() {
+        const res = await MF.Api.get('users.php');
+        users = res.data ?? res;
+        renderUsers();
+      }
+      function renderUsers() {
+        $('#stUsersBody').innerHTML = users.map((u) => `
+          <tr>
+            <td><div class="d-flex align-items-center gap-2"><span class="mf-avatar">${u.avatar ? `<img src="${MF.esc(u.avatar)}" alt="">` : u.name.split(' ').map((x) => x[0]).join('').slice(0, 2)}</span><span class="td-title">${MF.esc(u.name)}</span></div></td>
+            <td>${MF.badge(u.role, u.role.includes('Admin') ? 'primary' : u.role === 'Pharmacist' ? 'success' : 'secondary')}</td>
+            <td class="num">${u.mobile || '—'}</td>
+            <td class="text-2">${MF.esc(u.email)}</td>
+            <td>${MF.statusBadge(u.status === 'active' ? 'Active' : 'Inactive')}</td>
+            <td class="num text-2" style="white-space:nowrap">${u.last_login ? fmt12(u.last_login) : 'Never'}</td>
+            <td class="text-end row-actions">
+              <button class="btn btn-icon btn-light-mf text-primary" data-view="${u.id}" title="View profile"><i class="bi bi-eye"></i></button>
+              <button class="btn btn-icon btn-light-mf text-success" data-edit="${u.id}" title="Edit profile"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-icon btn-light-mf ${u.status === 'active' ? 'text-warning' : 'text-success'}" data-toggle="${u.id}" data-status="${u.status}" title="Toggle status"><i class="bi bi-power"></i></button>
+            </td>
+          </tr>`).join('');
+        $('#stUsersBody').querySelectorAll('[data-toggle]').forEach((b) => b.addEventListener('click', async () => {
+          const newStatus = b.dataset.status === 'active' ? 'disabled' : 'active';
+          try {
+            await MF.Api.put('users.php', { id: b.dataset.toggle, status: newStatus });
+            MF.toast(`User is now ${newStatus}.`, newStatus === 'active' ? 'success' : 'warn', 'User status');
+            loadUsers();
+          } catch (err) {
+            MF.toast(err.message || 'Could not update user.', 'danger');
+          }
+        }));
+      }
+
+      /* ---- user profile: view + edit ---- */
+      let viewingId = null, editingId = null;
+      const userById = (id) => users.find((x) => String(x.id) === String(id)) || null;
+      const initialsOf = (nm) => String(nm || '').trim().split(/\s+/).map((x) => x[0] || '').join('').slice(0, 2).toUpperCase() || 'U';
+
+      $('#stUsersBody').addEventListener('click', (e) => {
+        const vb = e.target.closest('[data-view]');
+        if (vb) { openUserView(userById(vb.dataset.view)); return; }
+        const eb = e.target.closest('[data-edit]');
+        if (eb) { openUserEdit(userById(eb.dataset.edit)); }
+      });
+
+      function openUserView(u) {
+        if (!u) return;
+        viewingId = u.id;
+        $('#stViewAvatar').innerHTML = u.avatar ? `<img src="${MF.esc(u.avatar)}" alt="">` : initialsOf(u.name);
+        $('#stViewName').textContent = u.name || '—';
+        $('#stViewRole').innerHTML = MF.badge(u.role || 'Staff', String(u.role || '').includes('Admin') ? 'primary' : 'success');
+        const row = (ic, lbl, val) => `<div class="d-flex align-items-center justify-content-between py-2" style="border-top:1px solid #EEF0F4">
+          <span class="text-2"><i class="bi bi-${ic} me-2"></i>${lbl}</span><b class="fw-semibold">${val}</b></div>`;
+        $('#stViewRows').innerHTML =
+          row('phone', 'Mobile', u.mobile ? MF.esc(u.mobile) : '—') +
+          row('envelope', 'Email', MF.esc(u.email || '—')) +
+          row('toggle2-on', 'Status', u.status === 'active' ? 'Active' : 'Disabled') +
+          row('clock-history', 'Last login', u.last_login ? fmt12(u.last_login) : 'Never');
+        new bootstrap.Modal($('#stUserViewModal')).show();
+      }
+      function openUserEdit(u) {
+        if (!u) return;
+        editingId = u.id;
+        $('#stEditName').value = u.name || '';
+        $('#stEditMobile').value = u.mobile || '';
+        $('#stEditEmail').value = u.email || '';
+        $('#stEditRole').value = u.role || 'Pharmacist';
+        const selfEdit = !!(MF._me && String(MF._me.id) === String(u.id));
+        $('#stEditPassLbl').textContent = selfEdit ? 'Change via OTP' : 'Force temp password';
+        $('#stEditPassHint').innerHTML = selfEdit
+          ? '<i class="bi bi-shield-lock me-1"></i>This is your own account — current password → emailed OTP → new password.'
+          : '<i class="bi bi-shield-lock me-1"></i>You cannot know their password, so a one-time temp password will be issued (shown once' + (u.email ? ', emailed too if mail is set up' : '') + ').';
+        new bootstrap.Modal($('#stUserEditModal')).show();
+      }
+      $('#stViewEdit').addEventListener('click', () => {
+        bootstrap.Modal.getInstance($('#stUserViewModal'))?.hide();
+        openUserEdit(userById(viewingId));
+      });
+      $('#stAvatarBtn').addEventListener('click', () => $('#stAvatarFile').click());
+      $('#stAvatarFile').addEventListener('change', function () {
+        const f = this.files && this.files[0]; const u = userById(viewingId);
+        if (!f || !u) return;
+        const rd = new FileReader();
+        rd.onload = () => {
+          const img = new Image();
+          img.onload = () => {
+            const sc = Math.min(1, 256 / Math.max(img.width, img.height));
+            const cv = document.createElement('canvas');
+            cv.width = Math.max(1, Math.round(img.width * sc)); cv.height = Math.max(1, Math.round(img.height * sc));
+            cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+            cv.toBlob((blob) => {
+              if (!blob) { MF.toast('Could not process that image.', 'danger'); return; }
+              const fr = new FileReader();
+              fr.onload = async () => {
+                try {
+                  await MF.Api.put('users.php', { id: u.id, avatar: fr.result });
+                  await loadUsers();
+                  bootstrap.Modal.getInstance($('#stUserViewModal'))?.hide();
+                  openUserView(userById(u.id));
+                  MF.toast('Profile photo updated.', 'success', 'User');
+                } catch (e2) { MF.toast(e2.message || 'Could not save photo.', 'danger'); }
+              };
+              fr.readAsDataURL(blob);
+            }, 'image/jpeg', 0.85);
+          };
+          img.onerror = () => MF.toast('That file is not a readable image.', 'danger');
+          img.src = rd.result;
+        };
+        rd.readAsDataURL(f);
+        this.value = '';
+      });
+
+      $('#stEditSave').addEventListener('click', async () => {
+        const u = userById(editingId); if (!u) return;
+        const name = $('#stEditName').value.trim(), email = $('#stEditEmail').value.trim();
+        if (!name || !email) { MF.toast('Name and email are required.', 'err', 'Validation'); return; }
+        const payload = { id: editingId, name, email, mobile: $('#stEditMobile').value.trim(), role: $('#stEditRole').value };
+        try {
+          await MF.Api.put('users.php', payload);
+          await loadUsers();
+          const after = userById(editingId);
+          const took = after && after.name === name && after.email === email;
+          bootstrap.Modal.getInstance($('#stUserEditModal')).hide();
+          if (took) { MF.toast('Profile updated.', 'success', 'User'); }
+          else { MF.toast('Server acknowledged but kept old values — the users API needs its update handler extended for profile fields.', 'warn', 'Verify'); }
+        } catch (err) { MF.toast(err.message || 'Could not update user.', 'danger'); }
+      });
+
+      $('#stAddUser').addEventListener('click', () => new bootstrap.Modal($('#stUserModal')).show());
+      $('#stUserSave').addEventListener('click', async () => {
+        const name = $('#stUserName').value.trim(), email = $('#stUserEmail').value.trim();
+        if (!name || !email) { MF.toast('Name and email are required.', 'err', 'Validation'); return; }
+        try {
+          const res = await MF.Api.post('users.php', { name, email, mobile: $('#stUserMobile').value.trim(), role: $('#stUserRole').value });
+          bootstrap.Modal.getInstance($('#stUserModal')).hide();
+          $('#stUserName').value = ''; $('#stUserMobile').value = ''; $('#stUserEmail').value = '';
+          $('#stCredTitle').textContent = 'User Created';
+          $('#stCredNote').innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>This password is shown once and cannot be retrieved again — share it with the user now.';
+          $('#stCredEmail').value = email; $('#stCredPass').value = res.tempPassword;
+          new bootstrap.Modal($('#stUserCredModal')).show();
+          loadUsers();
+        } catch (err) {
+          MF.toast(err.message || 'Could not create user.', 'danger');
+        }
+      });
+
+      /* GSTIN / PAN / IFSC: capitalised AS TYPED (the stored value, not just the
+         rendering). Paste and autofill pass through the same input event. */
+      document.addEventListener('input', (e) => {
+        const t = e.target;
+        if (t && t.classList && t.classList.contains('mf-upper')) {
+          const v = t.value.toUpperCase().replace(/\s/g, '');
+          if (v !== t.value) t.value = v;
+        }
+      });
+
+      /* ---- Password security ----
+         Self: 3-step wizard — current password → emailed 6-digit OTP → new
+         password, token-gated server-side. Admin on someone else: one-time
+         temp password (shown once, emailed when mail works). */
+      const PP = { busy: false, cd: null, modal: null, token: null };
+      const ppEl = (sel) => document.querySelector(sel);
+      function ppStep(n) {
+        [1, 2, 3].forEach((i) => {
+          ppEl('#ppStep' + i).hidden = i !== n;
+          const chip = ppEl('#ppChip' + i);
+          chip.classList.toggle('on', i === n);
+          chip.classList.toggle('done', i < n);
+        });
+        ppEl('#stPassTitle').textContent = n === 1 ? 'Change password' : n === 2 ? 'Enter the 6-digit code' : 'Set a new password';
+        ppEl('#stPassSub').textContent = n === 1 ? 'Step 1 — prove it is you with the current password.'
+          : n === 2 ? 'Step 2 — open your inbox and type the code.'
+          : 'Step 3 — verified. Now pick a password you will actually remember.';
+      }
+      function ppPwMeter() {
+        const v = ppEl('#ppNew1').value;
+        const mix = /[A-Za-z]/.test(v) && /\d/.test(v);
+        const score = (v.length >= 8 ? 1 : 0) + (mix ? 1 : 0) + (v.length >= 12 ? 1 : 0) + ((/[^A-Za-z0-9]/.test(v) || (/[a-z]/.test(v) && /[A-Z]/.test(v))) ? 1 : 0);
+        const W = [0, 30, 55, 80, 100], COL = ['#E5484D', '#E5484D', '#F5A524', '#0CA678', '#176B5B'], TXT = ['Too short', 'Weak', 'Fair', 'Good', 'Strong'];
+        ppEl('#pwBar').style.width = W[score] + '%';
+        ppEl('#pwBar').style.background = COL[score];
+        ppEl('#pwLbl').textContent = v ? TXT[score] : '8+ chars, letters + numbers';
+        const ok1 = v.length >= 8, ok2 = mix;
+        ppEl('#pwOk1').innerHTML = (ok1 ? '\u2713 ' : '\u2715 ') + '8+ characters';
+        ppEl('#pwOk2').innerHTML = (ok2 ? '\u2713 ' : '\u2715 ') + 'letters + numbers';
+        ppEl('#pwOk1').style.color = ok1 ? '#0CA678' : '#94A3B8';
+        ppEl('#pwOk2').style.color = ok2 ? '#0CA678' : '#94A3B8';
+      }
+      function ppReset() {
+        ppEl('#ppCurrent').value = ''; ppEl('#ppNew1').value = ''; ppEl('#ppNew2').value = '';
+        document.querySelectorAll('.pp-otp').forEach((x) => { x.value = ''; });
+        ppEl('#ppOtpMsg').textContent = '';
+        PP.token = null;
+        ppPwMeter();
+      }
+      function ppOpen() {
+        ppReset(); ppStep(1);
+        PP.modal = PP.modal || new bootstrap.Modal(ppEl('#stPassModal'));
+        PP.modal.show();
+        setTimeout(() => ppEl('#ppCurrent').focus(), 250);
+      }
+      function ppCountdown(sec) {
+        clearInterval(PP.cd);
+        const btn = ppEl('#ppResend');
+        let left = sec;
+        btn.disabled = true; btn.textContent = 'Resend in ' + left + 's';
+        PP.cd = setInterval(() => {
+          left -= 1;
+          if (left <= 0) { clearInterval(PP.cd); btn.disabled = false; btn.textContent = 'Resend code'; }
+          else btn.textContent = 'Resend in ' + left + 's';
+        }, 1000);
+      }
+      async function ppSendOtp() {
+        if (PP.busy) return;
+        const cur = ppEl('#ppCurrent').value;
+        if (!cur) { MF.toast('Enter your current password first.', 'err', 'Verify'); ppEl('#ppCurrent').focus(); return; }
+        PP.busy = true;
+        const b = ppEl('#ppSendOtp');
+        b.disabled = true; b.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Verifying\u2026';
+        try {
+          const r = await MF.Api.post('users.php', { action: 'password-otp', current_password: cur });
+          const d = (r && r.data) || {};
+          ppEl('#ppEmail').textContent = d.masked || 'your registered email';
+          document.querySelectorAll('.pp-otp').forEach((x) => { x.value = ''; });
+          ppStep(2); ppCountdown(d.cooldownSec || 45);
+          setTimeout(() => ppEl('#ppOtp0').focus(), 250);
+        } catch (e) {
+          MF.toast(e.message || 'Could not send the code.', 'danger', 'OTP');
+        } finally {
+          PP.busy = false; b.disabled = false; b.innerHTML = '<i class="bi bi-send me-1"></i>Verify &amp; send OTP';
+        }
+      }
+      async function ppVerify() {
+        const boxes = [...document.querySelectorAll('.pp-otp')];
+        const otp = boxes.map((x) => x.value).join('');
+        if (otp.length !== 6 || PP.busy) return;
+        PP.busy = true;
+        const m = ppEl('#ppOtpMsg');
+        m.style.color = '#64748B'; m.textContent = 'Verifying\u2026';
+        try {
+          const r = await MF.Api.post('users.php', { action: 'otp-verify', otp });
+          PP.token = ((r && r.data) || {}).token || null;
+          if (!PP.token) throw new Error('Server did not return a verification token — try again.');
+          m.textContent = '';
+          ppStep(3);
+          setTimeout(() => ppEl('#ppNew1').focus(), 250);
+        } catch (e) {
+          m.style.color = '#E5484D';
+          m.textContent = e.message || 'Wrong code.';
+          boxes.forEach((x) => { x.value = ''; });
+          ppEl('#ppOtp0').focus();
+        } finally { PP.busy = false; }
+      }
+      async function ppSave() {
+        if (PP.busy) return;
+        const p1 = ppEl('#ppNew1').value, p2 = ppEl('#ppNew2').value;
+        if (p1.length < 8 || !(/[A-Za-z]/.test(p1) && /\d/.test(p1))) { MF.toast('At least 8 characters, mixing letters and numbers.', 'err', 'Weak password'); return; }
+        if (p1 !== p2) { MF.toast('The two passwords do not match.', 'err', 'Confirm'); return; }
+        PP.busy = true;
+        const b = ppEl('#ppSave');
+        b.disabled = true; b.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Updating\u2026';
+        try {
+          await MF.Api.post('users.php', { action: 'password-set', token: PP.token, new_password: p1 });
+          clearInterval(PP.cd);
+          PP.modal.hide();
+          MF.toast('Password updated — use it at your next sign-in.', 'success', 'Done');
+        } catch (e) {
+          MF.toast(e.message || 'Could not update the password.', 'danger');
+        } finally {
+          PP.busy = false; b.disabled = false; b.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Update password';
+        }
+      }
+      ppEl('#ppSendOtp').addEventListener('click', ppSendOtp);
+      ppEl('#ppVerifyOtp').addEventListener('click', ppVerify);
+      ppEl('#ppSave').addEventListener('click', ppSave);
+      ppEl('#ppNew1').addEventListener('input', ppPwMeter);
+      ppEl('#ppResend').addEventListener('click', ppSendOtp);
+      [['#ppEye1', '#ppCurrent'], ['#ppEye2', '#ppNew1']].forEach(([b, f]) => ppEl(b).addEventListener('click', () => {
+        const el = ppEl(f);
+        el.type = el.type === 'password' ? 'text' : 'password';
+        ppEl(b).innerHTML = el.type === 'password' ? '<i class="bi bi-eye"></i>' : '<i class="bi bi-eye-slash"></i>';
+      }));
+      document.querySelectorAll('.pp-otp').forEach((inp, i, all) => {
+        inp.addEventListener('input', () => {
+          inp.value = inp.value.replace(/\D/g, '').slice(-1);
+          if (inp.value && i < all.length - 1) all[i + 1].focus();
+          if (all.every((x) => x.value)) ppVerify();
+        });
+        inp.addEventListener('keydown', (e) => { if (e.key === 'Backspace' && !inp.value && i > 0) all[i - 1].focus(); });
+        inp.addEventListener('paste', (e) => {
+          e.preventDefault();
+          const ds = (((e.clipboardData || {}).getData && e.clipboardData.getData('text')) || '').replace(/\D/g, '').slice(0, 6).split('');
+          ds.forEach((ch, j) => { if (all[j]) all[j].value = ch; });
+          if (ds.length === 6) ppVerify();
+          else if (all[Math.min(5, ds.length)]) all[Math.min(5, ds.length)].focus();
+        });
+      });
+      ppEl('#stMyPass').addEventListener('click', ppOpen);
+      ppEl('#stEditPassBtn').addEventListener('click', async () => {
+        const u = userById(editingId); if (!u) return;
+        const self = !!(MF._me && String(MF._me.id) === String(u.id));
+        if (self) { bootstrap.Modal.getInstance(ppEl('#stUserEditModal'))?.hide(); ppOpen(); return; }
+        const ok = await MF.confirm({
+          title: 'Force password reset',
+          message: `${u.name} gets a brand-new temporary password — shown once${u.email ? ' and emailed too if mail is configured' : ''}. The old password stops working immediately.`,
+          confirmText: 'Issue temp password', tone: 'danger',
+        });
+        if (!ok) return;
+        try {
+          const r = await MF.Api.post('users.php', { action: 'reset-password', id: u.id });
+          const d = (r && r.data) || {};
+          bootstrap.Modal.getInstance(ppEl('#stUserEditModal'))?.hide();
+          ppEl('#stCredTitle').textContent = 'Temporary Password Issued';
+          ppEl('#stCredNote').innerHTML = d.emailed
+            ? `<i class="bi bi-envelope-check me-1"></i>Emailed to ${MF.esc(d.email || u.email || '')} as well — the copy shown here is the authoritative one.`
+            : `<i class="bi bi-exclamation-triangle me-1"></i>Shown once — share it with ${MF.esc(u.name)} now. (Could not email from this server.)`;
+          ppEl('#stCredEmail').value = d.email || u.email || '';
+          ppEl('#stCredPass').value = d.tempPassword || '(none returned)';
+          new bootstrap.Modal(ppEl('#stUserCredModal')).show();
+          MF.toast(`Fresh temp password issued for ${u.name}.`, 'success', 'User');
+        } catch (e) { MF.toast(e.message || 'Reset failed.', 'danger', 'User'); }
+      });
+
+      /* Roles matrix — every sidebar menu & submenu, per role.
+         Semantics: ticked = allowed. A menu is hidden from a role's sidebar
+         only after you save it unticked here; unconfigured menus stay open. */
+      const MATRIX_ROLES = ['Owner / Admin', 'Pharmacist', 'Billing Clerk', 'Purchase Manager'];
+      const MATRIX_MENUS = [
+        { group: 'Core',           items: ['Dashboard'] },
+        { group: 'Sales',          items: ['Retail POS', 'Wholesale Billing', 'Sales Invoices', 'Sales Returns', 'Customers', 'Customer Dues'] },
+        { group: 'Purchases',      items: ['New Purchase', 'Purchase Invoices', 'Purchase Returns', 'Suppliers', 'Supplier Dues'] },
+        { group: 'Inventory',      items: ['Products / Medicines', 'Stock Overview', 'Medicine Ledger', 'Batch Management', 'Expiry Management', 'Low Stock', 'Stock Adjustment', 'Stock Transfer'] },
+        { group: 'Pharmacy',       items: ['Prescriptions', 'Doctors', 'Manufacturers', 'Medicine Categories', 'Schedule / Class', 'Compliance Register'] },
+        { group: 'Accounts',       items: ['Payments', 'Expenses', 'Cash Book', 'GST'] },
+        { group: 'Reports',        items: ['Sales Reports', 'Purchase Reports', 'Stock Reports', 'Expiry Reports', 'Profit Reports', 'GST Reports', 'Due Reports'] },
+        { group: 'Administration', items: ['Users', 'Roles & Permissions', 'Store Settings', 'Invoice Settings', 'Tax Settings', 'Audit Logs', 'My Subscription'] },
+      ];
+      async function loadRoles() {
+        try { const res = await MF.Api.get('role-permissions.php'); rolePerms = res.data ?? res ?? []; }
+        catch (_) { rolePerms = []; }
+        renderRoles();
+      }
+      const roleTotal = () => MATRIX_MENUS.reduce((s, g) => s + g.items.length, 0);
+      function renderRoles() {
+        $('#stRolesHead').innerHTML = `<tr><th style="min-width:210px">Menu · Item</th>${MATRIX_ROLES.map((r) => `<th class="text-center" style="min-width:88px">${r.replace(' / ', '/')}</th>`).join('')}</tr>`;
+        let html = '';
+        MATRIX_MENUS.forEach((g, gi) => {
+          html += `<tr class="st-grp" data-g="${gi}"><td colspan="${MATRIX_ROLES.length + 1}"><i class="bi bi-layout-sidebar me-1"></i>${g.group} <span class="fw-normal text-2" style="text-transform:none;letter-spacing:0">· ${g.items.length} menu(s)</span></td></tr>`;
+          g.items.forEach((mod) => {
+            html += `<tr data-g="${gi}"><td class="td-title">${mod}</td>` + MATRIX_ROLES.map((role) => {
+              if (role === MATRIX_ROLES[0]) { return `<td class="text-center"><input type="checkbox" class="perm-check" checked disabled title="Owners always have full access"></td>`; }
+              const entry = rolePerms.find((r) => String(r.role) === role && String(r.module) === mod);
+              const on = entry === undefined ? true : !!Number(entry.allowed);
+              return `<td class="text-center"><input type="checkbox" class="perm-check" data-role="${role}" data-module="${mod}" ${on ? 'checked' : ''}></td>`;
+            }).join('') + '</tr>';
+          });
+        });
+        $('#stRolesBody').innerHTML = html;
+        $('#stRolesFilter').innerHTML = `<option value="all">All sections (${roleTotal()} menus — long view)</option>` +
+          MATRIX_MENUS.map((g, i) => `<option value="${i}"${i === 0 ? ' selected' : ''}>${g.group} — ${g.items.length} menu(s)</option>`).join('');
+        applyRoleFilter();
+      }
+      function applyRoleFilter() {
+        const f = $('#stRolesFilter').value;
+        let vis = 0;
+        $('#stRolesBody').querySelectorAll('tr').forEach((tr) => {
+          const show = f === 'all' || tr.dataset.g === f;
+          tr.hidden = !show;
+          if (show && !tr.classList.contains('st-grp')) vis++;
+        });
+        const label = f === 'all' ? 'all sections' : (MATRIX_MENUS[+f] ? MATRIX_MENUS[+f].group : '');
+        $('#stRolesCount').textContent = `${vis} of ${roleTotal()} menus · ${label}`;
+      }
+      $('#stRolesFilter').addEventListener('change', applyRoleFilter);
+      $('#stRolesSave').addEventListener('click', async () => {
+        const rows = [...document.querySelectorAll('.perm-check')].map((c) => ({ role: c.dataset.role, module: c.dataset.module, allowed: c.checked }));
+        try {
+          await MF.Api.post('role-permissions.php', { rows });
+          MF.toast('Role permissions saved.', 'success', 'Settings saved');
+        } catch (err) {
+          MF.toast(err.message || 'Could not save permissions.', 'danger');
+        }
+      });
+
+      /* Audit — default 10 rows, "Load more" reveals 10 more at a time */
+      const AUDIT_PAGE = 10;
+      let auditRows = [];
+      let auditShown = AUDIT_PAGE;
+      let auditQuery = '';
+      async function loadAudit() {
+        const res = await MF.Api.get('audit-logs.php');
+        auditRows = res.data ?? res;
+        auditShown = AUDIT_PAGE;
+        renderAudit();
+      }
+      function renderAudit(q = auditQuery) {
+        const rows = auditRows.filter((l) => (l.user + l.action + l.detail).toLowerCase().includes(q.toLowerCase()));
+        const shown = rows.slice(0, auditShown);
+        $('#stAuditBody').innerHTML = shown.map((l) => `
+          <tr>
+            <td class="num text-2">${MF.fmtDateTime(l.ts)}</td>
+            <td>${MF.esc(l.user)}</td>
+            <td>${MF.badge(l.action, { LOGIN: 'secondary', SALE_CREATE: 'success', WHOLESALE_SALE: 'warning', PURCHASE_CREATE: 'info', STOCK_ADJUST: 'warning', SALES_RETURN: 'danger', PURCHASE_RETURN: 'danger', PAYMENT_RECORDED: 'success', USER_CREATE: 'primary', USER_STATUS: 'secondary', USER_PASSWORD_CHANGE: 'danger', USER_PWD_RESET: 'danger', USER_PWD_OTP: 'secondary', USER_PWD_DENY: 'danger', SETTINGS_UPDATE: 'secondary', PERMISSIONS_UPDATE: 'secondary', SEED_DEFAULTS: 'info' }[l.action] || 'secondary')}</td>
+            <td class="text-2">${MF.esc(l.detail)}</td>
+          </tr>`).join('') || `<tr><td colspan="4"><div class="empty-state"><i class="bi bi-journal"></i>No matching log entries.</div></td></tr>`;
+        const info = $('#stAuditInfo'), more = $('#stAuditMore');
+        if (info) info.textContent = rows.length ? `Showing ${shown.length} of ${rows.length} log(s)` : 'No log entries';
+        if (more) more.hidden = rows.length <= shown.length;
+      }
+      $('#stAuditSearch').addEventListener('input', (e) => { auditQuery = e.target.value; auditShown = AUDIT_PAGE; renderAudit(auditQuery); });
+      const auditMoreBtn = $('#stAuditMore');
+      if (auditMoreBtn) auditMoreBtn.addEventListener('click', () => { auditShown += AUDIT_PAGE; renderAudit(); });
+
+      await loadSettings();
+      await loadUsers();
+      await loadRoles();
+      await loadAudit();
+
+      const tab = new URLSearchParams(location.search).get('tab');
+      if (tab) {
+        const btn = document.querySelector(`#setTabs [data-tab="${tab}"]`);
+        if (btn) bootstrap.Tab.getOrCreateInstance(btn).show();
+      }
+    });
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a43e5a00dd118fa7',t:'MTc5MDg4Nzk1MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

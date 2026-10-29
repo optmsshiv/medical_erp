@@ -43,6 +43,7 @@ final class MenuGate
         'schedules.php'          => ['Schedule / Class', []],
         'compliance-reports.php' => ['Compliance Register', ['compliance_export']],
         'payments.php'           => ['Payments', []],
+        'whatsapp.php'           => ['Store Settings', ['menu_whatsapp']],
         'expenses.php'           => ['Expenses', ['expenses']],
         'cash-book.php'          => ['Cash Book', []],
         // settings.php bundles six admin tabs; it opens if ANY of them is allowed.
