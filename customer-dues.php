@@ -27,11 +27,12 @@ if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/Men
     .cd-act-menu .dropdown-item { display:flex; align-items:center; gap:10px; font-size:.84rem; font-weight:600; border-radius:8px; padding:.48rem .65rem; transition:background .15s ease, color .15s ease; }
     .cd-act-menu .dropdown-item i { width:1.05rem; color:var(--mf-primary); }
     .cd-act-menu .dropdown-item:hover { background:var(--mf-primary-soft); color:var(--mf-primary-dark); }
-    .cd-name { font-weight:700; color:#1b2430; }
+    .cd-name { font-weight:700; color:#1b2430; max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .cd-muted { display:block; margin-top:2px; color:#8b9bb0; font-size:.75rem; font-weight:600; line-height:1.3; }
     .cd-gstin { font-size:.78rem; font-weight:700; letter-spacing:.03em; color:var(--mf-primary-dark); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:132px; display:inline-block; vertical-align:bottom; }
     .cd-due { color:#B02A37; font-weight:700; }
-    .cd-wide { table-layout:fixed; width:100%; }
+    .cd-wide { table-layout:auto; width:100%; }
+    .cd-wide thead th, .cd-wide tbody td { white-space:nowrap; }
     .cd-ledger { border:1px solid #e3ebf4; border-radius:16px; background:#fff; overflow:hidden; box-shadow:0 1px 2px rgba(22,50,92,.04), 0 10px 28px rgba(22,50,92,.04); }
     .cd-ledger-search { display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid #e7eef6; background:#fff; }
     .cd-ledger-search > i { color:#8b9bb0; font-size:15px; }
@@ -96,15 +97,15 @@ if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/Men
             <table class="table table-mf cd-wide">
               <thead>
                 <tr>
-                  <th style="width:33%">Customer</th>
-                  <th class="cd-h-lg" style="width:10%">GSTIN</th>
-                  <th class="text-end cd-h-md" style="width:6.5%">Open bills</th>
-                  <th class="text-end" style="width:9%">Billed</th>
-                  <th class="text-end" style="width:10%">Paid</th>
-                  <th class="text-end" style="width:9%">Due</th>
-                  <th style="width:9.5%">Oldest open</th>
-                  <th style="width:8%">Position</th>
-                  <th class="text-end" style="width:5%">Actions</th>
+                  <th>Customer</th>
+                  <th class="cd-h-lg">GSTIN</th>
+                  <th class="text-end cd-h-md">Open bills</th>
+                  <th class="text-end">Billed</th>
+                  <th class="text-end">Paid</th>
+                  <th class="text-end">Due</th>
+                  <th>Oldest open</th>
+                  <th>Position</th>
+                  <th class="text-end">Actions</th>
                 </tr>
               </thead>
               <tbody id="cdBody"></tbody>
@@ -446,7 +447,7 @@ if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/Men
           const payPct = Number(r.billed) > 0 ? Math.min(100, Math.round(Math.min(Number(r.billed), Number(r.amount_paid) || 0) / Number(r.billed) * 100)) : null;
           return `<tr${rowCls ? ` class="${rowCls}"` : ''}>
             <td>
-              <div class="cd-name">${MF.esc(r.customer_name || '—')}</div>
+              <div class="cd-name" title="${MF.esc(r.customer_name || '—')}">${MF.esc(r.customer_name || '—')}</div>
               ${phone ? `<span class="cd-muted">${MF.esc(phone)}</span>` : ''}
               <div class="mt-1">${typeBadge(r.customer_type)}</div>
             </td>

@@ -24,6 +24,7 @@ if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/Men
     .cu-save:hover, .cu-edit:hover { transform:translateY(-1px); }
     .cu-edit:hover { background:var(--mf-primary-soft); color:var(--mf-primary-dark); border-color:var(--mf-primary); }
     .cu-addr { display:block; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#516278; }
+    .cu-h-lg .cu-sub { max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .cu-type { display:inline-flex; align-items:center; margin-top:4px; border:1px solid transparent; border-radius:4px; padding:1px 6px; font-size:.72rem; font-weight:700; letter-spacing:.01em; }
     .cu-type.retail { background:#E6F1EE; color:#0F4D42; border-color:#b7ddd4; }
     .cu-type.wholesale { background:#E0F2FE; color:#0369A1; border-color:#bae6fd; }
@@ -72,7 +73,8 @@ if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/Men
     .btn-mf.cu-busy::after { background:#fff; }
     @keyframes cu-slide { from { transform:translateX(-120%); } to { transform:translateX(320%); } }
     /* ------- Customer ledger premium pass ------- */
-    .cu-table { table-layout: fixed; width: 100%; }
+    .cu-table { table-layout: auto; width: 100%; min-width: 880px; }
+    .cu-table thead th, .cu-table tbody td { white-space: nowrap; }
     .cu-minw0 { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
     .cu-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
     .cu-person { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -143,9 +145,9 @@ if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/Men
             <table class="table table-mf cu-table">
               <thead>
                 <tr>
-                  <th style="width:20%">Customer Name</th><th style="width:12%">Phone</th><th class="cu-h-lg" style="width:11%">GSTIN</th><th class="cu-h-lg" style="width:16%">Address</th>
-                  <th class="text-end" style="width:9%">Total Sales</th><th class="text-end" style="width:9%">Paid</th><th class="text-end" style="width:8%">Due</th>
-                  <th style="width:9%">Last Purchase</th><th class="text-end" style="width:6%">Actions</th>
+                  <th>Customer Name</th><th>Phone</th><th class="cu-h-lg">GSTIN</th><th class="cu-h-lg">Address</th>
+                  <th class="text-end">Total Sales</th><th class="text-end">Paid</th><th class="text-end">Due</th>
+                  <th>Last Purchase</th><th class="text-end">Actions</th>
                 </tr>
               </thead>
               <tbody id="cuBody"></tbody>
@@ -423,7 +425,7 @@ if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/Men
             <td><div class="cu-person"><span class="cu-av ${tone}">${MF.esc(initials)}</span><span class="cu-minw0"><span class="cu-nm cu-ellipsis" title="${MF.esc(c.name)}">${MF.esc(c.name)}</span>${biz ? `<span class="cu-sub cu-ellipsis" title="${MF.esc(biz)}">${MF.esc(biz)}</span>` : ''}</span></div></td>
             <td><div class="num">${MF.esc(c.phone || '—')}</div>${kind && kind !== '—' ? `<span class="cu-type ${tone}">${MF.esc(kind)}</span>` : ''}</td>
             <td class="cu-h-lg">${gstin ? `<span class="cu-mono">${MF.esc(gstin)}</span>` : '<span class="text-2">—</span>'}</td>
-            <td class="cu-h-lg">${addr ? `<span class="cu-addr" title="${MF.esc(addr)}">${MF.esc(addr)}</span>` : '<span class="text-2">—</span>'}${city ? `<div class="cu-sub">${MF.esc(city)}</div>` : ''}</td>
+            <td class="cu-h-lg">${addr ? `<span class="cu-addr" title="${MF.esc(addr)}">${MF.esc(addr)}</span>` : '<span class="text-2">—</span>'}${city ? `<div class="cu-sub" title="${MF.esc(city)}">${MF.esc(city)}</div>` : ''}</td>
             <td class="text-end cu-num">${MF.fmt(c.totalSales)}</td>
             <td class="text-end cu-num text-success">${MF.fmt(c.paid)}${settlePct != null ? `<div class="cu-bar"><i style="width:${settlePct}%"></i></div>` : ''}</td>
             <td class="text-end cu-num fw-semibold ${c.due > 0 ? 'text-danger' : ''}">${MF.fmt(c.due)}${!(c.due > 0) && (c.advance || 0) > 0 ? `<div class="cu-adv">ADV +₹${MF.fmt(c.advance)}</div>` : ''}</td>
