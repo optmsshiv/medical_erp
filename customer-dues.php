@@ -96,15 +96,15 @@ if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/Men
             <table class="table table-mf cd-wide">
               <thead>
                 <tr>
-                  <th style="width:23%">Customer</th>
-                  <th class="cd-h-lg" style="width:11%">GSTIN</th>
-                  <th class="text-end cd-h-md" style="width:8%">Open bills</th>
-                  <th class="text-end" style="width:11%">Billed</th>
-                  <th class="text-end" style="width:11%">Paid</th>
-                  <th class="text-end" style="width:11%">Due</th>
-                  <th style="width:10%">Oldest open</th>
-                  <th style="width:9%">Position</th>
-                  <th class="text-end" style="width:6%">Actions</th>
+                  <th style="width:33%">Customer</th>
+                  <th class="cd-h-lg" style="width:10%">GSTIN</th>
+                  <th class="text-end cd-h-md" style="width:6.5%">Open bills</th>
+                  <th class="text-end" style="width:9%">Billed</th>
+                  <th class="text-end" style="width:10%">Paid</th>
+                  <th class="text-end" style="width:9%">Due</th>
+                  <th style="width:9.5%">Oldest open</th>
+                  <th style="width:8%">Position</th>
+                  <th class="text-end" style="width:5%">Actions</th>
                 </tr>
               </thead>
               <tbody id="cdBody"></tbody>
@@ -463,6 +463,7 @@ if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/Men
                 <ul class="dropdown-menu dropdown-menu-end cd-act-menu">
                   <li><button type="button" class="dropdown-item" data-a="view" data-id="${MF.esc(r.customer_id)}"><i class="bi bi-eye"></i><span>View bills</span></button></li>
                   <li><button type="button" class="dropdown-item" data-a="stmt" data-id="${MF.esc(r.customer_id)}"><i class="bi bi-qr-code"></i><span>UPI statement</span></button></li>
+                  <li><button type="button" class="dropdown-item" data-a="wa" data-id="${MF.esc(r.customer_id)}" ${Number(r.outstanding) > 0.009 ? '' : 'disabled'}><i class="bi bi-whatsapp"></i><span>WhatsApp reminder</span></button></li>
                   <li><a class="dropdown-item" href="customers.php"><i class="bi bi-people"></i><span>Customers</span></a></li>
                   <li><a class="dropdown-item" href="retail-pos.php"><i class="bi bi-cart-plus"></i><span>New retail sale</span></a></li>
                 </ul>
@@ -481,6 +482,25 @@ if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/Men
         $('#cdBody').querySelectorAll('[data-a="stmt"]').forEach((b) => b.addEventListener('click', () => {
           const row = state.customers.find((r) => String(r.customer_id) === String(b.dataset.id));
           if (row) openStmt(row);
+        }));
+        $('#cdBody').querySelectorAll('[data-a="wa"]').forEach((b) => b.addEventListener('click', async () => {
+          if (!MF.Api.live) { MF.toast('Reminders need the live server.', 'warn', 'Demo mode'); return; }
+          const row = state.customers.find((r) => String(r.customer_id) === String(b.dataset.id));
+          if (!row) return;
+          const label = b.querySelector('span');
+          const old = label ? label.textContent : '';
+          b.disabled = true;
+          if (label) label.textContent = 'Sending…';
+          try {
+            const res = await MF.Api.post('wa-reminder.php', { customerId: row.customer_id });
+            const d = (res && res.data) || {};
+            MF.toast(`Reminder sent to ${MF.esc(d.to || 'the customer')} for ${MF.fmt(Number(d.amount) || 0)}.`, 'success', 'WhatsApp');
+          } catch (err) {
+            MF.toast((err && err.message) || 'Could not send the reminder.', 'danger', 'WhatsApp');
+          } finally {
+            b.disabled = false;
+            if (label) label.textContent = old;
+          }
         }));
         renderFilters();
       }
