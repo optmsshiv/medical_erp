@@ -2,6 +2,7 @@
 session_start();
 require __DIR__ . '/middleware/tenant.php';
 require __DIR__ . '/middleware/auth.php'; // redirects to /login.php if not logged in
+if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/MenuGate.php'; MenuGate::enforce(); }  // roles matrix + platform kill-switch — typed URLs obey
 
 $client = Tenant::current();
 $user   = Auth::user();
@@ -646,7 +647,7 @@ if ($cashier === '') $cashier = 'Cashier';
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="assets/js/data.js"></script>
   <script src="assets/js/config.js"></script>
-  <script src="assets/js/app.js?v=2026-10-26.01"></script>
+  <script src="assets/js/app.js?v=2026-10-26.04"></script>
   <!-- Quick Refill — slide-in side panel -->
   <div class="pos-refill-overlay" id="posRefillOverlay" hidden></div>
   <aside class="pos-refill-panel" id="posRefillPanel" role="dialog" aria-label="Quick refill" hidden>
@@ -707,19 +708,50 @@ if ($cashier === '') $cashier = 'Cashier';
   </aside>
 
   <!-- BUMP this version on EVERY pos.js change — long-cache browsers must not serve stale billing logic. -->
-  <script src="assets/js/pos.js?v=2026-10-26.01"></script>
+  <script src="assets/js/pos.js?v=2026-10-26.02"></script>
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
       await MF.boot();
       const D = window.MF_DATA;
       const $ = (s) => document.querySelector(s);
 
+      /* OTC = over the counter: an unclaimed bill must default to "Walk-in
+         Customer", never to whichever name happens to be first in the book.
+         The row is provisioned once per tenant through the normal customers
+         API (older installs never got one); if that is not possible, the
+         pinned option carries value '' — sales.php records no-customer sales
+         as Walk-in in the ledger, so the paperwork matches the screen. */
+      function walkInRow() { return (D.customers || []).find((c) => c.name === 'Walk-in Customer') || null; }
       function renderCustomers() {
         const custSel = document.getElementById('posCustomer');
-        custSel.innerHTML = D.customers.map((c) =>
-          `<option value="${c.id}">${MF.esc(c.name)}${c.name === 'Walk-in Customer' ? ' (default)' : ''}</option>`).join('');
+        if (!custSel) return;
+        const keep = custSel.value;
+        const w = walkInRow();
+        const wid = w ? String(w.id) : '';
+        const rest = (D.customers || []).filter((c) => !w || c !== w);
+        custSel.innerHTML = `<option value="${MF.esc(wid)}">Walk-in Customer (default)</option>` +
+          rest.map((c) => `<option value="${MF.esc(String(c.id))}">${MF.esc(c.name)}</option>`).join('');
+        const still = keep && [...custSel.options].some((o) => String(o.value) === String(keep));
+        custSel.value = still ? keep : wid;
       }
+      async function ensureWalkIn() {
+        if (walkInRow()) return;
+        if (!(window.MF && MF.Api && MF.Api.live)) {
+          D.customers = D.customers || [];
+          D.customers.unshift({ id: 'walkin', name: 'Walk-in Customer', phone: '', address: '', type: 'retail' });
+          return;
+        }
+        try {
+          const res = await MF.Api.post('customers.php', { name: 'Walk-in Customer', type: 'retail' });
+          if (res && res.id) {
+            D.customers = D.customers || [];
+            D.customers.unshift({ id: res.id, name: 'Walk-in Customer', phone: '', address: '', type: 'retail' });
+          }
+        } catch (e) { /* server refused — the pinned no-customer default still holds */ }
+      }
+      await ensureWalkIn();
       renderCustomers();
+      if (window.POSUI && POSUI.syncPickers) POSUI.syncPickers(); // lookup input paints its label before options exist — repaint
 
       /* One quick-add modal serves both Customer (+ beside Customer) and Doctor (+ beside Doctor). */
       const qaModal = new bootstrap.Modal('#quickAddModal');

@@ -86,6 +86,20 @@ if ($cashier === '') $cashier = 'Cashier';
     .pos-complete-btn:disabled { opacity:.6; }
     .pos-complete-amt { font-size:1.12rem; font-weight:800; font-variant-numeric:tabular-nums; }
 
+    /* Checkout lock veil — shown by pos.js while the sale is being written.
+       z-1040: above the sticky topbar, below modals (1055) and toasts (1090). */
+    #posSaleOv { position:fixed; inset:0; z-index:1040; background:rgba(11,26,20,.42); backdrop-filter:blur(2px); display:flex; align-items:center; justify-content:center; animation:posSaleIn .16s ease; cursor:progress; }
+    .pos-sale-lock { background:#fff; border:1px solid #e3ebf4; border-radius:16px; box-shadow:0 24px 60px rgba(10,25,20,.35); padding:22px 32px; display:flex; flex-direction:column; align-items:center; gap:10px; min-width:290px; }
+    .pos-sale-lock .spinner-border { width:1.55rem; height:1.55rem; border-width:.2em; color:#176B5B; }
+    .pos-sale-lock b { font-size:.95rem; color:#12291F; }
+    .pos-sale-note { font-size:.72rem; color:#8b9bb0; text-align:center; }
+    .pos-sale-bar { width:220px; max-width:70vw; height:4px; border-radius:4px; background:#EDF1F4; overflow:hidden; position:relative; }
+    .pos-sale-bar i { position:absolute; top:0; left:-40%; width:40%; height:100%; border-radius:4px; background:linear-gradient(90deg,#34B399,#176B5B); animation:posSaleRun .95s ease-in-out infinite; }
+    @keyframes posSaleRun { to { left:100%; } }
+    @keyframes posSaleIn { from { opacity:0; } }
+    .pos-complete-btn.pos-sale-done { filter:brightness(1.05); }
+    .pos-complete-btn[aria-busy="true"] { cursor:progress; }
+
     /* Bill-level discount — % | ₹ segmented toggle (teal active cell) */
     .pos-disc-input { max-width:110px; flex:0 0 auto; }
     .pos-disc-toggle { display:inline-flex; border:1.5px solid #cfd9e4; border-radius:9px; overflow:hidden; flex:0 0 auto; background:#fff; }
@@ -417,7 +431,7 @@ if ($cashier === '') $cashier = 'Cashier';
               <div class="pos-complete-bar">
                 <button class="btn btn-mf pos-complete-btn" id="posComplete" type="button">
                   <i class="bi bi-check2-circle"></i>
-                  <span>Complete Sale ·</span>
+                  <span id="posCompleteTxt">Complete Sale ·</span>
                   <span class="pos-complete-amt" id="posCompleteAmt">₹0</span>
                   <span class="badge bg-white text-success">F10</span>
                 </button>
@@ -708,7 +722,7 @@ if ($cashier === '') $cashier = 'Cashier';
   </aside>
 
   <!-- BUMP this version on EVERY pos.js change — long-cache browsers must not serve stale billing logic. -->
-  <script src="assets/js/pos.js?v=2026-10-26.02"></script>
+  <script src="assets/js/pos.js?v=2026-10-26.03"></script>
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
       await MF.boot();

@@ -2884,6 +2884,7 @@
 
   async function completeSale() {
     if (state.tenderOpen) { document.getElementById('posTenderOk')?.click(); return; }
+    if (state.completing) { MF.toast('The last sale is still being finished — one moment.', 'info', 'Busy'); return; }
     if (!state.cart.length) { MF.toast('Cart is empty', 'warn', 'Cannot complete sale'); return; }
     // Schedule H/H1/X/NDPS in the cart → doctor and patient details are mandatory.
     const sch = autoRxSchedule();
@@ -2932,7 +2933,31 @@
     if (!tender) return;
     state.tender = tender;
 
-    $('#posComplete').disabled = true;
+    /* Checkout is never silent: phase label in the button, a dimmed lock veil
+       across the counter, and a beforeunload guard while the bill is written. */
+    state.completing = true;
+    const cbtn = $('#posComplete');
+    const ctxt = $('#posCompleteTxt');
+    const cico = cbtn ? cbtn.querySelector('i') : null;
+    const cicoOld = cico ? cico.className : '';
+    let saleOv = document.getElementById('posSaleOv');
+    if (!saleOv) {
+      saleOv = document.createElement('div');
+      saleOv.id = 'posSaleOv';
+      saleOv.innerHTML = '<div class="pos-sale-lock"><span class="spinner-border spinner-border-sm"></span><b id="posSalePhase">Saving sale\u2026</b><div class="pos-sale-bar"><i></i></div><span class="pos-sale-note">Writing the bill \u2014 please don\u2019t close or refresh this window.</span></div>';
+      document.body.appendChild(saleOv);
+    }
+    const setPhase = (t) => {
+      if (ctxt) ctxt.textContent = t;
+      const p = document.getElementById('posSalePhase');
+      if (p) p.textContent = t;
+    };
+    const beforeUnload = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', beforeUnload);
+    if (cbtn) { cbtn.disabled = true; cbtn.setAttribute('aria-busy', 'true'); }
+    if (cico) cico.className = 'spinner-border spinner-border-sm';
+    setPhase('Saving sale\u2026');
+    let saleOk = false;
     try {
       const res = await MF.Api.post('sales.php', {
         customerId: $('#posCustomer').value,
@@ -2944,6 +2969,8 @@
         changeReturned: tender.changeReturned,
         items: state.cart.map((l) => ({ medId: l.medId, batchId: l.batchId, qty: l.qty, rate: l.rate, discPct: l.discPct, unit: l.unit || 'pack' })),
       });
+      saleOk = true;
+      setPhase('Printing & stock sync\u2026');
       if (state.autoPrint) {
         MF.printHtml(state.printFmt === 'thermal'
           ? thermalReceiptHtml(res.invoiceNo, t)
@@ -3018,7 +3045,23 @@
       state.tender = null;
       MF.toast(err.message || 'Could not complete the sale.', 'danger', 'Sale failed');
     } finally {
-      $('#posComplete').disabled = false;
+      state.completing = false;
+      window.removeEventListener('beforeunload', beforeUnload);
+      const ovEl = document.getElementById('posSaleOv');
+      if (ovEl) ovEl.remove();
+      const restore = () => {
+        if (ctxt) ctxt.textContent = 'Complete Sale \u00b7';
+        if (cico) cico.className = cicoOld;
+        if (cbtn) { cbtn.disabled = false; cbtn.removeAttribute('aria-busy'); cbtn.classList.remove('pos-sale-done'); }
+      };
+      if (saleOk) {
+        setPhase('Sale completed \u2713');
+        if (cico) cico.className = 'bi bi-check2-all';
+        if (cbtn) { cbtn.disabled = false; cbtn.classList.add('pos-sale-done'); }
+        setTimeout(restore, 850);
+      } else {
+        restore();
+      }
     }
   }
 
