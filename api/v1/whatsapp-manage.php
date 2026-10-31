@@ -77,9 +77,14 @@ if ($method === 'GET') {
     $log = []; $stats = ['today_reminders' => 0, 'sent_7d' => 0, 'failed_7d' => 0];
     $client = null;
     if ($master !== null) {
-        $cfg = WaSend::cfg($master);
+        $cfg = WaSend::cfg($master, $pdo);
+        $platformOn = $cfg['enabled'] === '1' && $cfg['token'] !== '' && $cfg['phone_id'] !== '';
+        $err = '';
+        if ($cfg['source'] === 'off') { $err = 'Reminders are paused for this store (Setup → switched off).'; }
+        elseif (!$cfg['on'] && $cfg['source'] === 'own') { $err = 'Your own line needs a Phone number ID and token in Setup below.'; }
+        elseif (!$cfg['on']) { $err = $platformOn ? 'Platform line incomplete.' : 'The platform line is off or incomplete — ask the platform admin, or use your own line in Setup below.'; }
         $status = [
-            'configured' => $cfg['enabled'] === '1' && ($cfg['token'] !== '' || $cfg['phone_id'] !== ''),
+            'configured' => $platformOn,
             'on' => (bool) $cfg['on'],
             'phone_id' => $cfg['phone_id'],
             'ver' => $cfg['ver'],
@@ -87,7 +92,11 @@ if ($method === 'GET') {
             'cc' => $cfg['cc'],
             'tpl_alert' => $cfg['tpl_alert'],
             'token_mask' => $cfg['token'] !== '' ? '••••' . substr($cfg['token'], -4) : '',
-            'error' => $cfg['on'] ? '' : 'Turn WhatsApp on (and save credentials) on the portal first.',
+            'source' => $cfg['source'],
+            'mode' => $cfg['mode'],
+            'platform_on' => $platformOn,
+            'own' => $cfg['own'],
+            'error' => $err,
         ];
         $client = WaSend::clientId($master);
         if ($client !== null) {
@@ -175,10 +184,41 @@ if ($method === 'POST') {
         Json::ok(['data' => ['saved' => true, 'whatsapp' => $num]]);
     }
 
+    if ($action === 'save_cfg') {
+        $mode = trim((string) ($input['mode'] ?? ''));
+        if (!in_array($mode, ['platform', 'own', 'off'], true)) { Json::error('Unknown WhatsApp mode.', 422); }
+        $pick = function (string $key, string $pattern, string $why, int $max = 64) use ($input): string {
+            $v = trim((string) ($input[$key] ?? ''));
+            if ($v !== '' && !preg_match($pattern, $v)) { Json::error($why, 422); }
+            return substr($v, 0, $max);
+        };
+        $rows = ['wa_mode' => $mode];
+        $rows['wa_phone_id'] = $pick('phone_id', '/^\d{6,24}$/', 'Phone number ID should be digits only (Meta app dashboard → WhatsApp → API setup).');
+        $rows['wa_ver']      = $pick('ver', '/^v\d{1,2}\.\d+$/', 'API version looks wrong — use the format v21.0.');
+        $rows['wa_lang']     = $pick('lang', '/^[a-z]{2}(-[A-Za-z]{2})?$/', 'Language should be a code like en or en_GB.');
+        $rows['wa_cc']       = $pick('cc', '/^\d{1,3}$/', 'Country code should be 1–3 digits, e.g. 91.');
+        $rows['wa_tpl_alert'] = $pick('tpl_alert', '/^[a-z0-9_]{2,64}$/', 'Template names use lowercase letters, digits and underscores.');
+        $tok = trim((string) ($input['token'] ?? ''));
+        if ($tok !== '' && $tok !== '••keep••') {
+            if (!preg_match('/^[\w\.\-=]{20,512}$/', $tok)) { Json::error('That does not look like a Meta permanent access token.', 422); }
+            $rows['wa_token'] = $tok;
+        }
+        if (!empty($input['clear_token'])) { $rows['wa_token'] = ''; }
+        try {
+            $stmt = $pdo->prepare('INSERT INTO settings (setting_key, setting_value) VALUES (:k, :v) ON DUPLICATE KEY UPDATE setting_value = :v2');
+            foreach ($rows as $k => $v) { $stmt->execute(['k' => $k, 'v' => (string) $v, 'v2' => (string) $v]); }
+        } catch (Throwable $e) {
+            Json::error('Could not save the WhatsApp setup: ' . $e->getMessage(), 500);
+        }
+        try { Audit::log('SETTINGS_UPDATE', 'WhatsApp line settings saved (mode: ' . $mode . ')'); } catch (Throwable $e) { }
+        Json::ok(['data' => ['saved' => true, 'mode' => $mode]]);
+    }
+
     if ($action === 'test') {
         if ($master === null) { Json::error($masterErr, 503); }
-        $cfg = WaSend::cfg($master);
-        if (!$cfg['on']) { Json::error('WhatsApp is not configured (or is switched off) on the platform.', 503); }
+        $cfg = WaSend::cfg($master, $pdo);
+        if ($cfg['source'] === 'off') { Json::error('Reminders are switched off for this store (WhatsApp › Setup).', 409); }
+        if (!$cfg['on']) { Json::error($cfg['source'] === 'own' ? 'Finish your own line setup first (Phone number ID + token).' : 'The platform WhatsApp line is off or incomplete.', 503); }
         $cc = $cfg['cc'] !== '' ? $cfg['cc'] : '91';
         $to = (string) ($cust['phone'] ?? '');
         try {

@@ -23,8 +23,16 @@ class WaSend
     const REMINDERS_PER_NUM_PER_DAY = 3;
     const TESTS_PER_NUM_PER_DAY = 5;
 
-    /** wa_* config from the control plane, with the portal's defaults. */
-    public static function cfg(PDO $m): array
+    /**
+     * Resolved send config with a three-tier precedence:
+     *   tenant wa_mode='own'       → the store's own Meta number (fields stored in the
+     *                                TENANT settings table under the same wa_* keys)
+     *   tenant wa_mode='off'       → tenant-originated sends paused (platform sends,
+     *                                e.g. billing receipts, are untouched)
+     *   otherwise (default)        → the platform line from master billing_settings
+     * $t null → platform-only (portal use). 'source' tells the UI which line is live.
+     */
+    public static function cfg(PDO $m, ?PDO $t = null): array
     {
         $out = ['enabled' => '', 'token' => '', 'phone_id' => '', 'ver' => 'v21.0', 'lang' => 'en', 'cc' => '91',
                 'tpl_onboard' => '', 'tpl_paid' => '', 'tpl_alert' => ''];
@@ -34,7 +42,37 @@ class WaSend
                 if (array_key_exists($k, $out)) { $out[$k] = (string) $r['value']; }
             }
         } catch (Throwable $e) { /* control plane unreadable → treated as off below */ }
-        $out['on'] = ($out['enabled'] === '1' && $out['token'] !== '' && $out['phone_id'] !== '');
+        $platformOn = ($out['enabled'] === '1' && $out['token'] !== '' && $out['phone_id'] !== '');
+
+        $mode = 'platform';
+        $ov = [];
+        if ($t !== null) {
+            try {
+                foreach ($t->query("SELECT setting_key, setting_value FROM settings WHERE setting_key LIKE 'wa_%'")->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                    $ov[substr((string) $r['setting_key'], 3)] = trim((string) $r['setting_value']);
+                }
+            } catch (Throwable $e) { /* no rows yet = plain platform mode */ }
+            $m0 = (string) ($ov['mode'] ?? '');
+            if ($m0 === 'own' || $m0 === 'off' || $m0 === 'platform') { $mode = $m0; }
+        }
+        $out['mode'] = $mode;
+        $out['own'] = ['phone_id' => (string) ($ov['phone_id'] ?? ''), 'ver' => (string) ($ov['ver'] ?? ''),
+                       'lang' => (string) ($ov['lang'] ?? ''), 'cc' => (string) ($ov['cc'] ?? ''),
+                       'tpl_alert' => (string) ($ov['tpl_alert'] ?? ''), 'has_token' => (string) ($ov['token'] ?? '') !== ''];
+
+        if ($mode === 'own') {
+            foreach (['token', 'phone_id', 'ver', 'lang', 'cc', 'tpl_alert'] as $k) {
+                if (($ov[$k] ?? '') !== '') { $out[$k] = (string) $ov[$k]; }
+            }
+            $out['source'] = 'own';
+            $out['on'] = ($out['token'] !== '' && $out['phone_id'] !== '');
+        } elseif ($mode === 'off') {
+            $out['source'] = 'off';
+            $out['on'] = false;
+        } else {
+            $out['source'] = 'platform';
+            $out['on'] = $platformOn;
+        }
         return $out;
     }
 

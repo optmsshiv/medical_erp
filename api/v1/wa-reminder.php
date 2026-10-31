@@ -84,9 +84,12 @@ try {
     Json::error('Control plane unreachable — WhatsApp is managed centrally.', 503);
 }
 
-$cfg = WaSend::cfg($m);
+$cfg = WaSend::cfg($m, $pdo);
+if ($cfg['source'] === 'off') {
+    Json::error('Due reminders are switched off for this store (WhatsApp › Setup).', 409);
+}
 if (!$cfg['on']) {
-    Json::error('WhatsApp is not configured (or is switched off) on the platform.', 503);
+    Json::error($cfg['source'] === 'own' ? 'Your own WhatsApp line is not ready — add Phone number ID + token in WhatsApp › Setup.' : 'WhatsApp is not configured (or is switched off) on the platform.', 503);
 }
 
 $num = WaSend::norm($to, $cfg['cc']);

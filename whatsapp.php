@@ -7,7 +7,7 @@ if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/Men
 <!doctype html>
 <html lang="en">
 <head>
-  <!-- build 2026-10-29.01 - tenant WhatsApp management (numbers, status, sends) -->
+  <!-- build 2026-10-29.02 - tenant WhatsApp management + own-line setup -->
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>WhatsApp · OPTMS-RX</title>
@@ -44,6 +44,13 @@ if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/Men
     .wa-search { display:flex; align-items:center; gap:8px; border:1px solid #e3ebf4; border-radius:10px; padding:6px 11px; background:#fff; }
     .wa-search input { border:0; outline:0; background:transparent; width:210px; font-size:.86rem; }
     .wa-log-ok { color:#0F766E; font-weight:800; } .wa-log-fail { color:#B02A37; font-weight:800; }
+    .wa-mode { display:flex; gap:10px; align-items:flex-start; border:1px solid #e3ebf4; border-radius:12px; padding:10px 13px; cursor:pointer; transition:border-color .15s, background .15s; }
+    .wa-mode:hover { background:#fbfcfe; }
+    .wa-mode.sel { border-color:#25D366; background:#F3FBF8; }
+    .wa-mode input { margin-top:3px; }
+    .wa-mode b { font-size:.86rem; color:#1b2430; }
+    .wa-lbl { display:block; font-size:.66rem; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:#8b9bb0; margin-bottom:3px; }
+    .wa-input.w-100 { width:100%; max-width:none; }
     .wa-note { font-size:.78rem; color:#8b9bb0; line-height:1.5; }
     @media (max-width:767.98px) { .wa-search input { width:120px; } }
   </style>
@@ -66,6 +73,39 @@ if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/Men
         </div>
 
         <div class="row g-3 mb-3" id="waStats"></div>
+
+        <div class="card-mf wa-card mb-3">
+          <div class="wa-head">
+            <h6><i class="bi bi-sliders me-1"></i>WhatsApp line &amp; setup</h6>
+            <span class="wa-note me-auto" id="waSrcBadge">—</span>
+          </div>
+          <div class="p-3">
+            <div class="d-flex flex-column gap-2 mb-3" id="waModes">
+              <label class="wa-mode" data-m="platform"><input type="radio" name="waMode" value="platform">
+                <span><b>Platform line <span class="wa-note">(recommended)</span></b><div class="wa-note">Send through the shared store line managed by OPTMS-RX. Nothing to configure.</div></span></label>
+              <label class="wa-mode" data-m="own"><input type="radio" name="waMode" value="own">
+                <span><b>My own WhatsApp Business number</b><div class="wa-note">Your Meta Business account's phone number ID + permanent token. Templates must be approved on <em>your</em> number.</div></span></label>
+              <label class="wa-mode" data-m="off"><input type="radio" name="waMode" value="off">
+                <span><b>Off</b><div class="wa-note">Pause due-reminder sends from this store. The portal's own billing messages are unaffected.</div></span></label>
+            </div>
+            <div id="waOwn" hidden>
+              <div class="row g-2">
+                <div class="col-6 col-lg-4"><label class="wa-lbl">Phone number ID *</label><input class="wa-input w-100" id="waPhoneId" inputmode="numeric" placeholder="e.g. 1055xxxxxxxxxxx"></div>
+                <div class="col-6 col-lg-4"><label class="wa-lbl">Permanent token <span id="waTokHint" class="wa-note"></span></label><input class="wa-input w-100" id="waToken" type="password" autocomplete="new-password" placeholder="paste EABA… token"></div>
+                <div class="col-6 col-lg-4"><label class="wa-lbl">Alert template (optional)</label><input class="wa-input w-100" id="waTpl" placeholder="due_reminder"></div>
+                <div class="col-6 col-lg-4"><label class="wa-lbl">API version</label><input class="wa-input w-100" id="waVer" placeholder="v21.0"></div>
+                <div class="col-3 col-lg-2"><label class="wa-lbl">Language</label><input class="wa-input w-100" id="waLang" placeholder="en"></div>
+                <div class="col-3 col-lg-2"><label class="wa-lbl">Country code</label><input class="wa-input w-100" id="waCc" placeholder="91"></div>
+              </div>
+              <label class="wa-note d-inline-flex align-items-center gap-1 mt-2 mb-0"><input type="checkbox" id="waTokClear" class="form-check-input mt-0"> remove saved token</label>
+              <p class="wa-note mb-0 mt-2"><i class="bi bi-info-circle me-1"></i>Where to find these: Meta for Developers → your app → WhatsApp → API setup. The token is stored in this store's own database, never on the browser.</p>
+            </div>
+            <div class="d-flex align-items-center gap-2 mt-3">
+              <button class="btn btn-sm btn-mf" id="waCfgSave"><i class="bi bi-check2 me-1"></i>Save setup</button>
+              <span class="wa-note" id="waCfgNote"></span>
+            </div>
+          </div>
+        </div>
 
         <div class="card-mf wa-card mb-3">
           <div class="wa-head">
@@ -115,11 +155,50 @@ if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/Men
       const $ = (s) => document.querySelector(s);
       let D = { customers: [], log: [], status: {}, stats: {}, store: '', hasNumberColumn: true };
 
+      function setSetup(st) {
+        if (!st || !st.mode) return;
+        const mode = st.mode;
+        document.querySelectorAll('input[name="waMode"]').forEach((r) => { r.checked = r.value === mode; });
+        document.querySelectorAll('.wa-mode').forEach((l) => l.classList.toggle('sel', l.getAttribute('data-m') === mode));
+        $('#waOwn').hidden = mode !== 'own';
+        const own = st.own || {};
+        const fill = (id, v) => { const el = $(id); if (el && !el.matches(':focus')) el.value = v || ''; };
+        fill('#waPhoneId', own.phone_id); fill('#waVer', own.ver); fill('#waLang', own.lang); fill('#waCc', own.cc); fill('#waTpl', own.tpl_alert);
+        $('#waTokHint').textContent = own.has_token ? `(saved ${st.token_mask || '••••'})` : '(required)';
+        $('#waToken').value = ''; $('#waToken').placeholder = own.has_token ? '••keep•• — leave blank to keep' : 'paste EABA… token';
+        $('#waTokClear').checked = false;
+      }
+
+      document.querySelectorAll('input[name="waMode"]').forEach((r) => r.addEventListener('change', () => {
+        document.querySelectorAll('.wa-mode').forEach((l) => l.classList.toggle('sel', l.querySelector('input').checked && l.getAttribute('data-m') === r.value));
+        $('#waOwn').hidden = r.value !== 'own';
+      }));
+
+      $('#waCfgSave').addEventListener('click', async () => {
+        const mode = (document.querySelector('input[name="waMode"]:checked') || {}).value || 'platform';
+        const btn = $('#waCfgSave'); const old = btn.innerHTML;
+        btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving…';
+        try {
+          await MF.Api.post('whatsapp-manage.php', {
+            action: 'save_cfg', mode,
+            phone_id: $('#waPhoneId').value.trim(), token: $('#waToken').value.trim(),
+            clear_token: $('#waTokClear').checked ? 1 : 0,
+            ver: $('#waVer').value.trim(), lang: $('#waLang').value.trim(), cc: $('#waCc').value.trim(),
+            tpl_alert: $('#waTpl').value.trim(),
+          });
+          $('#waCfgNote').textContent = 'Saved.';
+          MF.toast('WhatsApp setup saved.', 'success', 'WhatsApp');
+          load();
+        } catch (err) { MF.toast((err && err.message) || 'Could not save setup.', 'danger', 'WhatsApp'); }
+        finally { btn.disabled = false; btn.innerHTML = old; setTimeout(() => { $('#waCfgNote').textContent = ''; }, 2500); }
+      });
+
       async function load() {
         if (!MF.Api.live) {
           $('#waStats').innerHTML = '<div class="col-12"><div class="wa-card p-3 wa-note">Demo mode — connect the live server to manage WhatsApp.</div></div>';
           $('#waBody').innerHTML = '<tr><td colspan="4"><div class="empty-state"><i class="bi bi-plug"></i>Live data only</div></td></tr>';
           $('#waLog').innerHTML = '';
+          $('#waCfgSave').disabled = true;
           return;
         }
         try {
@@ -136,11 +215,14 @@ if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/Men
         const st = D.status || {};
         const sa = D.stats || {};
         const conn = st.on
-          ? '<span class="wa-on"><i class="bi bi-check-circle-fill me-1"></i>On</span>'
-          : '<span class="wa-off"><i class="bi bi-slash-circle me-1"></i>Off</span>';
+          ? `<span class="wa-on"><i class="bi bi-check-circle-fill me-1"></i>On</span>`
+          : `<span class="wa-off"><i class="bi bi-slash-circle me-1"></i>Off</span>`;
+        const src = st.source === 'own' ? 'Your own line' : (st.source === 'off' ? 'Switched off' : 'Platform line');
+        $('#waSrcBadge').innerHTML = `<b>${src}</b> · ${st.on ? 'ready' : 'not ready'}`;
+        setSetup(st);
         $('#waStats').innerHTML = `
-          <div class="col-6 col-lg-3"><div class="wa-stat"><span>Platform line</span><strong>${conn}</strong>
-            <span class="wa-sub">${st.on ? 'Number ' + MF.esc(st.phone_id || '—') + ' · ' + MF.esc(st.ver || '') : MF.esc(st.error || 'Ask the platform admin')}</span></div></div>
+          <div class="col-6 col-lg-3"><div class="wa-stat"><span>Active line</span><strong>${conn}</strong>
+            <span class="wa-sub">${st.on ? src + ' · ' + MF.esc(st.phone_id || '—') + ' · ' + MF.esc(st.ver || '') : MF.esc(st.error || 'Use Setup below')}</span></div></div>
           <div class="col-6 col-lg-3"><div class="wa-stat"><span>Alert template</span><strong>${st.tpl_alert ? MF.esc(st.tpl_alert) : 'Free text'}</strong>
             <span class="wa-sub">${st.tpl_alert ? 'approved Meta template' : 'works within 24h chat window only'}</span></div></div>
           <div class="col-6 col-lg-3"><div class="wa-stat"><span>Reminders today</span><strong class="num">${MF.num(sa.today_reminders || 0)}</strong>
