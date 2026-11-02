@@ -121,7 +121,7 @@ if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/Men
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="assets/js/data.js"></script>
   <script src="assets/js/config.js"></script>
-  <script src="assets/js/app.js?v=2026-10-26.07"></script>
+  <script src="assets/js/app.js?v=2026-10-26.08"></script>
   <script>
     (function () {
       'use strict';
@@ -130,7 +130,7 @@ if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/Men
 
       async function load() {
         if (!MF.Api.live) { MF.toast('Offline billing needs the live server.', 'warn', 'Demo mode'); return; }
-        const dev = await MF.Off.deviceId();
+        const dev = await MF.Off.ensureDeviceId();
         $('#obDevId').textContent = dev;
         try {
           const res = await MF.Api.get('offline.php?admin=1&d=' + encodeURIComponent(dev));
@@ -189,7 +189,7 @@ if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/Men
         const saltBytes = new Uint8Array(16); crypto.getRandomValues(saltBytes);
         const salt = Array.from(saltBytes).map((b) => b.toString(16).padStart(2, '0')).join('');
         const hash = await MF.Off.derivePin(salt, p1);
-        const dev = await MF.Off.deviceId();
+        const dev = await MF.Off.ensureDeviceId();
         if (hash.length !== 64) { msg.textContent = 'This browser could not derive the PIN hash (PBKDF2 failed). Use https:// with Chrome/Edge, not a private window or an old WebView.'; return; }
         if (!dev) { msg.textContent = 'No device id on this browser — IndexedDB is blocked (private window / storage disabled). Use a normal window.'; return; }
         try {
