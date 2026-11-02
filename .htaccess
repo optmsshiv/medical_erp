@@ -12,3 +12,16 @@
 # never requested directly by a browser — block direct access.
 RewriteEngine On
 RewriteRule ^(core|models|middleware|config|database|scripts|services|controllers|helpers)/ - [F,L]
+
+# OPTMS-RX — cache policy for the POS app (store root .htaccess)
+# Pages and JS/CSS always revalidate against the server, so "I uploaded the
+# new app-v11.js but nothing changed" cannot happen; the browser may still
+# reuse a copy when the server says it's unchanged (cheap 304), which is correct.
+<IfModule mod_headers.c>
+  <FilesMatch "\.(php|html)$">
+    Header set Cache-Control "no-store, max-age=0"
+  </FilesMatch>
+  <FilesMatch "\.(js|css)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+</IfModule>
