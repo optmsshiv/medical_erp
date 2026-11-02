@@ -2887,7 +2887,7 @@
     if (state.completing) { MF.toast('The last sale is still being finished — one moment.', 'info', 'Busy'); return; }
     /* Offline till: unlock first, and controlled-schedule lines never bill
        without the register being live (server re-checks at sync too). */
-    if (navigator.onLine === false && MF.Off && MF.Off.armed) {
+    if (MF.isOffline() && MF.Off && MF.Off.armed) {
       if (!MF.Off.unlocked && sessionStorage.getItem('mf-off-ok') !== '1') { MF.Off.gate(); return; }
       const badSch = state.cart.some((l) => {
         const m = (typeof MF.med === 'function' ? MF.med(l.medId) : null) || {};

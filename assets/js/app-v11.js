@@ -30,7 +30,12 @@ window.MF = window.MF || {};
      still OPENS (service worker) and shows the REAL last-synced masters — not the
      demo catalog. Writes stay hard-blocked until Phase C (offline sale journal +
      sync) lands; the design sits in OFFLINE-POS-DESIGN.md. */
-  MF.offline = false; MF.snapAt = 0;
+  MF.offline = false; MF.snapAt = 0; MF.netDown = false;
+  /* navigator.onLine only reports "a network interface is up", so a router with no
+     WAN (the common Indian-shop outage) leaves it true and the app would believe
+     itself online. Anything we would rather not send into the void is gated on the
+     verified state, not the browser's. */
+  MF.isOffline = () => navigator.onLine === false || MF.netDown === true;
   const SNAP_DB = 'optms-offline', SNAP_ST = 'snap';
   function snapOpen() {
     return new Promise((res, rej) => {
@@ -168,19 +173,39 @@ window.MF = window.MF || {};
     },
     async bootOffline() {
       let pol = D.offlinePolicy || (await this.getMeta('offlinePolicy'));
-      if (pol && !pol.enabled) return;
+      if (pol && !pol.enabled) return this._refuse('policy_off');
       let t = this.ticket;
       if (!t) { t = await this.getMeta('ticket'); }
-      if (!t) return;
+      if (!t) return this._refuse('no_ticket');
       const cl = this.parseTicket(t);
-      if (!cl) return;
+      if (!cl) return this._refuse('ticket_unreadable');
       const d = await this.ensureDeviceId().catch(() => '');
-      if (!d || cl.d !== d) return;
-      if (Number(cl.exp) * 1000 < Date.now()) return;
+      if (!d) return this._refuse('no_device_id');
+      if (cl.d !== d) return this._refuse('ticket_device_mismatch', 'ticket=' + cl.d + ' this=' + d);
+      if (Number(cl.exp) * 1000 < Date.now()) return this._refuse('ticket_expired', new Date(Number(cl.exp) * 1000).toLocaleString());
       const ageH = MF.snapAt ? (Date.now() - MF.snapAt) / 36e5 : Infinity;
-      if (ageH > (pol ? (Number(pol.snapMaxH) || 72) : 72)) return;
-      this.ticket = t; this.claims = cl; this.armed = true;
+      const maxH = pol ? (Number(pol.snapMaxH) || 72) : 72;
+      if (ageH > maxH) return this._refuse('snapshot_stale', ageH.toFixed(1) + 'h > ' + maxH + 'h');
+      this.ticket = t; this.claims = cl; this.armed = true; this.refused = '';
       this.unlocked = sessionStorage.getItem('mf-off-ok') === '1';
+    },
+    /* Offline arming is deliberately strict, so every refusal is named: a till
+       that cannot bill offline must say exactly why instead of going silent. */
+    _refuse(code, detail) {
+      this.armed = false; this.refused = code; this.refuseDetail = detail || '';
+      try { console.warn('[Optms Rx] offline billing not armed:', code, detail || ''); } catch (_) { }
+      try { this.paint(); } catch (_) { }
+      return false;
+    },
+    refuseMsg() {
+      const m = { policy_off: 'offline billing is switched off by the owner',
+        no_ticket: 'no offline ticket on this machine yet - sign in once with internet',
+        ticket_unreadable: 'offline ticket is unreadable - re-pair this counter',
+        no_device_id: 'device id unavailable - storage blocked (private window?)',
+        ticket_device_mismatch: 'ticket was issued for a different counter - re-pair on this browser',
+        ticket_expired: 'offline ticket expired - sign in once with internet to renew',
+        snapshot_stale: 'last synced data is too old - sign in once with internet to refresh' };
+      return (m[this.refused] || this.refused || 'offline billing unavailable') + (this.refuseDetail ? ' (' + this.refuseDetail + ')' : '');
     },
     async replayJournal() {
       const rows = await this.rows();
@@ -200,6 +225,7 @@ window.MF = window.MF || {};
     },
     async capture(payload) {
       if (!this.armed) return null;
+      if (!MF.isOffline()) throw new Error('Offline capture refused while the server is reachable.');
       if (!this.unlocked && sessionStorage.getItem('mf-off-ok') !== '1') return null;
       let rows, seq, inv;
       try {
@@ -257,13 +283,15 @@ window.MF = window.MF || {};
       return rows.length ? ' · ' + rows.length + ' queued' : '';
     },
     async paint() {
-      if (navigator.onLine !== false) return;
+      if (!MF.isOffline()) return;
       const label = 'OFFLINE';
       let b = document.getElementById('mf-offline');
       if (!b) { b = document.createElement('div'); b.id = 'mf-offline'; b.setAttribute('style', 'position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:1200;background:#12291F;color:#DFF3EC;border:1px solid #295243;border-radius:12px;padding:9px 16px;font:700 12.5px/1.45 Inter,system-ui,sans-serif;box-shadow:0 12px 30px rgba(8,20,14,.35);display:flex;gap:9px;align-items:center;max-width:92vw'); document.body.appendChild(b); }
       const n = (await this.rows()).length;
       if (!this.armed) {
-        b.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#F0B429;flex:none"></span><span>OFFLINE · data synced ' + (MF.snapAt ? new Date(MF.snapAt).toLocaleString() : 'an unknown time') + ' · billing &amp; saves disabled — one online sign-in on this till arms offline mode</span>';
+        b.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#F0B429;flex:none"></span><span>OFFLINE \u00b7 ' + MF.esc(this.refuseMsg()) + '</span><button id="mfOffBtn" style="border:1px solid #F0B429;background:transparent;color:#F7DFA5;border-radius:8px;padding:4px 10px;font:inherit;cursor:pointer">Retry</button>';
+        const rb = document.getElementById('mfOffBtn');
+        if (rb) rb.addEventListener('click', () => { Promise.resolve(this.bootOffline()).then(() => this.replayJournal()).then(() => this.paint()); });
         return;
       }
       if (!this.unlocked) {
@@ -291,7 +319,7 @@ window.MF = window.MF || {};
       document.body.appendChild(card);
       const inp = card.querySelector('#mfOffPin');
       inp.focus();
-      const done = () => card.remove();
+      const done = () => { card.remove(); try { this.paint(); } catch (_) { } };
       card.querySelector('#mfOffNo').addEventListener('click', done);
       card.addEventListener('click', (e) => { if (e.target === card) done(); });
       const submit = async () => {
@@ -321,7 +349,7 @@ window.MF = window.MF || {};
     base: MF.Config.apiBase || 'api/v1',
     async request(path, method = 'GET', payload = null) {
       if (!this.live) return { ok: true, demo: true, data: null };
-      if (method !== 'GET' && navigator.onLine === false) {
+      if (method !== 'GET' && MF.isOffline()) {
         if (path === 'sales.php' && MF.Off) {
           const jr = await MF.Off.capture(payload);
           if (jr) return jr;
@@ -384,12 +412,26 @@ window.MF = window.MF || {};
     if (!MF._bootP) {
       MF._bootP = MF.Api.get('bootstrap.php')
         .then(async (res) => {
+          res = res || {};
           /* A GET that "succeeded" while the browser has no connection can only
              be the service worker serving bootstrap.php from its API cache. Treat
              it as offline: throw to the snapshot path so offline arming
              (bootOffline/paint) always runs during real outages. */
           if (navigator.onLine === false) throw new Error('sw-cached-boot');
-          Object.assign(window.MF_DATA, res.data);
+          /* A service worker sitting in front of the network makes an outage look
+             like a live boot, and a router with no WAN makes it look live to
+             navigator.onLine too. Verify against the real endpoint before
+             believing any cached answer — failure means: go offline properly. */
+          /* A service worker sitting in front of the network makes an outage look
+             like a live boot: its API cache answers GETs even with no internet, so
+             the app never reaches the snapshot/arming path. Detect the controller
+             and verify the endpoint is genuinely live before believing the answer. */
+          try {
+            const live = await fetch('api/v1/bootstrap.php', { cache: 'no-store', headers: { 'X-Requested-With': 'fetch' }, credentials: 'same-origin' });
+            if (!live || !live.ok) throw new Error('probe-unreachable');
+            res = live.json ? await live.json().catch(() => res) : res;
+          } catch (_) { MF.netDown = true; throw new Error('no-live-server'); }
+          Object.assign(window.MF_DATA, (res && res.data) || {});
           try { const wr = await MF.Api.get('whoami.php'); MF._me = (wr && wr.data) || {}; } catch (_) { MF._me = null; }
           try { const pr = await MF.Api.get('role-permissions.php'); MF._prms = (pr && pr.data) || []; } catch (_) { MF._prms = null; }
           try { const nr = await MF.Api.get('nav-state.php'); MF._feats = ((nr && nr.data) || {}).features || null; } catch (_) { MF._feats = null; }
