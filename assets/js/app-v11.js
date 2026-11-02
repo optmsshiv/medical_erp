@@ -31,7 +31,7 @@ window.MF = window.MF || {};
      demo catalog. Writes stay hard-blocked until Phase C (offline sale journal +
      sync) lands; the design sits in OFFLINE-POS-DESIGN.md. */
   MF.offline = false; MF.snapAt = 0; MF.netDown = false;
-  MF.build = 'app-v11.2026-11-03a';  /* printed at every boot + shown in the offline pill — if the till's console does not show this, the file on disk is not the file I sent */
+  MF.build = 'app-v11.2026-11-03b';  /* printed at every boot + shown in the offline pill — if the till's console does not show this, the file on disk is not the file I sent */
   console.info('[Optms Rx] build', MF.build);
   /* navigator.onLine only reports "a network interface is up", so a router with no
      WAN (the common Indian-shop outage) leaves it true and the app would believe
@@ -39,43 +39,16 @@ window.MF = window.MF || {};
      verified state, not the browser's. */
   MF.isOffline = () => navigator.onLine === false || MF.netDown === true;
   const SNAP_DB = 'optms-offline', SNAP_ST = 'snap';
-  function snapOpen() {
-    return new Promise((res, rej) => {
-      if (!('indexedDB' in window)) { rej(new Error('no idb')); return; }
-      const r = indexedDB.open(SNAP_DB, 1);
-      r.onupgradeneeded = () => { r.result.createObjectStore(SNAP_ST); };
-      r.onsuccess = () => res(r.result);
-      r.onerror = () => rej(r.error || new Error('idb open failed'));
-    });
-  }
   MF.snapSave = async (obj) => {
-    try {
-      const db = await snapOpen();
-      await new Promise((res, rej) => {
-        const tx = db.transaction(SNAP_ST, 'readwrite');
-        tx.objectStore(SNAP_ST).put(Object.assign({ at: Date.now() }, obj), 'boot');
-        tx.oncomplete = res; tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error);
-      });
-    } catch (_) { /* private mode / quota — offline viewing just won't be rich */ }
+    try { await MF.Off.tx('snap', 'readwrite', (st) => st.put(Object.assign({ at: Date.now() }, obj), 'boot')); }
+    catch (_) { /* private mode / quota — offline viewing just won't be rich */ }
   };
   MF.snapLoad = async () => {
-    try {
-      const db = await snapOpen();
-      return await new Promise((res, rej) => {
-        const q = db.transaction(SNAP_ST).objectStore(SNAP_ST).get('boot');
-        q.onsuccess = () => res(q.result || null); q.onerror = () => rej(q.error);
-      });
-    } catch (_) { return null; }
+    try { const v = await MF.Off.tx('snap', 'readonly', (st) => st.get('boot')); return v || null; }
+    catch (_) { return null; }
   };
   MF.snapClear = async () => {
-    try {
-      const db = await snapOpen();
-      await new Promise((res, rej) => {
-        const tx = db.transaction(SNAP_ST, 'readwrite');
-        tx.objectStore(SNAP_ST).delete('boot');
-        tx.oncomplete = res; tx.onerror = () => rej(tx.error);
-      });
-    } catch (_) { }
+    try { await MF.Off.tx('snap', 'readwrite', (st) => st.delete('boot')); } catch (_) { }
     try { if (navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage('purge'); } catch (_) { }
   };
   MF._offlineBanner = function () {
