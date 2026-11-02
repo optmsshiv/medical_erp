@@ -18,7 +18,7 @@ const API = 'optms-api-v1';
 
 const CORE = [
   '/retail-pos.php', '/customers.php', '/customer-dues.php', '/payments.php', '/settings.php', '/wholesale-billing.php',
-  '/assets/css/style.css', '/assets/js/app.js', '/assets/js/config.js', '/assets/js/data.js', '/assets/js/pos.js',
+  '/assets/css/style.css', '/assets/js/app.js', '/assets/js/app-v11.js', '/assets/js/config.js', '/assets/js/data.js', '/assets/js/pos.js',
   '/manifest.json'
 ];
 
@@ -50,6 +50,10 @@ self.addEventListener('fetch', (e) => {
   const u = new URL(req.url);
 
   if (u.origin === self.location.origin && apiPath(u)) {
+    /* Endpoints that define "am I online?" must never be cache-served or cloned:
+       otherwise an offline boot mistakes cached JSON for a live login and skips
+       the offline-arming path entirely. */
+    if (/(bootstrap|offline)\.php$/.test(u.pathname)) { e.respondWith(fetch(req)); return; }
     e.respondWith((async () => {
       try {
         const res = await fetch(req);

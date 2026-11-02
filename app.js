@@ -384,6 +384,11 @@ window.MF = window.MF || {};
     if (!MF._bootP) {
       MF._bootP = MF.Api.get('bootstrap.php')
         .then(async (res) => {
+          /* A GET that "succeeded" while the browser has no connection can only
+             be the service worker serving bootstrap.php from its API cache. Treat
+             it as offline: throw to the snapshot path so offline arming
+             (bootOffline/paint) always runs during real outages. */
+          if (navigator.onLine === false) throw new Error('sw-cached-boot');
           Object.assign(window.MF_DATA, res.data);
           try { const wr = await MF.Api.get('whoami.php'); MF._me = (wr && wr.data) || {}; } catch (_) { MF._me = null; }
           try { const pr = await MF.Api.get('role-permissions.php'); MF._prms = (pr && pr.data) || []; } catch (_) { MF._prms = null; }
