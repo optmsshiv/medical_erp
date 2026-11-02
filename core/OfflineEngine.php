@@ -153,6 +153,10 @@ function oeApply(PDO $pdo, array $entry, bool $force, string $sessionCookie): ar
 {
     $payload = json_decode((string) ($entry['payload'] ?? ''), true);
     if (!is_array($payload)) { return ['status' => 'held', 'reason' => 'journal payload unreadable']; }
+    /* Rows stored by the sync INSERT are enveloped ({kind,meta,payload}); the hold/
+       approve path re-reads that column, so unwrap before validating. Without this,
+       every approve failed with "payload not a billable sale". */
+    if (isset($payload['kind'], $payload['payload']) && is_array($payload['payload'])) { $payload = $payload['payload']; }
     $sale = oeSalePayload($payload);
     if ($sale === null) { return ['status' => 'held', 'reason' => 'payload not a billable sale']; }
 
