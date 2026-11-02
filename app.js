@@ -127,7 +127,7 @@ window.MF = window.MF || {};
     },
     getMeta(k) { return this.tx('meta', 'readonly', (s) => s.get(k)).catch(() => undefined); },
     setMeta(k, v) { return this.tx('meta', 'readwrite', (s) => s.put(v, k)).catch(() => { }); },
-    async deviceId() {
+    async ensureDeviceId() { // NB: name must not clash with the deviceId property (object-literal dup key bug fixed 2026-11-02)
       if (this.deviceId) return this.deviceId;
       let id = await this.getMeta('deviceId');
       if (!id) {
@@ -156,7 +156,7 @@ window.MF = window.MF || {};
     },
     async bootOnline() {
       try {
-        const d = await this.deviceId();
+        const d = await this.ensureDeviceId();
         const res = await MF.Api.get('offline.php?d=' + encodeURIComponent(d));
         const data = (res && res.data) || {};
         if (data.policy) { D.offlinePolicy = data.policy; await this.setMeta('offlinePolicy', data.policy); }
@@ -174,7 +174,7 @@ window.MF = window.MF || {};
       if (!t) return;
       const cl = this.parseTicket(t);
       if (!cl) return;
-      const d = await this.deviceId().catch(() => '');
+      const d = await this.ensureDeviceId().catch(() => '');
       if (!d || cl.d !== d) return;
       if (Number(cl.exp) * 1000 < Date.now()) return;
       const ageH = MF.snapAt ? (Date.now() - MF.snapAt) / 36e5 : Infinity;
@@ -225,7 +225,7 @@ window.MF = window.MF || {};
       if (!rows.length) return;
       this.syncing = true;
       try {
-        const d = await this.deviceId();
+        const d = await this.ensureDeviceId();
         const t = await this.getMeta('ticket') || this.ticket || '';
         const res = await MF.Api.post('offline-sync.php', { device: d, ticket: t, entries: rows.map((e) => ({ clientKey: e.clientKey, kind: e.kind, payload: e.payload, meta: e.meta })) });
         const rs = ((res && res.data) || {}).results || [];
