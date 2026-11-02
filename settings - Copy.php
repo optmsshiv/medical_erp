@@ -400,7 +400,7 @@ if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/Men
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="assets/js/data.js"></script>
   <script src="assets/js/config.js"></script>
-  <script src="assets/js/app.js?v=2026-10-26.03"></script>
+  <script src="assets/js/app.js?v=2026-10-26.04"></script>
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
       await window.MF.boot();

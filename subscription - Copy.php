@@ -275,7 +275,7 @@ function inr(float $v): string { return '₹' . number_format($v, 0); }
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="assets/js/data.js"></script>
   <script src="assets/js/config.js"></script>
-  <script src="assets/js/app.js?v=2026-10-26.03"></script>
+  <script src="assets/js/app.js?v=2026-10-26.04"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       var b = document.getElementById('upiCopy');

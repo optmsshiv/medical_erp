@@ -25,11 +25,83 @@ window.MF = window.MF || {};
      ---------------------------------------------------------------------- */
   MF.Config = window.MF_CONFIG || { backend: false, apiBase: 'api/v1' };
 
+  /* ---------------- Offline layer (Phase A+B) ----------------
+     The last live boot is mirrored into IndexedDB, so with zero internet the app
+     still OPENS (service worker) and shows the REAL last-synced masters — not the
+     demo catalog. Writes stay hard-blocked until Phase C (offline sale journal +
+     sync) lands; the design sits in OFFLINE-POS-DESIGN.md. */
+  MF.offline = false; MF.snapAt = 0;
+  const SNAP_DB = 'optms-offline', SNAP_ST = 'snap';
+  function snapOpen() {
+    return new Promise((res, rej) => {
+      if (!('indexedDB' in window)) { rej(new Error('no idb')); return; }
+      const r = indexedDB.open(SNAP_DB, 1);
+      r.onupgradeneeded = () => { r.result.createObjectStore(SNAP_ST); };
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error || new Error('idb open failed'));
+    });
+  }
+  MF.snapSave = async (obj) => {
+    try {
+      const db = await snapOpen();
+      await new Promise((res, rej) => {
+        const tx = db.transaction(SNAP_ST, 'readwrite');
+        tx.objectStore(SNAP_ST).put(Object.assign({ at: Date.now() }, obj), 'boot');
+        tx.oncomplete = res; tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error);
+      });
+    } catch (_) { /* private mode / quota — offline viewing just won't be rich */ }
+  };
+  MF.snapLoad = async () => {
+    try {
+      const db = await snapOpen();
+      return await new Promise((res, rej) => {
+        const q = db.transaction(SNAP_ST).objectStore(SNAP_ST).get('boot');
+        q.onsuccess = () => res(q.result || null); q.onerror = () => rej(q.error);
+      });
+    } catch (_) { return null; }
+  };
+  MF.snapClear = async () => {
+    try {
+      const db = await snapOpen();
+      await new Promise((res, rej) => {
+        const tx = db.transaction(SNAP_ST, 'readwrite');
+        tx.objectStore(SNAP_ST).delete('boot');
+        tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+      });
+    } catch (_) { }
+    try { if (navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage('purge'); } catch (_) { }
+  };
+  MF._offlineBanner = function () {
+    let b = document.getElementById('mf-offline');
+    if (!b) {
+      b = document.createElement('div');
+      b.id = 'mf-offline';
+      b.setAttribute('style', 'position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:1200;background:#12291F;color:#DFF3EC;border:1px solid #295243;border-radius:12px;padding:9px 16px;font:700 12.5px/1.45 Inter,system-ui,sans-serif;box-shadow:0 12px 30px rgba(8,20,14,.35);display:flex;gap:9px;align-items:center;max-width:92vw');
+      document.body.appendChild(b);
+    }
+    const t = MF.snapAt ? new Date(MF.snapAt).toLocaleString() : 'an unknown time';
+    b.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#F0B429;flex:none"></span>'
+      + '<span>OFFLINE \u00b7 data synced ' + t + ' \u00b7 billing &amp; saves disabled until the connection returns</span>';
+  };
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => { /* not deployed yet — fine */ });
+      if (!document.querySelector('link[rel=manifest]')) {
+        const l = document.createElement('link'); l.rel = 'manifest'; l.href = 'manifest.json';
+        document.head.appendChild(l);
+      }
+    });
+  }
+  window.addEventListener('online', () => { if (MF.offline) location.reload(); });
+
   MF.Api = {
     live: !!MF.Config.backend,
     base: MF.Config.apiBase || 'api/v1',
     async request(path, method = 'GET', payload = null) {
       if (!this.live) return { ok: true, demo: true, data: null };
+      if (method !== 'GET' && navigator.onLine === false) {
+        throw new Error('Offline \u2014 this change needs the internet. Nothing was saved.');
+      }
       const res = await fetch(this.base + '/' + path, {
         method,
         headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
@@ -94,12 +166,22 @@ window.MF = window.MF || {};
             const extra = await MF.Api.get('medicines.php');
             mergeMedicineCatalog(window.MF_DATA, extra);
           } catch (_) { /* bootstrap remains usable if the medicine endpoint is not deployed yet */ }
+          MF.snapSave({ data: window.MF_DATA, feats: MF._feats, prms: MF._prms, me: MF._me });
           return window.MF_DATA;
         })
-        .catch((e) => {
+        .catch(async (e) => {
           MF._bootP = null;
           if (e.message === 'Session expired') throw e; // redirect already issued
-          console.warn('[Optms Rx] Backend unreachable — using offline demo data.', e.message);
+          const snap = await MF.snapLoad();
+          if (snap && snap.data) {
+            MF.offline = true; MF.snapAt = Number(snap.at) || 0;
+            Object.assign(window.MF_DATA, snap.data);
+            if (snap.feats !== undefined) MF._feats = snap.feats;
+            if (snap.prms) MF._prms = snap.prms;
+            if (snap.me) MF._me = snap.me;
+            MF._offlineBanner();
+          }
+          console.warn('[Optms Rx] Backend unreachable —', (snap && snap.data) ? 'serving last synced data (offline).' : 'offline with no snapshot; demo data only.', e.message);
           return window.MF_DATA;
         });
     }
@@ -637,6 +719,7 @@ window.MF = window.MF || {};
       if (!ok) return;
       if (MF.Api.live) {
         try { await MF.Api.post('auth/logout.php'); } catch (_) { /* session already gone */ }
+        MF.snapClear();
         location.replace('login.php');
       } else {
         MF.toast('Signed out (demo). Session management ships with the PHP backend.', 'info', 'Demo mode');
