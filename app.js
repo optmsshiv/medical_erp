@@ -263,7 +263,7 @@ window.MF = window.MF || {};
       if (!b) { b = document.createElement('div'); b.id = 'mf-offline'; b.setAttribute('style', 'position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:1200;background:#12291F;color:#DFF3EC;border:1px solid #295243;border-radius:12px;padding:9px 16px;font:700 12.5px/1.45 Inter,system-ui,sans-serif;box-shadow:0 12px 30px rgba(8,20,14,.35);display:flex;gap:9px;align-items:center;max-width:92vw'); document.body.appendChild(b); }
       const n = (await this.rows()).length;
       if (!this.armed) {
-        b.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#F0B429;flex:none"></span><span>OFFLINE · data synced ' + (MF.snapAt ? new Date(MF.snapAt).toLocaleString() : 'an unknown time') + ' · billing &amp; saves disabled</span>';
+        b.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#F0B429;flex:none"></span><span>OFFLINE · data synced ' + (MF.snapAt ? new Date(MF.snapAt).toLocaleString() : 'an unknown time') + ' · billing &amp; saves disabled — one online sign-in on this till arms offline mode</span>';
         return;
       }
       if (!this.unlocked) {

@@ -83,7 +83,7 @@ if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/Men
             <div class="ob-card h-100">
               <div class="ob-head"><h6><i class="bi bi-key me-1"></i>Pair this counter</h6></div>
               <div class="p-3">
-                <p class="ob-note mt-0">Device id <span class="ob-mono" id="obDevId">…</span> — a 4–6 digit <b>store PIN</b> (not the password) unlocks offline billing on this machine for 24 h, renewed on every online login.</p>
+                <p class="ob-note mt-0">Device id <span class="ob-mono" id="obDevId">…</span> — a 4–8 digit <b>store PIN</b> (not the password) unlocks offline billing on this machine for 24 h, renewed on every online login.</p>
                 <div class="row g-2">
                   <div class="col-6"><label class="ob-lbl">Store PIN</label><input id="obPin1" type="password" inputmode="numeric" maxlength="8" class="ob-in" placeholder="••••"></div>
                   <div class="col-6"><label class="ob-lbl">Confirm PIN</label><input id="obPin2" type="password" inputmode="numeric" maxlength="8" class="ob-in" placeholder="••••"></div>
@@ -121,7 +121,7 @@ if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/Men
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="assets/js/data.js"></script>
   <script src="assets/js/config.js"></script>
-  <script src="assets/js/app.js?v=2026-10-26.08"></script>
+  <script src="assets/js/app.js?v=2026-10-26.09"></script>
   <script>
     (function () {
       'use strict';
