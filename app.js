@@ -111,7 +111,7 @@ window.MF = window.MF || {};
       this.db = await new Promise((res, rej) => {
         if (!('indexedDB' in window)) { rej(new Error('no idb')); return; }
         const r = indexedDB.open(SNAP_DB, 2);
-        r.onupgradeneeded = () => { const dbs = r.result; if (!dbs.objectStoreNames.contains('snap')) dbs.createObjectStore('snap'); ['journal', 'meta'].forEach((n) => { if (!dbs.objectStoreNames.contains(n)) dbs.createObjectStore(n); }); };
+        r.onupgradeneeded = () => { const dbs = r.result; if (!dbs.objectStoreNames.contains('snap')) dbs.createObjectStore('snap');['journal', 'meta'].forEach((n) => { if (!dbs.objectStoreNames.contains(n)) dbs.createObjectStore(n); }); };
         r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error || new Error('idb'));
       });
       return this.db;
@@ -463,7 +463,7 @@ window.MF = window.MF || {};
   MF.fmtDateTime = (v) => {
     const d = MF.parseDate(v);
     return d ? d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) + ' · '
-             + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—';
+      + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—';
   };
   MF.fmtMonthYear = (v) => {
     const d = MF.parseDate(v);
@@ -971,7 +971,7 @@ window.MF = window.MF || {};
         const i = document.getElementById('mfUserIni'); if (i) i.textContent = ini;
         const n = document.getElementById('mfUserName'); if (n) n.textContent = nm;
         const rl = document.getElementById('mfUserRole'); if (rl && role) rl.textContent = role.charAt(0).toUpperCase() + role.slice(1);
-      }).catch(() => {});
+      }).catch(() => { });
     } catch (e) { }
   }
 
