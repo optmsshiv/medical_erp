@@ -12,13 +12,13 @@
  * Privacy: app.js posts 'purge' on logout → the api cache (contains customer data)
  * dies with the session. Shell caches are public UI bytes.
  */
-const SHELL = 'optms-shell-v2';
-const CDN = 'optms-cdn-v2';
+const SHELL = 'optms-shell-v3';
+const CDN = 'optms-cdn-v3';
 const API = 'optms-api-v1';
 
 const CORE = [
   '/retail-pos.php', '/customers.php', '/customer-dues.php', '/payments.php', '/settings.php', '/wholesale-billing.php',
-  '/assets/css/style.css', '/assets/js/app.js', '/assets/js/app-v11.js', '/assets/js/config.js', '/assets/js/data.js', '/assets/js/pos.js',
+  '/assets/css/style.css', '/assets/js/app-v11.js', '/assets/js/config.js', '/assets/js/data.js', '/assets/js/pos.js',
   '/manifest.json'
 ];
 
@@ -31,6 +31,7 @@ self.addEventListener('install', (e) => {
 });
 
 self.addEventListener('activate', (e) => {
+  /* Cache names bumped to v3 so a stale worker can never serve the pre-offline-billing shell. */
   e.waitUntil((async () => {
     for (const k of await caches.keys()) if (k !== SHELL && k !== CDN && k !== API) await caches.delete(k);
     self.clients.claim();
