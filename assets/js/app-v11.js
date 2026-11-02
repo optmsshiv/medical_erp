@@ -31,6 +31,8 @@ window.MF = window.MF || {};
      demo catalog. Writes stay hard-blocked until Phase C (offline sale journal +
      sync) lands; the design sits in OFFLINE-POS-DESIGN.md. */
   MF.offline = false; MF.snapAt = 0; MF.netDown = false;
+  MF.build = 'app-v11.2026-11-03a';  /* printed at every boot + shown in the offline pill — if the till's console does not show this, the file on disk is not the file I sent */
+  console.info('[Optms Rx] build', MF.build);
   /* navigator.onLine only reports "a network interface is up", so a router with no
      WAN (the common Indian-shop outage) leaves it true and the app would believe
      itself online. Anything we would rather not send into the void is gated on the
@@ -301,6 +303,7 @@ window.MF = window.MF || {};
       }
       const btn = document.getElementById('mfOffBtn');
       if (btn) btn.addEventListener('click', () => this.gate());
+      b.insertAdjacentHTML('beforeend', '<span style="opacity:.45;font-size:10px;margin-left:4px">' + (MF.build || '?') + '</span>');
     },
     gate() {
       if (document.getElementById('mf-offgate')) return;
