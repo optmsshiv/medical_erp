@@ -112,8 +112,14 @@ if ($method === 'POST') {
         $deviceId = substr(preg_replace('/[^A-Za-z0-9\-]/', '', (string) ($input['deviceId'] ?? '')) ?? '', 0, 32);
         $salt = strtolower(trim((string) ($input['salt'] ?? '')));
         $hash = strtolower(trim((string) ($input['pinHash'] ?? '')));
-        if ($deviceId === '' || !oePinShape($salt, $hash)) {
-            Json::error('Pairing needs a device id and a locally derived PIN hash (WebCrypto required — use HTTPS).', 422);
+        if ($deviceId === '') {
+            Json::error('No device id received \u2014 the till page could not create one (IndexedDB blocked? Use a normal browser window, not private/incognito).', 422);
+        }
+        if (!preg_match('/^[a-f0-9]{32}$/i', $salt)) {
+            Json::error('Malformed pairing salt \u2014 browser WebCrypto problem on this device.', 422);
+        }
+        if (!preg_match('/^[a-f0-9]{64}$/i', $hash)) {
+            Json::error('PIN hash is empty or malformed \u2014 PBKDF2 failed in this browser (needs https:// + Chrome/Edge/Firefox; private windows and old Android WebViews can block WebCrypto).', 422);
         }
         if ($action === 'pair') {
             $label = substr(preg_replace('/[^\p{L}\p{N} \-_.]/u', '', (string) ($input['label'] ?? 'Counter')) ?? '', 0, 40);

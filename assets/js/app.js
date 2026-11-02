@@ -159,7 +159,7 @@ window.MF = window.MF || {};
         const d = await this.deviceId();
         const res = await MF.Api.get('offline.php?d=' + encodeURIComponent(d));
         const data = (res && res.data) || {};
-        if (data.policy) { D.offlinePolicy = data.policy; }
+        if (data.policy) { D.offlinePolicy = data.policy; await this.setMeta('offlinePolicy', data.policy); }
         this.ticket = data.ticket || null;
         await this.setMeta('ticket', this.ticket || '');
         const rows = await this.rows();
@@ -167,8 +167,8 @@ window.MF = window.MF || {};
       } catch (_) { /* old deploy without the endpoint — offline billing stays off */ }
     },
     async bootOffline() {
-      const pol = D.offlinePolicy;
-      if (!pol || !pol.enabled) return;
+      let pol = D.offlinePolicy || (await this.getMeta('offlinePolicy'));
+      if (pol && !pol.enabled) return;
       let t = this.ticket;
       if (!t) { t = await this.getMeta('ticket'); }
       if (!t) return;
@@ -178,7 +178,7 @@ window.MF = window.MF || {};
       if (!d || cl.d !== d) return;
       if (Number(cl.exp) * 1000 < Date.now()) return;
       const ageH = MF.snapAt ? (Date.now() - MF.snapAt) / 36e5 : Infinity;
-      if (ageH > (Number(pol.snapMaxH) || 72)) return;
+      if (ageH > (pol ? (Number(pol.snapMaxH) || 72) : 72)) return;
       this.ticket = t; this.claims = cl; this.armed = true;
       this.unlocked = sessionStorage.getItem('mf-off-ok') === '1';
     },

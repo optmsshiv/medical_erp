@@ -190,6 +190,8 @@ if (is_file(__DIR__ . '/core/MenuGate.php')) { require_once __DIR__ . '/core/Men
         const salt = Array.from(saltBytes).map((b) => b.toString(16).padStart(2, '0')).join('');
         const hash = await MF.Off.derivePin(salt, p1);
         const dev = await MF.Off.deviceId();
+        if (hash.length !== 64) { msg.textContent = 'This browser could not derive the PIN hash (PBKDF2 failed). Use https:// with Chrome/Edge, not a private window or an old WebView.'; return; }
+        if (!dev) { msg.textContent = 'No device id on this browser — IndexedDB is blocked (private window / storage disabled). Use a normal window.'; return; }
         try {
           await MF.Api.post('offline.php', pair ? { action: 'pair', deviceId: dev, salt, pinHash: hash, label: 'Counter' } : { action: 'rotate_pin', deviceId: dev, salt, pinHash: hash });
           msg.textContent = pair ? 'Paired. Offline billing is armed on this machine for 24 h from its next boot.' : 'PIN updated for this counter.';
