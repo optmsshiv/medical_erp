@@ -92,7 +92,229 @@ window.MF = window.MF || {};
       }
     });
   }
-  window.addEventListener('online', () => { if (MF.offline) location.reload(); });
+  window.addEventListener('online', async () => {
+    try { await MF.Off.sync(); } catch (_) { }
+    if (MF.offline) location.reload();
+  });
+
+  /* ---------------- Phase C — offline billing engine ----------------
+     While the store is offline AND an owner-armed ticket is valid, retail sales
+     are journalled in IndexedDB (never silently lost, never half-posted) and the
+     till keeps trading. Sync replays them through the store's own sales API.
+     PINs are verified locally via PBKDF2 against a hash the server only ever
+     saw as a hash. Full contract: OFFLINE-POS-DESIGN.md §3.5 + §5. */
+  MF.Off = {
+    armed: false, unlocked: false, syncing: false, ticket: null, claims: null,
+    deviceId: '', attempt: 0, timer: null, db: null,
+    async open() {
+      if (this.db) return this.db;
+      this.db = await new Promise((res, rej) => {
+        if (!('indexedDB' in window)) { rej(new Error('no idb')); return; }
+        const r = indexedDB.open(SNAP_DB, 2);
+        r.onupgradeneeded = () => { const dbs = r.result; if (!dbs.objectStoreNames.contains('snap')) dbs.createObjectStore('snap'); ['journal', 'meta'].forEach((n) => { if (!dbs.objectStoreNames.contains(n)) dbs.createObjectStore(n); }); };
+        r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error || new Error('idb'));
+      });
+      return this.db;
+    },
+    async tx(store, mode, fn) {
+      const db = await this.open();
+      return new Promise((res, rej) => {
+        const t = db.transaction(store, mode);
+        const r = fn(t.objectStore(store));
+        t.oncomplete = () => res(r && 'result' in r ? r.result : undefined);
+        t.onerror = t.onabort = () => rej(t.error);
+      });
+    },
+    getMeta(k) { return this.tx('meta', 'readonly', (s) => s.get(k)).catch(() => undefined); },
+    setMeta(k, v) { return this.tx('meta', 'readwrite', (s) => s.put(v, k)).catch(() => { }); },
+    async deviceId() {
+      if (this.deviceId) return this.deviceId;
+      let id = await this.getMeta('deviceId');
+      if (!id) {
+        const buf = new Uint8Array(5);
+        (window.crypto && crypto.getRandomValues ? crypto.getRandomValues(buf) : buf.forEach((_, i) => { buf[i] = Math.floor(Math.random() * 256); }));
+        id = 'DEV-' + Array.from(buf).map((b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+        await this.setMeta('deviceId', id);
+      }
+      return (this.deviceId = id);
+    },
+    rows() { return this.tx('journal', 'readonly', (s) => s.getAll()).catch(() => []); },
+    parseTicket(t) {
+      try {
+        const b64 = String(t).split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
+        return JSON.parse(decodeURIComponent(escape(atob(b64))));
+      } catch (_) { return null; }
+    },
+    async derivePin(saltHex, pin) {
+      if (!(window.crypto && crypto.subtle)) return '';
+      try {
+        const salt = Uint8Array.from(String(saltHex).match(/../g) || [], (h) => parseInt(h, 16));
+        const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(String(pin)), 'PBKDF2', false, ['deriveBits']);
+        const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 120000, hash: 'SHA-256' }, k, 256);
+        return Array.from(new Uint8Array(bits)).map((b) => b.toString(16).padStart(2, '0')).join('');
+      } catch (_) { return ''; }
+    },
+    async bootOnline() {
+      try {
+        const d = await this.deviceId();
+        const res = await MF.Api.get('offline.php?d=' + encodeURIComponent(d));
+        const data = (res && res.data) || {};
+        if (data.policy) { D.offlinePolicy = data.policy; }
+        this.ticket = data.ticket || null;
+        await this.setMeta('ticket', this.ticket || '');
+        const rows = await this.rows();
+        if (rows.length) { await this.sync(); }
+      } catch (_) { /* old deploy without the endpoint — offline billing stays off */ }
+    },
+    async bootOffline() {
+      const pol = D.offlinePolicy;
+      if (!pol || !pol.enabled) return;
+      let t = this.ticket;
+      if (!t) { t = await this.getMeta('ticket'); }
+      if (!t) return;
+      const cl = this.parseTicket(t);
+      if (!cl) return;
+      const d = await this.deviceId().catch(() => '');
+      if (!d || cl.d !== d) return;
+      if (Number(cl.exp) * 1000 < Date.now()) return;
+      const ageH = MF.snapAt ? (Date.now() - MF.snapAt) / 36e5 : Infinity;
+      if (ageH > (Number(pol.snapMaxH) || 72)) return;
+      this.ticket = t; this.claims = cl; this.armed = true;
+      this.unlocked = sessionStorage.getItem('mf-off-ok') === '1';
+    },
+    async replayJournal() {
+      const rows = await this.rows();
+      rows.forEach((e) => { try { this.applyDelta(e); } catch (_) { } });
+    },
+    applyDelta(e) {
+      const p = (e && e.payload) || {};
+      (p.items || []).forEach((it) => {
+        const b = (D.batches || []).find((x) => String(x.id) === String(it.batchId));
+        if (b) b.qty = Math.max(0, (Number(b.qty) || 0) - (Number(it.qty) || 0));
+      });
+      const due = Number((e.meta && e.meta.due) || 0);
+      if (due > 0 && p.customerId) {
+        const c = (D.customers || []).find((x) => String(x.id) === String(p.customerId));
+        if (c) c.due = Math.round(((Number(c.due) || 0) + due) * 100) / 100;
+      }
+    },
+    async capture(payload) {
+      if (!this.armed) return null;
+      if (!this.unlocked && sessionStorage.getItem('mf-off-ok') !== '1') return null;
+      let rows, seq, inv;
+      try {
+        rows = await this.rows();
+        seq = (await this.getMeta('seq')) || 0;
+        seq += 1; await this.setMeta('seq', seq);
+        const short = (this.deviceId || '').replace(/^DEV-?/, '');
+        inv = 'OFF-' + short + '-' + new Date().toISOString().slice(2, 10).replace(/-/g, '') + '-' + String(seq).padStart(4, '0');
+      } catch (_) { return null; }
+      const meta = (payload && payload._meta) || {};
+      const grand = Math.round((Number(meta.grandTotal) || 0) * 100) / 100;
+      const cap = Number((this.claims || {}).mb || 0);
+      if (cap > 0 && grand > cap) { throw new Error('Offline bills are capped at ' + MF.fmt(cap) + ' per policy — finish this one online.'); }
+      if ((payload || {}).paymentMode === 'credit' && !(Number((this.claims || {}).cc) === 1)) { throw new Error('Credit sales are switched off for offline billing by the owner.'); }
+      const entry = { clientKey: (this.deviceId || 'DEV') + '-' + seq, at: Date.now(), kind: 'sale', payload, meta: { grandTotal: grand, due: Math.round((Number(meta.due) || 0) * 100) / 100, invoiceNo: inv } };
+      try { await this.tx('journal', 'readwrite', (s) => s.put(entry, entry.clientKey)); } catch (_) { return null; }
+      try { this.applyDelta(entry); } catch (_) { }
+      return { ok: true, offline: true, invoiceNo: inv, grandTotal: grand, balanceDue: entry.meta.due };
+    },
+    async sync() {
+      if (this.syncing || navigator.onLine === false) return;
+      const rows = await this.rows();
+      if (!rows.length) return;
+      this.syncing = true;
+      try {
+        const d = await this.deviceId();
+        const t = await this.getMeta('ticket') || this.ticket || '';
+        const res = await MF.Api.post('offline-sync.php', { device: d, ticket: t, entries: rows.map((e) => ({ clientKey: e.clientKey, kind: e.kind, payload: e.payload, meta: e.meta })) });
+        const rs = ((res && res.data) || {}).results || [];
+        let applied = 0, held = 0;
+        for (const r of rs) {
+          if (r.status === 'applied' || r.status === 'dup' || r.status === 'voided') {
+            try { await this.tx('journal', 'readwrite', (s) => s.delete(r.clientKey)); } catch (_) { }
+            if (r.status === 'applied') applied += 1;
+          } else { held += 1; }
+        }
+        const left = rows.length - applied - held;
+        if (applied) { MF.toast(applied + ' offline sale(s) synced' + (held ? ' · ' + held + ' waiting for owner approval on Offline Billing' : ''), held ? 'warn' : 'success', 'Offline sync'); this.attempt = 0; }
+        const gone = rows.length;
+        const still = (await this.rows()).length;
+        if (still && navigator.onLine !== false) { this.scheduleRetry(); }
+        else if (applied) { setTimeout(() => location.reload(), 600); }
+        else if (left > 0 && still < gone) { this.scheduleRetry(); }
+      } catch (err) {
+        this.scheduleRetry();
+      } finally { this.syncing = false; }
+    },
+    scheduleRetry() {
+      clearTimeout(this.timer);
+      this.attempt = (this.attempt || 0) + 1;
+      this.timer = setTimeout(() => { this.sync(); }, Math.min(900000, 30000 * Math.pow(2, this.attempt)));
+    },
+    async countLabel() {
+      const rows = await this.rows();
+      return rows.length ? ' · ' + rows.length + ' queued' : '';
+    },
+    async paint() {
+      if (navigator.onLine !== false) return;
+      const label = 'OFFLINE';
+      let b = document.getElementById('mf-offline');
+      if (!b) { b = document.createElement('div'); b.id = 'mf-offline'; b.setAttribute('style', 'position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:1200;background:#12291F;color:#DFF3EC;border:1px solid #295243;border-radius:12px;padding:9px 16px;font:700 12.5px/1.45 Inter,system-ui,sans-serif;box-shadow:0 12px 30px rgba(8,20,14,.35);display:flex;gap:9px;align-items:center;max-width:92vw'); document.body.appendChild(b); }
+      const n = (await this.rows()).length;
+      if (!this.armed) {
+        b.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#F0B429;flex:none"></span><span>OFFLINE · data synced ' + (MF.snapAt ? new Date(MF.snapAt).toLocaleString() : 'an unknown time') + ' · billing &amp; saves disabled</span>';
+        return;
+      }
+      if (!this.unlocked) {
+        b.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#34B399;flex:none"></span><span>OFFLINE BILLING READY · sign in to this till to start' + (n ? ' · ' + n + ' queued' : '') + '</span><button id="mfOffBtn" style="border:1px solid #34B399;background:transparent;color:#9FE8D7;border-radius:8px;padding:4px 10px;font:inherit;cursor:pointer">Unlock</button>';
+      } else {
+        b.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#34B399;flex:none"></span><span>OFFLINE BILLING ON · saved on device' + (n ? ' · ' + n + ' queued for sync' : '') + '</span>';
+      }
+      const btn = document.getElementById('mfOffBtn');
+      if (btn) btn.addEventListener('click', () => this.gate());
+    },
+    gate() {
+      if (document.getElementById('mf-offgate')) return;
+      const card = document.createElement('div');
+      card.id = 'mf-offgate';
+      card.setAttribute('style', 'position:fixed;inset:0;z-index:1210;background:rgba(8,20,14,.55);display:flex;align-items:center;justify-content:center');
+      const cl = this.claims || {};
+      const who = (D.users || []).find((u) => String(u.id) === String(cl.u || ''));
+      card.innerHTML = '<div style="background:#fff;border-radius:16px;padding:22px 24px;min-width:300px;box-shadow:0 24px 60px rgba(8,20,14,.45);font-family:Inter,system-ui,sans-serif">'
+        + '<h6 style="margin:0 0 2px;font-size:.95rem;font-weight:800;color:#12291F">Continue offline as ' + MF.esc((who && who.name) || 'this till') + '</h6>'
+        + '<p style="margin:0 0 12px;font-size:.78rem;color:#8b9bb0">Store PIN unlocks offline billing · expires ' + new Date((Number(cl.exp) || 0) * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '</p>'
+        + '<input id="mfOffPin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="••••" style="width:100%;border:1px solid #e3ebf4;border-radius:10px;padding:10px 12px;font-size:1rem;letter-spacing:.3em;text-align:center;outline:0">'
+        + '<div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end"><button id="mfOffNo" style="border:1px solid #e3ebf4;background:#fff;border-radius:9px;padding:7px 14px;font-weight:700;font-size:.8rem;cursor:pointer;color:#516278">Later</button>'
+        + '<button id="mfOffYes" style="border:0;background:#176B5B;color:#fff;border-radius:9px;padding:7px 16px;font-weight:800;font-size:.8rem;cursor:pointer">Unlock</button></div>'
+        + '<p id="mfOffMsg" style="margin:8px 0 0;font-size:.72rem;color:#B02A37;min-height:1em"></p></div>';
+      document.body.appendChild(card);
+      const inp = card.querySelector('#mfOffPin');
+      inp.focus();
+      const done = () => card.remove();
+      card.querySelector('#mfOffNo').addEventListener('click', done);
+      card.addEventListener('click', (e) => { if (e.target === card) done(); });
+      const submit = async () => {
+        const fails = Number(sessionStorage.getItem('mf-off-fail') || 0);
+        if (fails >= 5) { card.querySelector('#mfOffMsg').textContent = 'Too many tries — offline unlock locked until the next online sign-in.'; return; }
+        const ok = await this.unlock(inp.value);
+        if (ok) { sessionStorage.removeItem('mf-off-fail'); done(); MF.toast('Offline billing unlocked — bills will queue and sync automatically.', 'success', 'Offline'); this.paint(); return; }
+        sessionStorage.setItem('mf-off-fail', String(fails + 1));
+        card.querySelector('#mfOffMsg').textContent = 'Wrong PIN (' + (fails + 1) + '/5).';
+        inp.value = ''; inp.focus();
+      };
+      card.querySelector('#mfOffYes').addEventListener('click', submit);
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+    },
+    async unlock(pin) {
+      const cl = this.claims;
+      if (!cl || !cl.s || !cl.h) return false;
+      const got = await this.derivePin(cl.s, pin);
+      const ok = got && got === String(cl.h).toLowerCase();
+      if (ok) { this.unlocked = true; sessionStorage.setItem('mf-off-ok', '1'); }
+      return !!ok;
+    },
+  };
 
   MF.Api = {
     live: !!MF.Config.backend,
@@ -100,6 +322,10 @@ window.MF = window.MF || {};
     async request(path, method = 'GET', payload = null) {
       if (!this.live) return { ok: true, demo: true, data: null };
       if (method !== 'GET' && navigator.onLine === false) {
+        if (path === 'sales.php' && MF.Off) {
+          const jr = await MF.Off.capture(payload);
+          if (jr) return jr;
+        }
         throw new Error('Offline \u2014 this change needs the internet. Nothing was saved.');
       }
       const res = await fetch(this.base + '/' + path, {
@@ -167,6 +393,7 @@ window.MF = window.MF || {};
             mergeMedicineCatalog(window.MF_DATA, extra);
           } catch (_) { /* bootstrap remains usable if the medicine endpoint is not deployed yet */ }
           MF.snapSave({ data: window.MF_DATA, feats: MF._feats, prms: MF._prms, me: MF._me });
+          MF.Off.bootOnline();
           return window.MF_DATA;
         })
         .catch(async (e) => {
@@ -180,6 +407,7 @@ window.MF = window.MF || {};
             if (snap.prms) MF._prms = snap.prms;
             if (snap.me) MF._me = snap.me;
             MF._offlineBanner();
+            Promise.resolve(MF.Off.bootOffline()).then(() => MF.Off.replayJournal()).then(() => MF.Off.paint()).catch(() => { });
           }
           console.warn('[Optms Rx] Backend unreachable —', (snap && snap.data) ? 'serving last synced data (offline).' : 'offline with no snapshot; demo data only.', e.message);
           return window.MF_DATA;
@@ -540,6 +768,7 @@ window.MF = window.MF || {};
         { label: 'Roles & Permissions', icon: 'shield-lock', href: 'settings.php?tab=roles' },
         { label: 'Store Settings', icon: 'shop', href: 'settings.php?tab=store' },
         { label: 'WhatsApp', icon: 'whatsapp', page: 'whatsapp', href: 'whatsapp.php' },
+        { label: 'Offline Billing', icon: 'wifi-off', page: 'offline-admin', href: 'offline-admin.php' },
         { label: 'Invoice Settings', icon: 'file-earmark-text', href: 'settings.php?tab=invoice' },
         { label: 'Tax Settings', icon: 'calculator', href: 'settings.php?tab=tax' },
         { label: 'Audit Logs', icon: 'journal-check', href: 'settings.php?tab=audit' },

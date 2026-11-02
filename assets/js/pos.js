@@ -2885,6 +2885,16 @@
   async function completeSale() {
     if (state.tenderOpen) { document.getElementById('posTenderOk')?.click(); return; }
     if (state.completing) { MF.toast('The last sale is still being finished — one moment.', 'info', 'Busy'); return; }
+    /* Offline till: unlock first, and controlled-schedule lines never bill
+       without the register being live (server re-checks at sync too). */
+    if (navigator.onLine === false && MF.Off && MF.Off.armed) {
+      if (!MF.Off.unlocked && sessionStorage.getItem('mf-off-ok') !== '1') { MF.Off.gate(); return; }
+      const badSch = state.cart.some((l) => {
+        const m = (typeof MF.med === 'function' ? MF.med(l.medId) : null) || {};
+        return /\b(H1|X|NDPS)\b/i.test(String(m.schedule || ''));
+      });
+      if (badSch) { MF.toast('Schedule H1/X/NDPS items cannot be billed offline — the register must be live. Remove the line or wait for the internet.', 'warn', 'Not allowed offline'); return; }
+    }
     if (!state.cart.length) { MF.toast('Cart is empty', 'warn', 'Cannot complete sale'); return; }
     // Schedule H/H1/X/NDPS in the cart → doctor and patient details are mandatory.
     const sch = autoRxSchedule();
@@ -2967,6 +2977,7 @@
         splitUpi: state.split.upi,
         cashReceived: tender.cashReceived,
         changeReturned: tender.changeReturned,
+        _meta: { grandTotal: Number(t.grand) || 0, due: state.payment === 'credit' ? (Number(t.grand) || 0) : 0 },
         items: state.cart.map((l) => ({ medId: l.medId, batchId: l.batchId, qty: l.qty, rate: l.rate, discPct: l.discPct, unit: l.unit || 'pack' })),
       });
       saleOk = true;
@@ -2978,7 +2989,9 @@
       }
       saveLastBill(res.invoiceNo, t);
       paintLastBill();
-      MF.toast(`${res.invoiceNo} · ${MF.fmt(res.grandTotal)} · ${state.payment.toUpperCase()}`, 'success', 'Sale completed');
+      MF.toast(res.offline
+        ? `${res.invoiceNo} saved on this device · will sync automatically when the internet returns`
+        : `${res.invoiceNo} · ${MF.fmt(res.grandTotal)} · ${state.payment.toUpperCase()}`, 'success', res.offline ? 'Offline sale' : 'Sale completed');
       if (state.lossApproved && state.lossApproved.length) {
         MF.Api.post('sale-audit.php', {
           event: 'BELOW_COST_SALE',
