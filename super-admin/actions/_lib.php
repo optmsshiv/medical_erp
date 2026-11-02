@@ -86,6 +86,7 @@ const CLIENT_FEATURE_GROUPS = [
     ],
     'Administration' => [
         'menu_whatsapp' => ['WhatsApp page', 'Customer numbers & due-reminder control'],
+        'menu_offline_billing' => ['Offline Billing page', 'Offline POS policy, pairing & hold queue'],
     ],
 ];
 
